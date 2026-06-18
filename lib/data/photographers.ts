@@ -242,6 +242,53 @@ export async function getPortfolioItems(photographerId: string): Promise<Portfol
   }));
 }
 
+export async function getPublicPortfolioItem(
+  photographerId: string,
+  portfolioItemId: string
+): Promise<PortfolioItem | undefined> {
+  if (!canUseDatabase()) {
+    return undefined;
+  }
+
+  const item = await prisma.photographerPortfolioItem.findFirst({
+    where: {
+      id: portfolioItemId,
+      photographerId,
+      photographer: {
+        status: "PUBLISHED",
+        user: {
+          email: {
+            notIn: demoPhotographerEmails
+          }
+        }
+      }
+    },
+    include: {
+      albumImages: {
+        orderBy: { sortOrder: "asc" }
+      }
+    }
+  });
+
+  if (!item) {
+    return undefined;
+  }
+
+  return {
+    id: item.id,
+    imageUrl: item.imageUrl,
+    imagePublicId: item.imagePublicId ?? undefined,
+    title: item.title ?? "",
+    description: item.description ?? "",
+    albumImages: item.albumImages.map((image) => ({
+      id: image.id,
+      imageUrl: image.imageUrl,
+      imagePublicId: image.imagePublicId ?? undefined,
+      sortOrder: image.sortOrder
+    }))
+  };
+}
+
 export async function getPhotographerAvailabilitySlots(
   photographerId: string
 ): Promise<DashboardAvailabilitySlot[]> {

@@ -107,7 +107,7 @@ async function PhotographerDetail({ params, searchParams }: PhotographerDetailPa
             <p className="mt-2 text-sm text-muted-foreground">
               Откройте работу, чтобы посмотреть все фотографии внутри альбома.
             </p>
-            <PortfolioGallery items={portfolioItems} />
+            <PortfolioGallery photographerId={photographer.id} items={portfolioItems} />
           </div>
           <Card>
             <CardHeader>
