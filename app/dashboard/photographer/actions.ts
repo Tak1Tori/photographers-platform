@@ -18,6 +18,9 @@ const placeholderImage =
 
 type ActionResult = { success: boolean; error?: string };
 
+const customStyleImage =
+  "https://images.unsplash.com/photo-1452780212940-6f5c0d14d848?auto=format&fit=crop&w=1200&q=80";
+
 async function requirePhotographerProfile() {
   const session = await getSession();
 
@@ -41,6 +44,87 @@ async function requirePhotographerProfile() {
   }
 
   return { session, profile };
+}
+
+export async function createCustomPhotographerStyleAction(
+  formData: FormData
+): Promise<ActionResult> {
+  try {
+    const { profile } = await requirePhotographerProfile();
+    const name = String(formData.get("styleName") ?? "")
+      .trim()
+      .replace(/\s+/g, " ");
+
+    if (name.length < 2 || name.length > 60) {
+      return {
+        success: false,
+        error: "Название стиля должно содержать от 2 до 60 символов."
+      };
+    }
+
+    if (!canUseDatabase()) {
+      return {
+        success: false,
+        error: "Для добавления нового стиля требуется подключение к базе данных."
+      };
+    }
+
+    await prisma.$transaction(async (transaction) => {
+      let style = await transaction.style.findFirst({
+        where: {
+          name: {
+            equals: name,
+            mode: "insensitive"
+          }
+        },
+        select: {
+          id: true
+        }
+      });
+
+      if (!style) {
+        const baseSlug = slugifyStyleName(name);
+        let slug = baseSlug;
+        let suffix = 2;
+
+        while (await transaction.style.findUnique({ where: { slug }, select: { id: true } })) {
+          slug = `${baseSlug}-${suffix}`;
+          suffix += 1;
+        }
+
+        style = await transaction.style.create({
+          data: {
+            name,
+            slug,
+            description: "Пользовательский стиль съемки",
+            startingPrice:
+              "hourlyRate" in profile ? profile.hourlyRate : profile.pricePerHour,
+            imageUrl: customStyleImage
+          },
+          select: {
+            id: true
+          }
+        });
+      }
+
+      await transaction.photographerProfile.update({
+        where: { id: profile.id },
+        data: {
+          styles: {
+            connect: { id: style.id }
+          }
+        }
+      });
+    });
+
+    revalidatePath("/dashboard/photographer");
+    revalidatePath("/styles");
+    revalidatePath("/photographers");
+    revalidatePath(`/photographers/${profile.id}`);
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: getErrorMessage(error) };
+  }
 }
 
 export async function updatePhotographerProfileAction(formData: FormData): Promise<ActionResult> {
@@ -555,4 +639,54 @@ function isValidStatusTransition(current: BookingStatus, next: BookingStatus) {
 
 function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : "Unexpected error";
+}
+
+function slugifyStyleName(value: string) {
+  const transliteration: Record<string, string> = {
+    а: "a",
+    б: "b",
+    в: "v",
+    г: "g",
+    д: "d",
+    е: "e",
+    ё: "e",
+    ж: "zh",
+    з: "z",
+    и: "i",
+    й: "y",
+    к: "k",
+    л: "l",
+    м: "m",
+    н: "n",
+    о: "o",
+    п: "p",
+    р: "r",
+    с: "s",
+    т: "t",
+    у: "u",
+    ф: "f",
+    х: "h",
+    ц: "c",
+    ч: "ch",
+    ш: "sh",
+    щ: "sch",
+    ъ: "",
+    ы: "y",
+    ь: "",
+    э: "e",
+    ю: "yu",
+    я: "ya"
+  };
+  const transliterated = value
+    .toLocaleLowerCase("ru")
+    .split("")
+    .map((character) => transliteration[character] ?? character)
+    .join("");
+  const slug = transliterated
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
+  return slug || `custom-style-${Date.now()}`;
 }

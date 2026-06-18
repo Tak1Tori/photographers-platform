@@ -3,9 +3,10 @@
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Fragment, useState, useTransition } from "react";
-import { Check, ImagePlus, Plus, Save, Trash2 } from "lucide-react";
+import { Check, ImagePlus, Plus, Save, Trash2, X } from "lucide-react";
 import {
   createPhotographerAvailabilitySlotAction,
+  createCustomPhotographerStyleAction,
   createPortfolioItemAction,
   createPortfolioItemWithUploadAction,
   deleteAvailabilitySlotAction,
@@ -58,6 +59,8 @@ export function PhotographerDashboardManager({
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [state, setState] = useState<ActionState>(null);
+  const [showCustomStyle, setShowCustomStyle] = useState(false);
+  const [customStyleName, setCustomStyleName] = useState("");
 
   function run(area: string, action: (formData: FormData) => Promise<{ success: boolean; error?: string }>) {
     return (formData: FormData) => {
@@ -74,6 +77,29 @@ export function PhotographerDashboardManager({
         }
       });
     };
+  }
+
+  function createCustomStyle() {
+    const formData = new FormData();
+    formData.set("styleName", customStyleName);
+    setState(null);
+
+    startTransition(async () => {
+      const result = await createCustomPhotographerStyleAction(formData);
+      setState({
+        area: "style-create",
+        success: result.success,
+        message: result.success
+          ? "Стиль добавлен и выбран."
+          : result.error ?? "Не удалось добавить стиль."
+      });
+
+      if (result.success) {
+        setCustomStyleName("");
+        setShowCustomStyle(false);
+        router.refresh();
+      }
+    });
   }
 
   return (
@@ -136,7 +162,52 @@ export function PhotographerDashboardManager({
                     {style.title}
                   </label>
                 ))}
+                <div className="flex items-center">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={isPending || !databaseReady}
+                    onClick={() => setShowCustomStyle((visible) => !visible)}
+                  >
+                    {showCustomStyle ? (
+                      <X className="size-4" aria-hidden="true" />
+                    ) : (
+                      <Plus className="size-4" aria-hidden="true" />
+                    )}
+                    {showCustomStyle ? "Отмена" : "Другие"}
+                  </Button>
+                </div>
               </div>
+              {showCustomStyle ? (
+                <div className="flex flex-col gap-2 rounded-md border border-emerald-500/30 bg-emerald-500/5 p-3 sm:flex-row">
+                  <input
+                    type="text"
+                    aria-label="Название нового стиля"
+                    placeholder="Например, спортивная съемка"
+                    value={customStyleName}
+                    maxLength={60}
+                    className={inputClass}
+                    onChange={(event) => setCustomStyleName(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        createCustomStyle();
+                      }
+                    }}
+                  />
+                  <Button
+                    type="button"
+                    disabled={isPending || customStyleName.trim().length < 2 || !databaseReady}
+                    onClick={createCustomStyle}
+                    className="shrink-0"
+                  >
+                    <Plus className="size-4" aria-hidden="true" />
+                    Добавить стиль
+                  </Button>
+                </div>
+              ) : null}
+              <Message state={state} area="style-create" />
             </div>
             <Button disabled={isPending || !databaseReady} className="w-fit">
               <Save className="size-4" aria-hidden="true" />
