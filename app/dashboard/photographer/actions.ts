@@ -128,12 +128,17 @@ export async function createCustomPhotographerStyleAction(
 }
 
 export async function updatePhotographerProfileAction(formData: FormData): Promise<ActionResult> {
+  let newAvatarPublicId: string | undefined;
+  let avatarSaved = false;
+
   try {
     const { profile } = await requirePhotographerProfile();
     const name = String(formData.get("name") ?? "").trim();
     const city = String(formData.get("city") ?? "").trim();
     const bio = String(formData.get("bio") ?? "").trim();
-    const avatarUrl = String(formData.get("avatarUrl") ?? "").trim() || placeholderImage;
+    const avatarFile = formData.get("avatar") as File | null;
+    const hasNewAvatar = Boolean(avatarFile?.size);
+    let avatarUrl = String(formData.get("avatarUrl") ?? "").trim() || placeholderImage;
     const hourlyRate = Number(formData.get("hourlyRate") ?? 0);
     const styleSlugs = Array.from(
       new Set(
@@ -153,7 +158,20 @@ export async function updatePhotographerProfileAction(formData: FormData): Promi
       return { success: false, error: "Цена за час должна быть положительным числом." };
     }
 
+    if (hasNewAvatar && avatarFile) {
+      const validation = validateImageFile(avatarFile);
+
+      if (!validation.valid) {
+        return { success: false, error: validation.error };
+      }
+
+      const uploaded = await uploadImageToCloudinary(avatarFile, "photographers/avatars");
+      avatarUrl = uploaded.secureUrl;
+      newAvatarPublicId = uploaded.publicId;
+    }
+
     if (!canUseDatabase()) {
+      const oldPublicId = "avatarPublicId" in profile ? profile.avatarPublicId : undefined;
       await updateDevStore((store) => ({
         ...store,
         photographerProfile: {
@@ -162,10 +180,15 @@ export async function updatePhotographerProfileAction(formData: FormData): Promi
           city,
           bio,
           avatarUrl,
+          avatarPublicId: newAvatarPublicId ?? store.photographerProfile.avatarPublicId,
           pricePerHour: hourlyRate,
           specializationIds: styleSlugs
         }
       }));
+      avatarSaved = true;
+      if (newAvatarPublicId) {
+        await deleteImageQuietly(oldPublicId);
+      }
       revalidatePath("/dashboard/photographer");
       revalidatePath("/photographers");
       return { success: true };
@@ -196,65 +219,30 @@ export async function updatePhotographerProfileAction(formData: FormData): Promi
         city,
         bio,
         avatarUrl,
+        avatarPublicId:
+          newAvatarPublicId ??
+          ("avatarPublicId" in profile ? profile.avatarPublicId : undefined),
         hourlyRate,
         styles: {
           set: existingStyles.map(({ slug }) => ({ slug }))
         }
       }
     });
+    avatarSaved = true;
 
-    revalidatePath("/dashboard/photographer");
-    revalidatePath("/photographers");
-    revalidatePath(`/photographers/${profile.id}`);
-    return { success: true };
-  } catch (error) {
-    return { success: false, error: getErrorMessage(error) };
-  }
-}
-
-export async function uploadPhotographerAvatarAction(formData: FormData): Promise<ActionResult> {
-  try {
-    const { profile } = await requirePhotographerProfile();
-    const file = formData.get("avatar") as File | null;
-    const validation = validateImageFile(file);
-
-    if (!validation.valid || !file) {
-      return { success: false, error: validation.error };
-    }
-
-    const uploaded = await uploadImageToCloudinary(file, "photographers/avatars");
-
-    if (!canUseDatabase()) {
+    if (newAvatarPublicId) {
       const oldPublicId = "avatarPublicId" in profile ? profile.avatarPublicId : undefined;
-      await updateDevStore((store) => ({
-        ...store,
-        photographerProfile: {
-          ...store.photographerProfile,
-          avatarUrl: uploaded.secureUrl,
-          avatarPublicId: uploaded.publicId
-        }
-      }));
-      await deleteImageFromCloudinary(oldPublicId);
-      revalidatePath("/dashboard/photographer");
-      revalidatePath("/photographers");
-      return { success: true };
+      await deleteImageQuietly(oldPublicId);
     }
-
-    const oldPublicId = "avatarPublicId" in profile ? profile.avatarPublicId : undefined;
-    await prisma.photographerProfile.update({
-      where: { id: profile.id },
-      data: {
-        avatarUrl: uploaded.secureUrl,
-        avatarPublicId: uploaded.publicId
-      }
-    });
-    await deleteImageFromCloudinary(oldPublicId);
 
     revalidatePath("/dashboard/photographer");
     revalidatePath("/photographers");
     revalidatePath(`/photographers/${profile.id}`);
     return { success: true };
   } catch (error) {
+    if (newAvatarPublicId && !avatarSaved) {
+      await deleteImageQuietly(newAvatarPublicId);
+    }
     return { success: false, error: getErrorMessage(error) };
   }
 }
@@ -365,18 +353,45 @@ export async function createPortfolioItemWithUploadAction(
 }
 
 export async function updatePortfolioItemAction(formData: FormData): Promise<ActionResult> {
+  let newImagePublicId: string | undefined;
+  let imageSaved = false;
+
   try {
     const { profile } = await requirePhotographerProfile();
     const id = String(formData.get("id") ?? "");
-    const imageUrl = String(formData.get("imageUrl") ?? "").trim() || placeholderImage;
+    const imageFile = formData.get("image") as File | null;
+    const hasNewImage = Boolean(imageFile?.size);
+    let imageUrl = String(formData.get("imageUrl") ?? "").trim() || placeholderImage;
     const title = String(formData.get("title") ?? "").trim();
     const description = String(formData.get("description") ?? "").trim();
 
+    if (hasNewImage && imageFile) {
+      const validation = validateImageFile(imageFile);
+
+      if (!validation.valid) {
+        return { success: false, error: validation.error };
+      }
+
+      const uploaded = await uploadImageToCloudinary(imageFile, "photographers/portfolio");
+      imageUrl = uploaded.secureUrl;
+      newImagePublicId = uploaded.publicId;
+    }
+
     if (!canUseDatabase()) {
+      const store = await getDevStore();
+      const oldPublicId = store.portfolioItems.find((item) => item.id === id)?.imagePublicId;
       await updateDevStore((store) => ({
         ...store,
         portfolioItems: store.portfolioItems.map((item) =>
-          item.id === id ? { ...item, imageUrl, title, description } : item
+          item.id === id
+            ? {
+                ...item,
+                imageUrl,
+                imagePublicId: newImagePublicId ?? item.imagePublicId,
+                title,
+                description
+              }
+            : item
         ),
         photographerProfile: {
           ...store.photographerProfile,
@@ -385,6 +400,10 @@ export async function updatePortfolioItemAction(formData: FormData): Promise<Act
           )
         }
       }));
+      imageSaved = true;
+      if (newImagePublicId) {
+        await deleteImageQuietly(oldPublicId);
+      }
       revalidatePath("/dashboard/photographer");
       revalidatePath("/photographers");
       return { success: true };
@@ -398,13 +417,26 @@ export async function updatePortfolioItemAction(formData: FormData): Promise<Act
 
     await prisma.photographerPortfolioItem.update({
       where: { id },
-      data: { imageUrl, title, description }
+      data: {
+        imageUrl,
+        imagePublicId: newImagePublicId ?? item.imagePublicId,
+        title,
+        description
+      }
     });
+    imageSaved = true;
+
+    if (newImagePublicId) {
+      await deleteImageQuietly(item.imagePublicId);
+    }
 
     revalidatePath("/dashboard/photographer");
     revalidatePath(`/photographers/${profile.id}`);
     return { success: true };
   } catch (error) {
+    if (newImagePublicId && !imageSaved) {
+      await deleteImageQuietly(newImagePublicId);
+    }
     return { success: false, error: getErrorMessage(error) };
   }
 }
@@ -639,6 +671,14 @@ function isValidStatusTransition(current: BookingStatus, next: BookingStatus) {
 
 function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : "Unexpected error";
+}
+
+async function deleteImageQuietly(publicId?: string | null) {
+  try {
+    await deleteImageFromCloudinary(publicId);
+  } catch {
+    // The database already points to the new image, so cleanup must not fail the save.
+  }
 }
 
 function slugifyStyleName(value: string) {

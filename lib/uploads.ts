@@ -1,7 +1,11 @@
 import type { UploadApiResponse } from "cloudinary";
+import { randomUUID } from "crypto";
+import { mkdir, unlink, writeFile } from "fs/promises";
+import path from "path";
 import {
   configureCloudinary,
   deleteCloudinaryImage,
+  hasCloudinaryConfig,
   type CloudinaryUploadResult
 } from "@/lib/cloudinary";
 
@@ -32,6 +36,10 @@ export async function uploadImageToCloudinary(
 
   if (!validation.valid) {
     throw new Error(validation.error);
+  }
+
+  if (!hasCloudinaryConfig()) {
+    return saveImageLocally(file, folder);
   }
 
   const client = configureCloudinary();
@@ -67,4 +75,58 @@ export async function uploadImageToCloudinary(
   };
 }
 
-export { deleteCloudinaryImage as deleteImageFromCloudinary };
+export async function deleteImageFromCloudinary(publicId?: string | null) {
+  if (!publicId) {
+    return;
+  }
+
+  if (publicId.startsWith("local:")) {
+    const relativePath = publicId.slice("local:".length);
+    const uploadsRoot = path.join(process.cwd(), "public", "uploads");
+    const absolutePath = path.resolve(uploadsRoot, relativePath);
+
+    if (!absolutePath.startsWith(`${uploadsRoot}${path.sep}`)) {
+      return;
+    }
+
+    try {
+      await unlink(absolutePath);
+    } catch {
+      // The file may already be gone; database cleanup should still succeed.
+    }
+    return;
+  }
+
+  await deleteCloudinaryImage(publicId);
+}
+
+async function saveImageLocally(file: File, folder: string): Promise<CloudinaryUploadResult> {
+  const extensionByType: Record<string, string> = {
+    "image/jpeg": "jpg",
+    "image/png": "png",
+    "image/webp": "webp"
+  };
+  const safeFolder = folder
+    .split("/")
+    .map((part) => part.replace(/[^a-z0-9-]/gi, ""))
+    .filter(Boolean)
+    .join("/");
+  const extension = extensionByType[file.type] ?? "jpg";
+  const fileName = `${randomUUID()}.${extension}`;
+  const relativePath = path.posix.join(safeFolder, fileName);
+  const directory = path.join(process.cwd(), "public", "uploads", safeFolder);
+  const absolutePath = path.join(directory, fileName);
+  const buffer = Buffer.from(await file.arrayBuffer());
+
+  await mkdir(directory, { recursive: true });
+  await writeFile(absolutePath, buffer);
+
+  return {
+    secureUrl: `/uploads/${relativePath}`,
+    publicId: `local:${relativePath}`,
+    width: 0,
+    height: 0,
+    format: extension,
+    bytes: buffer.length
+  };
+}

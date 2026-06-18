@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Fragment, useState, useTransition } from "react";
 import { Check, ImagePlus, Plus, Save, Trash2, X } from "lucide-react";
@@ -14,13 +13,11 @@ import {
   updateAvailabilitySlotAction,
   updatePhotographerBookingStatusAction,
   updatePhotographerProfileAction,
-  updatePortfolioItemAction,
-  uploadPhotographerAvatarAction
+  updatePortfolioItemAction
 } from "@/app/dashboard/photographer/actions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusBadge } from "@/components/dashboard/status-badge";
-import { ImagePreview } from "@/components/uploads/image-preview";
 import { ImageUploadField } from "@/components/uploads/image-upload-field";
 import { UploadButton } from "@/components/uploads/upload-button";
 import { EQUIPMENT_OPTIONS, LOCATION_TYPES, SHOOT_TYPES, getOptionLabel } from "@/lib/booking-options";
@@ -119,35 +116,30 @@ export function PhotographerDashboardManager({
           </div>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-6">
-            <form action={run("avatar", uploadPhotographerAvatarAction)} className="grid gap-4 rounded-lg border border-border p-4 md:grid-cols-[220px_1fr]">
-              <ImagePreview src={profile.avatarUrl} alt={profile.name} aspect="aspect-square" />
-              <div className="grid content-start gap-3">
-                <Message state={state} area="avatar" />
+          <form action={run("profile", updatePhotographerProfileAction)} className="grid gap-6">
+            <Message state={state} area="profile" />
+            <div className="grid gap-4 rounded-lg border border-border p-4 md:grid-cols-[220px_1fr] md:items-start">
+              <div className="max-w-[220px]">
                 <ImageUploadField
                   name="avatar"
-                  label="Avatar image"
+                  label="Новый аватар"
                   currentUrl={profile.avatarUrl}
                   previewAlt={profile.name}
                 />
-                <UploadButton pending={isPending} disabled={!databaseReady}>
-                  Upload avatar
-                </UploadButton>
               </div>
-            </form>
-
-          <form action={run("profile", updatePhotographerProfileAction)} className="grid gap-4">
-            <Message state={state} area="profile" />
-            <div className="grid gap-4 md:grid-cols-2">
-              <Field label="Имя" name="name" defaultValue={profile.name} />
-              <Field label="Город" name="city" defaultValue={profile.city} />
+              <div className="grid gap-4">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <Field label="Имя" name="name" defaultValue={profile.name} />
+                  <Field label="Город" name="city" defaultValue={profile.city} />
+                </div>
+                <Field label="Avatar URL" name="avatarUrl" defaultValue={profile.avatarUrl ?? ""} />
+                <Field label="Цена за час" name="hourlyRate" type="number" defaultValue={String(profile.pricePerHour)} />
+                <label className="grid gap-2 text-sm font-medium">
+                  Описание
+                  <textarea name="bio" defaultValue={profile.bio} className={textareaClass} />
+                </label>
+              </div>
             </div>
-            <Field label="Avatar URL" name="avatarUrl" defaultValue={profile.avatarUrl ?? ""} />
-            <Field label="Цена за час" name="hourlyRate" type="number" defaultValue={String(profile.pricePerHour)} />
-            <label className="grid gap-2 text-sm font-medium">
-              Описание
-              <textarea name="bio" defaultValue={profile.bio} className={textareaClass} />
-            </label>
             <div className="grid gap-2">
               <p className="text-sm font-medium">Стили съемки</p>
               <div className="grid gap-2 rounded-md border border-border p-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -209,12 +201,11 @@ export function PhotographerDashboardManager({
               ) : null}
               <Message state={state} area="style-create" />
             </div>
-            <Button disabled={isPending || !databaseReady} className="w-fit">
+            <Button disabled={isPending || !databaseReady} className="w-full sm:w-fit sm:justify-self-end">
               <Save className="size-4" aria-hidden="true" />
-              Save changes
+              {isPending ? "Сохраняем..." : "Сохранить изменения"}
             </Button>
           </form>
-          </div>
         </CardContent>
       </Card>
 
@@ -258,18 +249,21 @@ export function PhotographerDashboardManager({
                   className="overflow-hidden rounded-lg border border-border"
                 >
                   <input type="hidden" name="id" value={item.id} />
-                  <div className="relative aspect-[4/3]">
-                    <Image src={item.imageUrl} alt={item.title || "Portfolio item"} fill className="object-cover" />
-                  </div>
                   <div className="grid gap-3 p-4">
                     <Message state={state} area={`portfolio-${item.id}`} />
+                    <ImageUploadField
+                      name="image"
+                      label="Заменить изображение"
+                      currentUrl={item.imageUrl}
+                      previewAlt={item.title || "Portfolio item"}
+                    />
                     <Field label="Image URL" name="imageUrl" defaultValue={item.imageUrl} />
                     <Field label="Title" name="title" defaultValue={item.title} />
                     <Field label="Description" name="description" defaultValue={item.description} />
                     <div className="flex flex-wrap gap-2">
                       <Button disabled={isPending || !databaseReady} size="sm" variant="outline">
                         <Check className="size-4" aria-hidden="true" />
-                        Edit
+                        Сохранить
                       </Button>
                       <Button
                         disabled={isPending || !databaseReady}
