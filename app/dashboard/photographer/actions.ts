@@ -51,7 +51,15 @@ export async function updatePhotographerProfileAction(formData: FormData): Promi
     const bio = String(formData.get("bio") ?? "").trim();
     const avatarUrl = String(formData.get("avatarUrl") ?? "").trim() || placeholderImage;
     const hourlyRate = Number(formData.get("hourlyRate") ?? 0);
-    const styleIds = formData.getAll("styleIds").map(String);
+    const styleSlugs = Array.from(
+      new Set(
+        formData
+          .getAll("styleIds")
+          .map(String)
+          .map((slug) => slug.trim())
+          .filter(Boolean)
+      )
+    );
 
     if (!name || !city || !bio) {
       return { success: false, error: "Заполните имя, город и описание." };
@@ -71,12 +79,30 @@ export async function updatePhotographerProfileAction(formData: FormData): Promi
           bio,
           avatarUrl,
           pricePerHour: hourlyRate,
-          specializationIds: styleIds
+          specializationIds: styleSlugs
         }
       }));
       revalidatePath("/dashboard/photographer");
       revalidatePath("/photographers");
       return { success: true };
+    }
+
+    const existingStyles = await prisma.style.findMany({
+      where: {
+        slug: {
+          in: styleSlugs
+        }
+      },
+      select: {
+        slug: true
+      }
+    });
+
+    if (existingStyles.length !== styleSlugs.length) {
+      return {
+        success: false,
+        error: "Некоторые выбранные стили больше недоступны. Обновите страницу и попробуйте снова."
+      };
     }
 
     await prisma.photographerProfile.update({
@@ -88,7 +114,7 @@ export async function updatePhotographerProfileAction(formData: FormData): Promi
         avatarUrl,
         hourlyRate,
         styles: {
-          set: styleIds.map((id) => ({ id }))
+          set: existingStyles.map(({ slug }) => ({ slug }))
         }
       }
     });
