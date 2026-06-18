@@ -190,6 +190,19 @@ model PhotographerPortfolioItem {
   description    String?
   createdAt      DateTime            @default(now())
   photographer   PhotographerProfile @relation(fields: [photographerId], references: [id], onDelete: Cascade)
+  albumImages    PhotographerPortfolioImage[]
+}
+
+model PhotographerPortfolioImage {
+  id              String                    @id @default(cuid())
+  portfolioItemId String
+  imageUrl        String
+  imagePublicId   String?
+  sortOrder       Int                       @default(0)
+  createdAt       DateTime                  @default(now())
+  portfolioItem   PhotographerPortfolioItem @relation(fields: [portfolioItemId], references: [id], onDelete: Cascade)
+
+  @@index([portfolioItemId, sortOrder])
 }
 
 model StudioProfile {

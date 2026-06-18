@@ -113,6 +113,14 @@ export interface PortfolioItem {
   imagePublicId?: string;
   title: string;
   description: string;
+  albumImages: PortfolioAlbumImage[];
+}
+
+export interface PortfolioAlbumImage {
+  id: string;
+  imageUrl: string;
+  imagePublicId?: string;
+  sortOrder: number;
 }
 
 export interface Photographer {

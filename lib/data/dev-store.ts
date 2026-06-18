@@ -27,7 +27,8 @@ const defaultStore: DevStore = {
     id: `dev-portfolio-${index + 1}`,
     imageUrl,
     title: `Portfolio ${index + 1}`,
-    description: "Dev portfolio item"
+    description: "Dev portfolio item",
+    albumImages: []
   })),
   photographerSlots: [],
   studioProfile: mockStudioProfile,

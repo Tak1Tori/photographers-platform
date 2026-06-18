@@ -16,6 +16,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusBadge } from "@/components/dashboard/status-badge";
+import { AlbumContentField } from "@/components/uploads/album-content-field";
 import { ImageUploadField } from "@/components/uploads/image-upload-field";
 import { EQUIPMENT_OPTIONS, LOCATION_TYPES, SHOOT_TYPES, getOptionLabel } from "@/lib/booking-options";
 import { formatPrice } from "@/lib/mock-data";
@@ -221,6 +222,7 @@ export function PhotographerDashboardManager({
               <div className="grid content-start gap-3">
                 <Field label="Название" name="newPortfolioTitle" />
                 <Field label="Описание" name="newPortfolioDescription" />
+                <AlbumContentField name="newAlbumImages" />
                 <p className="text-sm text-muted-foreground">
                   Новая работа появится в портфолио после общего сохранения.
                 </p>
@@ -248,6 +250,10 @@ export function PhotographerDashboardManager({
                       label="Описание"
                       name={`portfolioDescription:${item.id}`}
                       defaultValue={item.description}
+                    />
+                    <AlbumContentField
+                      name={`albumImages:${item.id}`}
+                      existingImages={item.albumImages}
                     />
                     <Button
                       disabled={isPending || !databaseReady}

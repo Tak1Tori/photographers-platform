@@ -8,6 +8,8 @@ import { getDevStore, updateDevStore } from "@/lib/data/dev-store";
 import { notifyBookingStatusChanged } from "@/lib/notifications/notification-service";
 import { prisma } from "@/lib/prisma";
 import {
+  albumImageMaxBytes,
+  albumUploadMaxBytes,
   deleteImageFromCloudinary,
   uploadImageToCloudinary,
   validateImageFile
@@ -262,7 +264,8 @@ export async function createPortfolioItemAction(formData: FormData): Promise<Act
             id: `dev-portfolio-${Date.now()}`,
             imageUrl,
             title,
-            description
+            description,
+            albumImages: []
           },
           ...store.portfolioItems
         ],
@@ -319,7 +322,8 @@ export async function createPortfolioItemWithUploadAction(
             imageUrl: uploaded.secureUrl,
             imagePublicId: uploaded.publicId,
             title,
-            description
+            description,
+            albumImages: []
           },
           ...store.portfolioItems
         ],
@@ -456,11 +460,15 @@ export async function savePhotographerPortfolioAction(
     const newTitle = String(formData.get("newPortfolioTitle") ?? "").trim();
     const newDescription = String(formData.get("newPortfolioDescription") ?? "").trim();
     const hasNewFile = Boolean(newFile?.size);
+    const newAlbumFiles = getFiles(formData, "newAlbumImages");
+    const removedAlbumImageIds = Array.from(
+      new Set(formData.getAll("removeAlbumImageIds").map(String).filter(Boolean))
+    );
 
-    if (!hasNewFile && (newTitle || newDescription)) {
+    if (!hasNewFile && (newTitle || newDescription || newAlbumFiles.length)) {
       return {
         success: false,
-        error: "Чтобы добавить новую работу, выберите изображение."
+        error: "Чтобы создать новый альбом, выберите обложку."
       };
     }
 
@@ -468,12 +476,39 @@ export async function savePhotographerPortfolioAction(
       id,
       title: String(formData.get(`portfolioTitle:${id}`) ?? "").trim(),
       description: String(formData.get(`portfolioDescription:${id}`) ?? "").trim(),
-      file: formData.get(`portfolioImage:${id}`) as File | null
+      file: formData.get(`portfolioImage:${id}`) as File | null,
+      albumFiles: getFiles(formData, `albumImages:${id}`)
     }));
+    const allNewAlbumFiles = [
+      ...newAlbumFiles,
+      ...existingInputs.flatMap((input) => input.albumFiles)
+    ];
+
+    if (
+      allNewAlbumFiles.reduce((total, file) => total + file.size, 0) >
+      albumUploadMaxBytes
+    ) {
+      return {
+        success: false,
+        error: "За одно сохранение можно загрузить не более 120 МБ содержимого альбомов."
+      };
+    }
+    if (newAlbumFiles.length > 20) {
+      return {
+        success: false,
+        error: "В одном альбоме может быть не более 20 изображений."
+      };
+    }
 
     for (const input of existingInputs) {
       if (input.file?.size) {
         const validation = validateImageFile(input.file);
+        if (!validation.valid) {
+          return { success: false, error: validation.error };
+        }
+      }
+      for (const albumFile of input.albumFiles) {
+        const validation = validateImageFile(albumFile, albumImageMaxBytes);
         if (!validation.valid) {
           return { success: false, error: validation.error };
         }
@@ -486,6 +521,12 @@ export async function savePhotographerPortfolioAction(
         return { success: false, error: validation.error };
       }
     }
+    for (const albumFile of newAlbumFiles) {
+      const validation = validateImageFile(albumFile, albumImageMaxBytes);
+      if (!validation.valid) {
+        return { success: false, error: validation.error };
+      }
+    }
 
     if (!canUseDatabase()) {
       const store = await getDevStore();
@@ -494,10 +535,34 @@ export async function savePhotographerPortfolioAction(
       if (ownedItems.length !== itemIds.length) {
         return { success: false, error: "Некоторые работы портфолио не найдены." };
       }
+      const ownedAlbumImageIds = new Set(
+        ownedItems.flatMap((item) => item.albumImages.map((image) => image.id))
+      );
+      if (removedAlbumImageIds.some((id) => !ownedAlbumImageIds.has(id))) {
+        return { success: false, error: "Некоторые кадры альбома не найдены." };
+      }
+      for (const input of existingInputs) {
+        const item = ownedItems.find((candidate) => candidate.id === input.id);
+        const remainingCount =
+          (item?.albumImages.length ?? 0) -
+          (item?.albumImages.filter((image) =>
+            removedAlbumImageIds.includes(image.id)
+          ).length ?? 0);
+        if (remainingCount + input.albumFiles.length > 20) {
+          return {
+            success: false,
+            error: "В одном альбоме может быть не более 20 изображений."
+          };
+        }
+      }
 
       const replacements = new Map<
         string,
         { secureUrl: string; publicId: string }
+      >();
+      const albumUploads = new Map<
+        string,
+        Array<{ secureUrl: string; publicId: string }>
       >();
 
       for (const input of existingInputs) {
@@ -509,6 +574,19 @@ export async function savePhotographerPortfolioAction(
         replacements.set(input.id, uploaded);
         uploadedPublicIds.push(uploaded.publicId);
       }
+      for (const input of existingInputs) {
+        const uploads: Array<{ secureUrl: string; publicId: string }> = [];
+        for (const albumFile of input.albumFiles) {
+          const uploaded = await uploadImageToCloudinary(
+            albumFile,
+            "photographers/albums",
+            albumImageMaxBytes
+          );
+          uploads.push(uploaded);
+          uploadedPublicIds.push(uploaded.publicId);
+        }
+        albumUploads.set(input.id, uploads);
+      }
 
       const uploadedNew =
         hasNewFile && newFile
@@ -516,6 +594,16 @@ export async function savePhotographerPortfolioAction(
           : null;
       if (uploadedNew) {
         uploadedPublicIds.push(uploadedNew.publicId);
+      }
+      const uploadedNewAlbum: Array<{ secureUrl: string; publicId: string }> = [];
+      for (const albumFile of newAlbumFiles) {
+        const uploaded = await uploadImageToCloudinary(
+          albumFile,
+          "photographers/albums",
+          albumImageMaxBytes
+        );
+        uploadedNewAlbum.push(uploaded);
+        uploadedPublicIds.push(uploaded.publicId);
       }
 
       const oldPublicIds: Array<string | undefined> = [];
@@ -527,12 +615,28 @@ export async function savePhotographerPortfolioAction(
           if (replacement) {
             oldPublicIds.push(item.imagePublicId);
           }
+          const removedImages = item.albumImages.filter((image) =>
+            removedAlbumImageIds.includes(image.id)
+          );
+          oldPublicIds.push(...removedImages.map((image) => image.imagePublicId));
+          const remainingAlbumImages = item.albumImages.filter(
+            (image) => !removedAlbumImageIds.includes(image.id)
+          );
+          const uploadedAlbumImages = (albumUploads.get(item.id) ?? []).map(
+            (image, index) => ({
+              id: `dev-album-${Date.now()}-${item.id}-${index}`,
+              imageUrl: image.secureUrl,
+              imagePublicId: image.publicId,
+              sortOrder: remainingAlbumImages.length + index
+            })
+          );
           return {
             ...item,
             imageUrl: replacement?.secureUrl ?? item.imageUrl,
             imagePublicId: replacement?.publicId ?? item.imagePublicId,
             title: input.title,
-            description: input.description
+            description: input.description,
+            albumImages: [...remainingAlbumImages, ...uploadedAlbumImages]
           };
         });
 
@@ -542,7 +646,13 @@ export async function savePhotographerPortfolioAction(
             imageUrl: uploadedNew.secureUrl,
             imagePublicId: uploadedNew.publicId,
             title: newTitle,
-            description: newDescription
+            description: newDescription,
+            albumImages: uploadedNewAlbum.map((image, index) => ({
+              id: `dev-album-${Date.now()}-new-${index}`,
+              imageUrl: image.secureUrl,
+              imagePublicId: image.publicId,
+              sortOrder: index
+            }))
           });
         }
 
@@ -562,16 +672,39 @@ export async function savePhotographerPortfolioAction(
         where: {
           id: { in: itemIds },
           photographerId: profile.id
-        }
+        },
+        include: { albumImages: true }
       });
 
       if (existingItems.length !== itemIds.length) {
         return { success: false, error: "Некоторые работы портфолио не найдены." };
       }
-
+      const ownedAlbumImages = existingItems.flatMap((item) => item.albumImages);
+      const ownedAlbumImageIds = new Set(ownedAlbumImages.map((image) => image.id));
+      if (removedAlbumImageIds.some((id) => !ownedAlbumImageIds.has(id))) {
+        return { success: false, error: "Некоторые кадры альбома не найдены." };
+      }
+      for (const input of existingInputs) {
+        const item = existingItems.find((candidate) => candidate.id === input.id);
+        const remainingCount =
+          (item?.albumImages.length ?? 0) -
+          (item?.albumImages.filter((image) =>
+            removedAlbumImageIds.includes(image.id)
+          ).length ?? 0);
+        if (remainingCount + input.albumFiles.length > 20) {
+          return {
+            success: false,
+            error: "В одном альбоме может быть не более 20 изображений."
+          };
+        }
+      }
       const replacements = new Map<
         string,
         { secureUrl: string; publicId: string }
+      >();
+      const albumUploads = new Map<
+        string,
+        Array<{ secureUrl: string; publicId: string }>
       >();
 
       for (const input of existingInputs) {
@@ -583,6 +716,19 @@ export async function savePhotographerPortfolioAction(
         replacements.set(input.id, uploaded);
         uploadedPublicIds.push(uploaded.publicId);
       }
+      for (const input of existingInputs) {
+        const uploads: Array<{ secureUrl: string; publicId: string }> = [];
+        for (const albumFile of input.albumFiles) {
+          const uploaded = await uploadImageToCloudinary(
+            albumFile,
+            "photographers/albums",
+            albumImageMaxBytes
+          );
+          uploads.push(uploaded);
+          uploadedPublicIds.push(uploaded.publicId);
+        }
+        albumUploads.set(input.id, uploads);
+      }
 
       const uploadedNew =
         hasNewFile && newFile
@@ -591,10 +737,31 @@ export async function savePhotographerPortfolioAction(
       if (uploadedNew) {
         uploadedPublicIds.push(uploadedNew.publicId);
       }
+      const uploadedNewAlbum: Array<{ secureUrl: string; publicId: string }> = [];
+      for (const albumFile of newAlbumFiles) {
+        const uploaded = await uploadImageToCloudinary(
+          albumFile,
+          "photographers/albums",
+          albumImageMaxBytes
+        );
+        uploadedNewAlbum.push(uploaded);
+        uploadedPublicIds.push(uploaded.publicId);
+      }
 
       await prisma.$transaction(async (transaction) => {
+        if (removedAlbumImageIds.length) {
+          await transaction.photographerPortfolioImage.deleteMany({
+            where: { id: { in: removedAlbumImageIds } }
+          });
+        }
         for (const input of existingInputs) {
           const replacement = replacements.get(input.id);
+          const item = existingItems.find((candidate) => candidate.id === input.id);
+          const removedFromItem =
+            item?.albumImages.filter((image) =>
+              removedAlbumImageIds.includes(image.id)
+            ).length ?? 0;
+          const startOrder = (item?.albumImages.length ?? 0) - removedFromItem;
           await transaction.photographerPortfolioItem.update({
             where: { id: input.id },
             data: {
@@ -605,7 +772,14 @@ export async function savePhotographerPortfolioAction(
                     imageUrl: replacement.secureUrl,
                     imagePublicId: replacement.publicId
                   }
-                : {})
+                : {}),
+              albumImages: {
+                create: (albumUploads.get(input.id) ?? []).map((image, index) => ({
+                  imageUrl: image.secureUrl,
+                  imagePublicId: image.publicId,
+                  sortOrder: startOrder + index
+                }))
+              }
             }
           });
         }
@@ -617,7 +791,14 @@ export async function savePhotographerPortfolioAction(
               imageUrl: uploadedNew.secureUrl,
               imagePublicId: uploadedNew.publicId,
               title: newTitle,
-              description: newDescription
+              description: newDescription,
+              albumImages: {
+                create: uploadedNewAlbum.map((image, index) => ({
+                  imageUrl: image.secureUrl,
+                  imagePublicId: image.publicId,
+                  sortOrder: index
+                }))
+              }
             }
           });
         }
@@ -627,8 +808,13 @@ export async function savePhotographerPortfolioAction(
       const replacedOldPublicIds = existingItems
         .filter((item) => replacements.has(item.id))
         .map((item) => item.imagePublicId);
+      const removedAlbumPublicIds = ownedAlbumImages
+        .filter((image) => removedAlbumImageIds.includes(image.id))
+        .map((image) => image.imagePublicId);
       await Promise.all(
-        replacedOldPublicIds.map((publicId) => deleteImageQuietly(publicId))
+        [...replacedOldPublicIds, ...removedAlbumPublicIds].map((publicId) =>
+          deleteImageQuietly(publicId)
+        )
       );
     }
 
@@ -644,6 +830,12 @@ export async function savePhotographerPortfolioAction(
     }
     return { success: false, error: getErrorMessage(error) };
   }
+}
+
+function getFiles(formData: FormData, name: string) {
+  return formData
+    .getAll(name)
+    .filter((value): value is File => value instanceof File && value.size > 0);
 }
 
 export async function deletePortfolioItemAction(formData: FormData): Promise<ActionResult> {
@@ -664,12 +856,20 @@ export async function deletePortfolioItemAction(formData: FormData): Promise<Act
         }
       }));
       await deleteImageFromCloudinary(deletedItem?.imagePublicId);
+      await Promise.all(
+        (deletedItem?.albumImages ?? []).map((image) =>
+          deleteImageFromCloudinary(image.imagePublicId)
+        )
+      );
       revalidatePath("/dashboard/photographer");
       revalidatePath("/photographers");
       return { success: true };
     }
 
-    const item = await prisma.photographerPortfolioItem.findUnique({ where: { id } });
+    const item = await prisma.photographerPortfolioItem.findUnique({
+      where: { id },
+      include: { albumImages: true }
+    });
 
     if (!item || item.photographerId !== profile.id) {
       return { success: false, error: "Portfolio item not found." };
@@ -677,6 +877,9 @@ export async function deletePortfolioItemAction(formData: FormData): Promise<Act
 
     await prisma.photographerPortfolioItem.delete({ where: { id } });
     await deleteImageFromCloudinary(item.imagePublicId);
+    await Promise.all(
+      item.albumImages.map((image) => deleteImageFromCloudinary(image.imagePublicId))
+    );
 
     revalidatePath("/dashboard/photographer");
     revalidatePath(`/photographers/${profile.id}`);

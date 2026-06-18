@@ -11,8 +11,13 @@ import {
 
 const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
 const maxBytes = 5 * 1024 * 1024;
+export const albumImageMaxBytes = 25 * 1024 * 1024;
+export const albumUploadMaxBytes = 120 * 1024 * 1024;
 
-export function validateImageFile(file: File | null | undefined) {
+export function validateImageFile(
+  file: File | null | undefined,
+  sizeLimit = maxBytes
+) {
   if (!file || file.size === 0) {
     return { valid: false, error: "Выберите изображение." };
   }
@@ -21,8 +26,11 @@ export function validateImageFile(file: File | null | undefined) {
     return { valid: false, error: "Можно загружать только JPEG, PNG или WebP." };
   }
 
-  if (file.size > maxBytes) {
-    return { valid: false, error: "Размер изображения не должен превышать 5MB." };
+  if (file.size > sizeLimit) {
+    return {
+      valid: false,
+      error: `Размер изображения не должен превышать ${Math.round(sizeLimit / 1024 / 1024)} МБ.`
+    };
   }
 
   return { valid: true };
@@ -30,9 +38,10 @@ export function validateImageFile(file: File | null | undefined) {
 
 export async function uploadImageToCloudinary(
   file: File,
-  folder: string
+  folder: string,
+  sizeLimit = maxBytes
 ): Promise<CloudinaryUploadResult> {
-  const validation = validateImageFile(file);
+  const validation = validateImageFile(file, sizeLimit);
 
   if (!validation.valid) {
     throw new Error(validation.error);

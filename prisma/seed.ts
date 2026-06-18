@@ -243,7 +243,16 @@ async function main() {
           create: seed.portfolio.map((imageUrl, index) => ({
             imageUrl,
             title: `${seed.name} portfolio ${index + 1}`,
-            description: "Seed portfolio item"
+            description: "Seed portfolio item",
+            albumImages: {
+              create: seed.portfolio
+                .filter((_, albumIndex) => albumIndex !== index)
+                .slice(0, 3)
+                .map((albumImageUrl, albumIndex) => ({
+                  imageUrl: albumImageUrl,
+                  sortOrder: albumIndex
+                }))
+            }
           }))
         }
       },

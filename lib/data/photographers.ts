@@ -17,7 +17,13 @@ interface PhotographerFilters {
 
 const photographerInclude = {
   styles: true,
-  portfolioItems: true,
+  portfolioItems: {
+    include: {
+      albumImages: {
+        orderBy: { sortOrder: "asc" as const }
+      }
+    }
+  },
   availabilitySlots: true
 };
 
@@ -196,6 +202,11 @@ export async function getPortfolioItems(photographerId: string): Promise<Portfol
 
   const items = await prisma.photographerPortfolioItem.findMany({
     where: { photographerId },
+    include: {
+      albumImages: {
+        orderBy: { sortOrder: "asc" }
+      }
+    },
     orderBy: { createdAt: "desc" }
   });
 
@@ -204,7 +215,13 @@ export async function getPortfolioItems(photographerId: string): Promise<Portfol
     imageUrl: item.imageUrl,
     imagePublicId: item.imagePublicId ?? undefined,
     title: item.title ?? "",
-    description: item.description ?? ""
+    description: item.description ?? "",
+    albumImages: item.albumImages.map((image) => ({
+      id: image.id,
+      imageUrl: image.imageUrl,
+      imagePublicId: image.imagePublicId ?? undefined,
+      sortOrder: image.sortOrder
+    }))
   }));
 }
 
