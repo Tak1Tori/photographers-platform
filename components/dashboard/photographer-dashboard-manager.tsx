@@ -2,24 +2,21 @@
 
 import { useRouter } from "next/navigation";
 import { Fragment, useState, useTransition } from "react";
-import { Check, ImagePlus, Plus, Save, Trash2, X } from "lucide-react";
+import { Plus, Save, Trash2, X } from "lucide-react";
 import {
   createPhotographerAvailabilitySlotAction,
   createCustomPhotographerStyleAction,
-  createPortfolioItemAction,
-  createPortfolioItemWithUploadAction,
   deleteAvailabilitySlotAction,
   deletePortfolioItemAction,
+  savePhotographerPortfolioAction,
   updateAvailabilitySlotAction,
   updatePhotographerBookingStatusAction,
-  updatePhotographerProfileAction,
-  updatePortfolioItemAction
+  updatePhotographerProfileAction
 } from "@/app/dashboard/photographer/actions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusBadge } from "@/components/dashboard/status-badge";
 import { ImageUploadField } from "@/components/uploads/image-upload-field";
-import { UploadButton } from "@/components/uploads/upload-button";
 import { EQUIPMENT_OPTIONS, LOCATION_TYPES, SHOOT_TYPES, getOptionLabel } from "@/lib/booking-options";
 import { formatPrice } from "@/lib/mock-data";
 import type {
@@ -132,7 +129,6 @@ export function PhotographerDashboardManager({
                   <Field label="Имя" name="name" defaultValue={profile.name} />
                   <Field label="Город" name="city" defaultValue={profile.city} />
                 </div>
-                <Field label="Avatar URL" name="avatarUrl" defaultValue={profile.avatarUrl ?? ""} />
                 <Field label="Цена за час" name="hourlyRate" type="number" defaultValue={String(profile.pricePerHour)} />
                 <label className="grid gap-2 text-sm font-medium">
                   Описание
@@ -214,78 +210,73 @@ export function PhotographerDashboardManager({
           <CardTitle>Портфолио</CardTitle>
         </CardHeader>
         <CardContent className="grid gap-5">
-          <form action={run("portfolio-upload", createPortfolioItemWithUploadAction)} className="grid gap-3 rounded-lg border border-border p-4">
-            <Message state={state} area="portfolio-upload" />
-            <ImageUploadField name="image" label="Portfolio image" previewAlt="Portfolio preview" />
-            <div className="grid gap-3 md:grid-cols-2">
-              <Field label="Title" name="title" />
-              <Field label="Description" name="description" />
-            </div>
-            <UploadButton pending={isPending} disabled={!databaseReady}>
-              Add portfolio item
-            </UploadButton>
-          </form>
-          <form action={run("portfolio", createPortfolioItemAction)} className="grid gap-3 rounded-lg border border-border p-4">
+          <form action={run("portfolio", savePhotographerPortfolioAction)} className="grid gap-5">
             <Message state={state} area="portfolio" />
-            <p className="text-sm font-medium text-muted-foreground">Или вставьте image URL вручную</p>
-            <div className="grid gap-3 md:grid-cols-3">
-              <Field label="Image URL" name="imageUrl" />
-              <Field label="Title" name="title" />
-              <Field label="Description" name="description" />
+            <div className="grid gap-4 rounded-lg border border-border p-4 md:grid-cols-[minmax(220px,360px)_1fr]">
+              <ImageUploadField
+                name="newPortfolioImage"
+                label="Добавить новую работу"
+                previewAlt="Предпросмотр новой работы"
+              />
+              <div className="grid content-start gap-3">
+                <Field label="Название" name="newPortfolioTitle" />
+                <Field label="Описание" name="newPortfolioDescription" />
+                <p className="text-sm text-muted-foreground">
+                  Новая работа появится в портфолио после общего сохранения.
+                </p>
+              </div>
             </div>
-            <Button disabled={isPending || !databaseReady} size="sm" className="w-fit">
-              <ImagePlus className="size-4" aria-hidden="true" />
-              Add portfolio item
-            </Button>
-          </form>
-          {portfolioItems.length === 0 ? (
-            <EmptyText text="Портфолио пока пустое." />
-          ) : (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {portfolioItems.map((item) => (
-                <form
-                  key={item.id}
-                  action={run(`portfolio-${item.id}`, updatePortfolioItemAction)}
-                  className="overflow-hidden rounded-lg border border-border"
-                >
-                  <input type="hidden" name="id" value={item.id} />
-                  <div className="grid gap-3 p-4">
-                    <Message state={state} area={`portfolio-${item.id}`} />
+            {portfolioItems.length === 0 ? (
+              <EmptyText text="Портфолио пока пустое. Добавьте первую работу выше." />
+            ) : (
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {portfolioItems.map((item) => (
+                  <div key={item.id} className="grid gap-3 rounded-lg border border-border p-4">
+                    <input type="hidden" name="portfolioItemIds" value={item.id} />
                     <ImageUploadField
-                      name="image"
+                      name={`portfolioImage:${item.id}`}
                       label="Заменить изображение"
                       currentUrl={item.imageUrl}
                       previewAlt={item.title || "Portfolio item"}
                     />
-                    <Field label="Image URL" name="imageUrl" defaultValue={item.imageUrl} />
-                    <Field label="Title" name="title" defaultValue={item.title} />
-                    <Field label="Description" name="description" defaultValue={item.description} />
-                    <div className="flex flex-wrap gap-2">
-                      <Button disabled={isPending || !databaseReady} size="sm" variant="outline">
-                        <Check className="size-4" aria-hidden="true" />
-                        Сохранить
-                      </Button>
-                      <Button
-                        disabled={isPending || !databaseReady}
-                        size="sm"
-                        variant="outline"
-                        type="button"
-                        onClick={() => {
-                          if (!window.confirm("Удалить portfolio item?")) return;
-                          const data = new FormData();
-                          data.set("id", item.id);
-                          run("portfolio", deletePortfolioItemAction)(data);
-                        }}
-                      >
-                        <Trash2 className="size-4" aria-hidden="true" />
-                        Delete
-                      </Button>
-                    </div>
+                    <Field
+                      label="Название"
+                      name={`portfolioTitle:${item.id}`}
+                      defaultValue={item.title}
+                    />
+                    <Field
+                      label="Описание"
+                      name={`portfolioDescription:${item.id}`}
+                      defaultValue={item.description}
+                    />
+                    <Button
+                      disabled={isPending || !databaseReady}
+                      size="sm"
+                      variant="outline"
+                      type="button"
+                      className="w-fit"
+                      onClick={() => {
+                        if (!window.confirm("Удалить работу из портфолио?")) return;
+                        const data = new FormData();
+                        data.set("id", item.id);
+                        run("portfolio", deletePortfolioItemAction)(data);
+                      }}
+                    >
+                      <Trash2 className="size-4" aria-hidden="true" />
+                      Удалить
+                    </Button>
                   </div>
-                </form>
-              ))}
-            </div>
-          )}
+                ))}
+              </div>
+            )}
+            <Button
+              disabled={isPending || !databaseReady}
+              className="w-full sm:w-fit sm:justify-self-end"
+            >
+              <Save className="size-4" aria-hidden="true" />
+              {isPending ? "Сохраняем..." : "Сохранить изменения"}
+            </Button>
+          </form>
         </CardContent>
       </Card>
 

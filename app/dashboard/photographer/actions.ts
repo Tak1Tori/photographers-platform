@@ -138,7 +138,7 @@ export async function updatePhotographerProfileAction(formData: FormData): Promi
     const bio = String(formData.get("bio") ?? "").trim();
     const avatarFile = formData.get("avatar") as File | null;
     const hasNewAvatar = Boolean(avatarFile?.size);
-    let avatarUrl = String(formData.get("avatarUrl") ?? "").trim() || placeholderImage;
+    let avatarUrl = profile.avatarUrl || placeholderImage;
     const hourlyRate = Number(formData.get("hourlyRate") ?? 0);
     const styleSlugs = Array.from(
       new Set(
@@ -436,6 +436,211 @@ export async function updatePortfolioItemAction(formData: FormData): Promise<Act
   } catch (error) {
     if (newImagePublicId && !imageSaved) {
       await deleteImageQuietly(newImagePublicId);
+    }
+    return { success: false, error: getErrorMessage(error) };
+  }
+}
+
+export async function savePhotographerPortfolioAction(
+  formData: FormData
+): Promise<ActionResult> {
+  const uploadedPublicIds: string[] = [];
+  let changesSaved = false;
+
+  try {
+    const { profile } = await requirePhotographerProfile();
+    const itemIds = Array.from(
+      new Set(formData.getAll("portfolioItemIds").map(String).filter(Boolean))
+    );
+    const newFile = formData.get("newPortfolioImage") as File | null;
+    const newTitle = String(formData.get("newPortfolioTitle") ?? "").trim();
+    const newDescription = String(formData.get("newPortfolioDescription") ?? "").trim();
+    const hasNewFile = Boolean(newFile?.size);
+
+    if (!hasNewFile && (newTitle || newDescription)) {
+      return {
+        success: false,
+        error: "Чтобы добавить новую работу, выберите изображение."
+      };
+    }
+
+    const existingInputs = itemIds.map((id) => ({
+      id,
+      title: String(formData.get(`portfolioTitle:${id}`) ?? "").trim(),
+      description: String(formData.get(`portfolioDescription:${id}`) ?? "").trim(),
+      file: formData.get(`portfolioImage:${id}`) as File | null
+    }));
+
+    for (const input of existingInputs) {
+      if (input.file?.size) {
+        const validation = validateImageFile(input.file);
+        if (!validation.valid) {
+          return { success: false, error: validation.error };
+        }
+      }
+    }
+
+    if (hasNewFile && newFile) {
+      const validation = validateImageFile(newFile);
+      if (!validation.valid) {
+        return { success: false, error: validation.error };
+      }
+    }
+
+    if (!canUseDatabase()) {
+      const store = await getDevStore();
+      const ownedItems = store.portfolioItems.filter((item) => itemIds.includes(item.id));
+
+      if (ownedItems.length !== itemIds.length) {
+        return { success: false, error: "Некоторые работы портфолио не найдены." };
+      }
+
+      const replacements = new Map<
+        string,
+        { secureUrl: string; publicId: string }
+      >();
+
+      for (const input of existingInputs) {
+        if (!input.file?.size) continue;
+        const uploaded = await uploadImageToCloudinary(
+          input.file,
+          "photographers/portfolio"
+        );
+        replacements.set(input.id, uploaded);
+        uploadedPublicIds.push(uploaded.publicId);
+      }
+
+      const uploadedNew =
+        hasNewFile && newFile
+          ? await uploadImageToCloudinary(newFile, "photographers/portfolio")
+          : null;
+      if (uploadedNew) {
+        uploadedPublicIds.push(uploadedNew.publicId);
+      }
+
+      const oldPublicIds: Array<string | undefined> = [];
+      await updateDevStore((current) => {
+        const nextItems = current.portfolioItems.map((item) => {
+          const input = existingInputs.find((candidate) => candidate.id === item.id);
+          if (!input) return item;
+          const replacement = replacements.get(item.id);
+          if (replacement) {
+            oldPublicIds.push(item.imagePublicId);
+          }
+          return {
+            ...item,
+            imageUrl: replacement?.secureUrl ?? item.imageUrl,
+            imagePublicId: replacement?.publicId ?? item.imagePublicId,
+            title: input.title,
+            description: input.description
+          };
+        });
+
+        if (uploadedNew) {
+          nextItems.unshift({
+            id: `dev-portfolio-${Date.now()}`,
+            imageUrl: uploadedNew.secureUrl,
+            imagePublicId: uploadedNew.publicId,
+            title: newTitle,
+            description: newDescription
+          });
+        }
+
+        return {
+          ...current,
+          portfolioItems: nextItems,
+          photographerProfile: {
+            ...current.photographerProfile,
+            portfolio: nextItems.map((item) => item.imageUrl)
+          }
+        };
+      });
+      changesSaved = true;
+      await Promise.all(oldPublicIds.map((publicId) => deleteImageQuietly(publicId)));
+    } else {
+      const existingItems = await prisma.photographerPortfolioItem.findMany({
+        where: {
+          id: { in: itemIds },
+          photographerId: profile.id
+        }
+      });
+
+      if (existingItems.length !== itemIds.length) {
+        return { success: false, error: "Некоторые работы портфолио не найдены." };
+      }
+
+      const replacements = new Map<
+        string,
+        { secureUrl: string; publicId: string }
+      >();
+
+      for (const input of existingInputs) {
+        if (!input.file?.size) continue;
+        const uploaded = await uploadImageToCloudinary(
+          input.file,
+          "photographers/portfolio"
+        );
+        replacements.set(input.id, uploaded);
+        uploadedPublicIds.push(uploaded.publicId);
+      }
+
+      const uploadedNew =
+        hasNewFile && newFile
+          ? await uploadImageToCloudinary(newFile, "photographers/portfolio")
+          : null;
+      if (uploadedNew) {
+        uploadedPublicIds.push(uploadedNew.publicId);
+      }
+
+      await prisma.$transaction(async (transaction) => {
+        for (const input of existingInputs) {
+          const replacement = replacements.get(input.id);
+          await transaction.photographerPortfolioItem.update({
+            where: { id: input.id },
+            data: {
+              title: input.title,
+              description: input.description,
+              ...(replacement
+                ? {
+                    imageUrl: replacement.secureUrl,
+                    imagePublicId: replacement.publicId
+                  }
+                : {})
+            }
+          });
+        }
+
+        if (uploadedNew) {
+          await transaction.photographerPortfolioItem.create({
+            data: {
+              photographerId: profile.id,
+              imageUrl: uploadedNew.secureUrl,
+              imagePublicId: uploadedNew.publicId,
+              title: newTitle,
+              description: newDescription
+            }
+          });
+        }
+      });
+      changesSaved = true;
+
+      const replacedOldPublicIds = existingItems
+        .filter((item) => replacements.has(item.id))
+        .map((item) => item.imagePublicId);
+      await Promise.all(
+        replacedOldPublicIds.map((publicId) => deleteImageQuietly(publicId))
+      );
+    }
+
+    revalidatePath("/dashboard/photographer");
+    revalidatePath("/photographers");
+    revalidatePath(`/photographers/${profile.id}`);
+    return { success: true };
+  } catch (error) {
+    if (!changesSaved) {
+      await Promise.all(
+        uploadedPublicIds.map((publicId) => deleteImageQuietly(publicId))
+      );
     }
     return { success: false, error: getErrorMessage(error) };
   }
