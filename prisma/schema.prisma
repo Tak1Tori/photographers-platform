@@ -1,0 +1,356 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  CLIENT
+  PHOTOGRAPHER
+  STUDIO_OWNER
+  ADMIN
+}
+
+enum ProfileStatus {
+  DRAFT
+  PUBLISHED
+  BLOCKED
+}
+
+enum HallStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+  DECLINED
+}
+
+enum BookingPaymentStatus {
+  UNPAID
+  DEPOSIT_PAID
+  PAID
+  REFUNDED
+  FAILED
+}
+
+enum BookingType {
+  FULL_SHOOT
+  PHOTOGRAPHER_ONLY
+  STUDIO_ONLY
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  CANCELLED
+  REFUNDED
+}
+
+enum PaymentProvider {
+  MOCK
+  CLOUDPAYMENTS
+  KASPI
+  MANUAL
+}
+
+enum PaymentType {
+  DEPOSIT
+  FULL_PAYMENT
+  REFUND
+}
+
+enum NotificationType {
+  BOOKING_CREATED
+  DEPOSIT_PAID
+  BOOKING_CONFIRMED
+  BOOKING_DECLINED
+  BOOKING_CANCELLED
+  BOOKING_COMPLETED
+  RESCHEDULE_REQUESTED
+  REVIEW_CREATED
+  PAYMENT_REFUNDED
+  ADMIN_NOTICE
+}
+
+enum NotificationChannel {
+  IN_APP
+  MOCK_EMAIL
+  MOCK_TELEGRAM
+}
+
+enum NotificationDeliveryStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+model User {
+  id                  String               @id @default(cuid())
+  name                String
+  email               String               @unique
+  emailVerified       DateTime?
+  image               String?
+  phone               String?
+  passwordHash        String?
+  role                UserRole
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  accounts            Account[]
+  sessions            Session[]
+  photographerProfile PhotographerProfile?
+  studioProfiles      StudioProfile[]
+  bookings            Booking[]            @relation("ClientBookings")
+  notifications       Notification[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Style {
+  id            String                @id @default(cuid())
+  name          String
+  slug          String                @unique
+  description   String
+  startingPrice Int
+  imageUrl      String
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+  photographers PhotographerProfile[] @relation("PhotographerStyles")
+  bookings      Booking[]
+}
+
+model PhotographerProfile {
+  id                String                      @id @default(cuid())
+  userId            String                      @unique
+  name              String
+  city              String
+  bio               String
+  avatarUrl         String
+  avatarPublicId    String?
+  hourlyRate        Int
+  rating            Float                       @default(0)
+  status            ProfileStatus               @default(DRAFT)
+  createdAt         DateTime                    @default(now())
+  updatedAt         DateTime                    @updatedAt
+  user              User                        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  styles            Style[]                     @relation("PhotographerStyles")
+  portfolioItems    PhotographerPortfolioItem[]
+  availabilitySlots AvailabilitySlot[]
+  bookings          Booking[]
+  reviews           Review[]
+}
+
+model PhotographerPortfolioItem {
+  id             String              @id @default(cuid())
+  photographerId String
+  imageUrl       String
+  imagePublicId  String?
+  title          String?
+  description    String?
+  createdAt      DateTime            @default(now())
+  photographer   PhotographerProfile @relation(fields: [photographerId], references: [id], onDelete: Cascade)
+}
+
+model StudioProfile {
+  id          String          @id @default(cuid())
+  ownerId     String
+  name        String
+  city        String
+  address     String
+  description String
+  imageUrl    String?
+  imagePublicId String?
+  rules       String
+  status      ProfileStatus   @default(DRAFT)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  owner       User            @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  halls       StudioHall[]
+  bookings    Booking[]
+  reviews     Review[]
+}
+
+model StudioHall {
+  id                String             @id @default(cuid())
+  studioId          String
+  name              String
+  description       String
+  capacity          Int
+  hourlyRate        Int
+  imageUrl          String
+  imagePublicId     String?
+  amenities         Json
+  status            HallStatus         @default(ACTIVE)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  studio            StudioProfile      @relation(fields: [studioId], references: [id], onDelete: Cascade)
+  availabilitySlots AvailabilitySlot[]
+  bookings          Booking[]
+}
+
+model AvailabilitySlot {
+  id             String               @id @default(cuid())
+  photographerId String?
+  studioHallId   String?
+  date           DateTime
+  startTime      String
+  endTime        String
+  isAvailable    Boolean              @default(true)
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+  photographer   PhotographerProfile? @relation(fields: [photographerId], references: [id], onDelete: Cascade)
+  studioHall     StudioHall?          @relation(fields: [studioHallId], references: [id], onDelete: Cascade)
+
+  @@index([photographerId])
+  @@index([studioHallId])
+}
+
+model Booking {
+  id                String              @id @default(cuid())
+  bookingNumber     String              @unique
+  clientName        String
+  clientEmail       String
+  clientPhone       String
+  clientId          String?
+  clientComment     String?
+  bookingType       BookingType         @default(FULL_SHOOT)
+  styleId           String?
+  photographerId    String?
+  studioId          String?
+  studioHallId      String?
+  shootType         String?
+  shootDescription  String?
+  locationType      String?
+  city              String?
+  district          String?
+  addressDetails    String?
+  peopleCount       Int?
+  equipmentNeeded   Json?
+  specialRequirements String?
+  rentalPurpose     String?
+  needsEquipment    Boolean?
+  selectedAmenities Json?
+  date              DateTime
+  startTime         String
+  endTime           String
+  durationHours     Int
+  photographerPrice Int
+  studioPrice       Int
+  serviceFee        Int
+  totalPrice        Int
+  depositAmount     Int                 @default(0)
+  paidAmount        Int                 @default(0)
+  remainingAmount   Int                 @default(0)
+  paymentStatus     BookingPaymentStatus @default(UNPAID)
+  rescheduleRequestedAt DateTime?
+  rescheduleComment String?
+  status            BookingStatus       @default(PENDING)
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  style             Style?              @relation(fields: [styleId], references: [id])
+  photographer      PhotographerProfile? @relation(fields: [photographerId], references: [id])
+  studio            StudioProfile?      @relation(fields: [studioId], references: [id])
+  studioHall        StudioHall?         @relation(fields: [studioHallId], references: [id])
+  client            User?               @relation("ClientBookings", fields: [clientId], references: [id], onDelete: SetNull)
+  payments          Payment[]
+  review            Review?
+}
+
+model Payment {
+  id                String          @id @default(cuid())
+  bookingId         String
+  amount            Int
+  currency          String          @default("KZT")
+  status            PaymentStatus   @default(PENDING)
+  provider          PaymentProvider @default(MOCK)
+  providerPaymentId String?
+  type              PaymentType     @default(DEPOSIT)
+  metadata          Json?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  booking           Booking         @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+}
+
+model Review {
+  id             String               @id @default(cuid())
+  bookingId      String               @unique
+  photographerId String?
+  studioId       String?
+  rating         Int
+  comment        String?
+  createdAt      DateTime             @default(now())
+  booking        Booking              @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  photographer   PhotographerProfile? @relation(fields: [photographerId], references: [id], onDelete: SetNull)
+  studio         StudioProfile?       @relation(fields: [studioId], references: [id], onDelete: SetNull)
+}
+
+model Notification {
+  id           String                    @id @default(cuid())
+  userId       String
+  type         NotificationType
+  title        String
+  message      String
+  linkUrl      String?
+  isRead       Boolean                   @default(false)
+  createdAt    DateTime                  @default(now())
+  updatedAt    DateTime                  @updatedAt
+  user         User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deliveryLogs NotificationDeliveryLog[]
+
+  @@index([userId, isRead, createdAt])
+  @@index([type])
+}
+
+model NotificationDeliveryLog {
+  id             String                     @id @default(cuid())
+  notificationId String
+  channel        NotificationChannel
+  status         NotificationDeliveryStatus @default(PENDING)
+  provider       String?
+  errorMessage   String?
+  createdAt      DateTime                   @default(now())
+  notification   Notification               @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+
+  @@index([notificationId])
+  @@index([channel, status])
+}

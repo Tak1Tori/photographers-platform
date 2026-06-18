@@ -1,0 +1,13 @@
+node_modules
+.next
+out
+dist
+.agents
+.data
+.DS_Store
+components/booking/new-flow/photographer-only-form 2.tsx
+components/booking/new-flow/studio-only-form 2.tsx
+.env
+.env*.local
+*.tsbuildinfo
+next-env.d.ts
