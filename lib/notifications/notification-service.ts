@@ -65,13 +65,16 @@ export async function markAllNotificationsAsRead(userId: string) {
   });
 }
 
-export async function getUserNotifications(userId: string): Promise<NotificationDTO[]> {
+export async function getUserNotifications(
+  userId: string,
+  limit = 50
+): Promise<NotificationDTO[]> {
   if (!canUseDatabase()) return [];
 
   const notifications = await prisma.notification.findMany({
     where: { userId },
     orderBy: { createdAt: "desc" },
-    take: 50
+    take: limit
   });
 
   return notifications.map(mapNotification);

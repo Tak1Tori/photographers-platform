@@ -28,6 +28,7 @@ export function PhotographerCard({ photographer, styleSlug, mode = "full-shoot" 
           src={photographer.imageUrl}
           alt={photographer.name}
           fill
+          sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
           className="object-cover"
         />
       </div>
@@ -55,7 +56,13 @@ export function PhotographerCard({ photographer, styleSlug, mode = "full-shoot" 
         <div className="mt-4 grid grid-cols-4 gap-2">
           {photographer.portfolio.slice(0, 4).map((imageUrl) => (
             <div key={imageUrl} className="relative aspect-square overflow-hidden rounded-md">
-              <Image src={imageUrl} alt="Preview портфолио" fill className="object-cover" />
+              <Image
+                src={imageUrl}
+                alt="Preview портфолио"
+                fill
+                sizes="96px"
+                className="object-cover"
+              />
             </div>
           ))}
         </div>

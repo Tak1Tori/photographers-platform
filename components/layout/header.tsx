@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Camera, LayoutDashboard, LogIn, UserPlus } from "lucide-react";
+import { Suspense } from "react";
 import { SignOutButton } from "@/components/auth/sign-out-button";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { Button } from "@/components/ui/button";
@@ -19,12 +20,6 @@ export async function Header() {
   const session = await getSession();
   const dashboardHref = getDashboardHref(session?.user.role);
   const dashboardLabel = session?.user.role === "CLIENT" ? "Мои брони" : "Кабинет";
-  const [notifications, unreadCount] = session?.user
-    ? await Promise.all([
-        getUserNotifications(session.user.id),
-        getUnreadNotificationsCount(session.user.id)
-      ])
-    : [[], 0];
 
   return (
     <header className="sticky top-0 z-50 border-b border-border/80 bg-background/90 backdrop-blur">
@@ -55,7 +50,9 @@ export async function Header() {
                   {dashboardLabel}
                 </Link>
               </Button>
-              <NotificationBell notifications={notifications.slice(0, 7)} unreadCount={unreadCount} />
+              <Suspense fallback={<NotificationBell notifications={[]} unreadCount={0} />}>
+                <HeaderNotifications userId={session.user.id} />
+              </Suspense>
               <SignOutButton />
             </>
           ) : (
@@ -77,5 +74,16 @@ export async function Header() {
         </div>
       </div>
     </header>
+  );
+}
+
+async function HeaderNotifications({ userId }: { userId: string }) {
+  const [notifications, unreadCount] = await Promise.all([
+    getUserNotifications(userId, 7),
+    getUnreadNotificationsCount(userId)
+  ]);
+
+  return (
+    <NotificationBell notifications={notifications} unreadCount={unreadCount} />
   );
 }

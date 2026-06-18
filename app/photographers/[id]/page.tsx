@@ -7,11 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PortfolioGallery } from "@/components/portfolio/portfolio-gallery";
 import { formatPrice, getStyleTitles } from "@/lib/mock-data";
 import {
-  getPhotographerById,
-  getPhotographerSlots,
-  getPortfolioItems
+  getPublicPhotographerPageData
 } from "@/lib/data/photographers";
-import { getStyleBySlug } from "@/lib/data/styles";
 
 interface PhotographerDetailPageProps {
   params: {
@@ -30,19 +27,18 @@ export default function PhotographerDetailPage({
 }
 
 async function PhotographerDetail({ params, searchParams }: PhotographerDetailPageProps) {
-  const photographer = await getPhotographerById(params.id);
+  const pageData = await getPublicPhotographerPageData(params.id);
 
-  if (!photographer) {
+  if (!pageData) {
     notFound();
   }
 
-  const [requestedStyle, fallbackStyle, slots, portfolioItems] = await Promise.all([
-    getStyleBySlug(searchParams.style),
-    getStyleBySlug(photographer.specializationIds[0]),
-    getPhotographerSlots(photographer.id),
-    getPortfolioItems(photographer.id)
-  ]);
-  const selectedStyle = requestedStyle ?? fallbackStyle;
+  const { photographer, portfolioItems, slots } = pageData;
+  const selectedStyleSlug =
+    searchParams.style &&
+    photographer.specializationIds.includes(searchParams.style)
+      ? searchParams.style
+      : photographer.specializationIds[0];
 
   return (
     <>
@@ -85,7 +81,7 @@ async function PhotographerDetail({ params, searchParams }: PhotographerDetailPa
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <Button asChild size="lg">
                 <Link
-                  href={`/studios?style=${selectedStyle?.id ?? photographer.specializationIds[0]}&photographer=${photographer.id}`}
+                  href={`/studios?style=${selectedStyleSlug}&photographer=${photographer.id}`}
                 >
                   <CalendarCheck className="size-4" aria-hidden="true" />
                   Выбрать этого фотографа

@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { unstable_cache } from "next/cache";
 import { mockPhotographerProfile } from "@/lib/mock-data";
 import { canUseDatabase } from "@/lib/data/db";
 import { getDevStore } from "@/lib/data/dev-store";
@@ -31,35 +32,138 @@ const photographerInclude = {
   availabilitySlots: true
 };
 
+const getCachedPublicPhotographers = unstable_cache(
+  async (style: string, city: string) => {
+    const photographers = await prisma.photographerProfile.findMany({
+      where: {
+        status: "PUBLISHED",
+        city: city || undefined,
+        user: {
+          email: {
+            notIn: demoPhotographerEmails
+          }
+        },
+        styles: style
+          ? {
+              some: {
+                slug: style
+              }
+            }
+          : undefined
+      },
+      select: {
+        id: true,
+        name: true,
+        city: true,
+        bio: true,
+        avatarUrl: true,
+        hourlyRate: true,
+        rating: true,
+        styles: {
+          select: {
+            slug: true
+          }
+        },
+        portfolioItems: {
+          select: {
+            imageUrl: true
+          },
+          orderBy: {
+            createdAt: "desc"
+          },
+          take: 4
+        }
+      },
+      orderBy: { rating: "desc" }
+    });
+
+    return photographers.map(mapPhotographer);
+  },
+  ["public-photographers-v1"],
+  { revalidate: 30 }
+);
+
 export async function getPhotographers(filters: PhotographerFilters = {}) {
   if (!canUseDatabase()) {
     return [];
   }
 
   try {
-    const photographers = await prisma.photographerProfile.findMany({
+    return getCachedPublicPhotographers(filters.style ?? "", filters.city ?? "");
+  } catch {
+    return [];
+  }
+}
+
+const getCachedPublicPhotographerPageData = unstable_cache(
+  async (id: string) => {
+    const profile = await prisma.photographerProfile.findFirst({
       where: {
+        id,
         status: "PUBLISHED",
-        city: filters.city,
         user: {
           email: {
             notIn: demoPhotographerEmails
           }
+        }
+      },
+      select: {
+        id: true,
+        name: true,
+        city: true,
+        bio: true,
+        avatarUrl: true,
+        hourlyRate: true,
+        rating: true,
+        styles: {
+          select: {
+            slug: true
+          }
         },
-        styles: filters.style
-          ? {
-              some: {
-                slug: filters.style
+        portfolioItems: {
+          include: {
+            albumImages: {
+              orderBy: {
+                sortOrder: "asc"
               }
             }
-          : undefined
-      },
-      include: photographerInclude,
-      orderBy: { rating: "desc" }
+          },
+          orderBy: {
+            createdAt: "desc"
+          }
+        },
+        availabilitySlots: {
+          where: {
+            isAvailable: true
+          },
+          orderBy: [{ date: "asc" }, { startTime: "asc" }]
+        }
+      }
     });
-    return photographers.map(mapPhotographer);
+
+    if (!profile) {
+      return undefined;
+    }
+
+    return {
+      photographer: mapPhotographer(profile),
+      portfolioItems: profile.portfolioItems.map(mapPortfolioItem),
+      slots: mapSlots(profile.availabilitySlots)
+    };
+  },
+  ["public-photographer-page-v1"],
+  { revalidate: 30 }
+);
+
+export async function getPublicPhotographerPageData(id: string) {
+  if (!canUseDatabase()) {
+    return undefined;
+  }
+
+  try {
+    return await getCachedPublicPhotographerPageData(id);
   } catch {
-    return [];
+    return undefined;
   }
 }
 
@@ -289,6 +393,69 @@ export async function getPublicPortfolioItem(
   };
 }
 
+const getCachedPublicAlbumPageData = unstable_cache(
+  async (photographerId: string, portfolioItemId: string) => {
+    const item = await prisma.photographerPortfolioItem.findFirst({
+      where: {
+        id: portfolioItemId,
+        photographerId,
+        photographer: {
+          status: "PUBLISHED",
+          user: {
+            email: {
+              notIn: demoPhotographerEmails
+            }
+          }
+        }
+      },
+      select: {
+        id: true,
+        imageUrl: true,
+        imagePublicId: true,
+        title: true,
+        description: true,
+        photographer: {
+          select: {
+            id: true,
+            name: true
+          }
+        },
+        albumImages: {
+          orderBy: {
+            sortOrder: "asc"
+          }
+        }
+      }
+    });
+
+    if (!item) {
+      return undefined;
+    }
+
+    return {
+      photographer: item.photographer,
+      album: mapPortfolioItem(item)
+    };
+  },
+  ["public-photographer-album-v1"],
+  { revalidate: 30 }
+);
+
+export async function getPublicAlbumPageData(
+  photographerId: string,
+  portfolioItemId: string
+) {
+  if (!canUseDatabase()) {
+    return undefined;
+  }
+
+  try {
+    return await getCachedPublicAlbumPageData(photographerId, portfolioItemId);
+  } catch {
+    return undefined;
+  }
+}
+
 export async function getPhotographerAvailabilitySlots(
   photographerId: string
 ): Promise<DashboardAvailabilitySlot[]> {
@@ -337,4 +504,32 @@ function mapProfileStatus(status: string): PhotographerProfile["status"] {
     BLOCKED: "Blocked"
   };
   return map[status] ?? "Draft";
+}
+
+function mapPortfolioItem(item: {
+  id: string;
+  imageUrl: string;
+  imagePublicId: string | null;
+  title: string | null;
+  description: string | null;
+  albumImages: Array<{
+    id: string;
+    imageUrl: string;
+    imagePublicId: string | null;
+    sortOrder: number;
+  }>;
+}): PortfolioItem {
+  return {
+    id: item.id,
+    imageUrl: item.imageUrl,
+    imagePublicId: item.imagePublicId ?? undefined,
+    title: item.title ?? "",
+    description: item.description ?? "",
+    albumImages: item.albumImages.map((image) => ({
+      id: image.id,
+      imageUrl: image.imageUrl,
+      imagePublicId: image.imagePublicId ?? undefined,
+      sortOrder: image.sortOrder
+    }))
+  };
 }

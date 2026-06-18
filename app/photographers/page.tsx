@@ -13,12 +13,14 @@ interface PhotographersPageProps {
 
 export default async function PhotographersPage({ searchParams }: PhotographersPageProps) {
   const isBookingMode = searchParams.mode === "booking";
-  const selectedStyle = await getStyleBySlug(searchParams.style);
-  const filteredPhotographers = isBookingMode
-    ? await getPhotographers()
-    : selectedStyle
-    ? await getPhotographersByStyle(selectedStyle.id)
-    : [];
+  const [selectedStyle, filteredPhotographers] = await Promise.all([
+    getStyleBySlug(searchParams.style),
+    isBookingMode
+      ? getPhotographers()
+      : searchParams.style
+        ? getPhotographersByStyle(searchParams.style)
+        : Promise.resolve([])
+  ]);
 
   return (
     <>

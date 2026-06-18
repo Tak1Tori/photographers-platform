@@ -5,8 +5,7 @@ import { notFound } from "next/navigation";
 import { AlbumPhotoGrid } from "@/components/portfolio/album-photo-grid";
 import { Button } from "@/components/ui/button";
 import {
-  getPhotographerById,
-  getPublicPortfolioItem
+  getPublicAlbumPageData
 } from "@/lib/data/photographers";
 
 interface AlbumPageProps {
@@ -17,14 +16,12 @@ interface AlbumPageProps {
 }
 
 export default async function PhotographerAlbumPage({ params }: AlbumPageProps) {
-  const [photographer, album] = await Promise.all([
-    getPhotographerById(params.id),
-    getPublicPortfolioItem(params.id, params.albumId)
-  ]);
+  const pageData = await getPublicAlbumPageData(params.id, params.albumId);
 
-  if (!photographer || !album) {
+  if (!pageData) {
     notFound();
   }
+  const { photographer, album } = pageData;
 
   return (
     <>
