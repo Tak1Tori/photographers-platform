@@ -1,9 +1,0 @@
-ALTER TABLE "Booking" DROP CONSTRAINT IF EXISTS "Booking_styleId_fkey";
-
-ALTER TABLE "Booking"
-  ALTER COLUMN "styleId" DROP NOT NULL;
-
-ALTER TABLE "Booking"
-  ADD CONSTRAINT "Booking_styleId_fkey"
-  FOREIGN KEY ("styleId") REFERENCES "Style"("id")
-  ON DELETE SET NULL ON UPDATE CASCADE;

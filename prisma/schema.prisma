@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 enum UserRole {
@@ -192,22 +193,22 @@ model PhotographerPortfolioItem {
 }
 
 model StudioProfile {
-  id          String          @id @default(cuid())
-  ownerId     String
-  name        String
-  city        String
-  address     String
-  description String
-  imageUrl    String?
+  id            String        @id @default(cuid())
+  ownerId       String
+  name          String
+  city          String
+  address       String
+  description   String
+  imageUrl      String?
   imagePublicId String?
-  rules       String
-  status      ProfileStatus   @default(DRAFT)
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
-  owner       User            @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  halls       StudioHall[]
-  bookings    Booking[]
-  reviews     Review[]
+  rules         String
+  status        ProfileStatus @default(DRAFT)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  owner         User          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  halls         StudioHall[]
+  bookings      Booking[]
+  reviews       Review[]
 }
 
 model StudioHall {
@@ -246,54 +247,54 @@ model AvailabilitySlot {
 }
 
 model Booking {
-  id                String              @id @default(cuid())
-  bookingNumber     String              @unique
-  clientName        String
-  clientEmail       String
-  clientPhone       String
-  clientId          String?
-  clientComment     String?
-  bookingType       BookingType         @default(FULL_SHOOT)
-  styleId           String?
-  photographerId    String?
-  studioId          String?
-  studioHallId      String?
-  shootType         String?
-  shootDescription  String?
-  locationType      String?
-  city              String?
-  district          String?
-  addressDetails    String?
-  peopleCount       Int?
-  equipmentNeeded   Json?
-  specialRequirements String?
-  rentalPurpose     String?
-  needsEquipment    Boolean?
-  selectedAmenities Json?
-  date              DateTime
-  startTime         String
-  endTime           String
-  durationHours     Int
-  photographerPrice Int
-  studioPrice       Int
-  serviceFee        Int
-  totalPrice        Int
-  depositAmount     Int                 @default(0)
-  paidAmount        Int                 @default(0)
-  remainingAmount   Int                 @default(0)
-  paymentStatus     BookingPaymentStatus @default(UNPAID)
+  id                    String               @id @default(cuid())
+  bookingNumber         String               @unique
+  clientName            String
+  clientEmail           String
+  clientPhone           String
+  clientId              String?
+  clientComment         String?
+  bookingType           BookingType          @default(FULL_SHOOT)
+  styleId               String?
+  photographerId        String?
+  studioId              String?
+  studioHallId          String?
+  shootType             String?
+  shootDescription      String?
+  locationType          String?
+  city                  String?
+  district              String?
+  addressDetails        String?
+  peopleCount           Int?
+  equipmentNeeded       Json?
+  specialRequirements   String?
+  rentalPurpose         String?
+  needsEquipment        Boolean?
+  selectedAmenities     Json?
+  date                  DateTime
+  startTime             String
+  endTime               String
+  durationHours         Int
+  photographerPrice     Int
+  studioPrice           Int
+  serviceFee            Int
+  totalPrice            Int
+  depositAmount         Int                  @default(0)
+  paidAmount            Int                  @default(0)
+  remainingAmount       Int                  @default(0)
+  paymentStatus         BookingPaymentStatus @default(UNPAID)
   rescheduleRequestedAt DateTime?
-  rescheduleComment String?
-  status            BookingStatus       @default(PENDING)
-  createdAt         DateTime            @default(now())
-  updatedAt         DateTime            @updatedAt
-  style             Style?              @relation(fields: [styleId], references: [id])
-  photographer      PhotographerProfile? @relation(fields: [photographerId], references: [id])
-  studio            StudioProfile?      @relation(fields: [studioId], references: [id])
-  studioHall        StudioHall?         @relation(fields: [studioHallId], references: [id])
-  client            User?               @relation("ClientBookings", fields: [clientId], references: [id], onDelete: SetNull)
-  payments          Payment[]
-  review            Review?
+  rescheduleComment     String?
+  status                BookingStatus        @default(PENDING)
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+  style                 Style?               @relation(fields: [styleId], references: [id])
+  photographer          PhotographerProfile? @relation(fields: [photographerId], references: [id])
+  studio                StudioProfile?       @relation(fields: [studioId], references: [id])
+  studioHall            StudioHall?          @relation(fields: [studioHallId], references: [id])
+  client                User?                @relation("ClientBookings", fields: [clientId], references: [id], onDelete: SetNull)
+  payments              Payment[]
+  review                Review?
 }
 
 model Payment {
