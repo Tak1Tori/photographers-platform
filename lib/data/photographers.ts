@@ -1,9 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import {
-  getPhotographerById as getMockPhotographerById,
-  mockPhotographerProfile,
-  photographers as mockPhotographers
-} from "@/lib/mock-data";
+import { mockPhotographerProfile } from "@/lib/mock-data";
 import { canUseDatabase } from "@/lib/data/db";
 import { getDevStore } from "@/lib/data/dev-store";
 import { mapPhotographer } from "@/lib/data/mappers";
@@ -14,6 +10,14 @@ interface PhotographerFilters {
   style?: string;
   city?: string;
 }
+
+const demoPhotographerEmails = [
+  "photographer@photo-booking.local",
+  "timur@example.com",
+  "maya@example.com",
+  "daniyar@example.com",
+  "leila@example.com"
+];
 
 const photographerInclude = {
   styles: true,
@@ -29,9 +33,7 @@ const photographerInclude = {
 
 export async function getPhotographers(filters: PhotographerFilters = {}) {
   if (!canUseDatabase()) {
-    return mockPhotographers.filter((photographer) =>
-      filters.style ? photographer.specializationIds.includes(filters.style) : true
-    );
+    return [];
   }
 
   try {
@@ -39,6 +41,11 @@ export async function getPhotographers(filters: PhotographerFilters = {}) {
       where: {
         status: "PUBLISHED",
         city: filters.city,
+        user: {
+          email: {
+            notIn: demoPhotographerEmails
+          }
+        },
         styles: filters.style
           ? {
               some: {
@@ -50,15 +57,9 @@ export async function getPhotographers(filters: PhotographerFilters = {}) {
       include: photographerInclude,
       orderBy: { rating: "desc" }
     });
-    return photographers.length > 0
-      ? photographers.map(mapPhotographer)
-      : mockPhotographers.filter((photographer) =>
-          filters.style ? photographer.specializationIds.includes(filters.style) : true
-        );
+    return photographers.map(mapPhotographer);
   } catch {
-    return mockPhotographers.filter((photographer) =>
-      filters.style ? photographer.specializationIds.includes(filters.style) : true
-    );
+    return [];
   }
 }
 
@@ -68,17 +69,25 @@ export async function getPhotographerById(id?: string) {
   }
 
   if (!canUseDatabase()) {
-    return getMockPhotographerById(id);
+    return undefined;
   }
 
   try {
-    const photographer = await prisma.photographerProfile.findUnique({
-      where: { id },
+    const photographer = await prisma.photographerProfile.findFirst({
+      where: {
+        id,
+        status: "PUBLISHED",
+        user: {
+          email: {
+            notIn: demoPhotographerEmails
+          }
+        }
+      },
       include: photographerInclude
     });
-    return photographer ? mapPhotographer(photographer) : getMockPhotographerById(id);
+    return photographer ? mapPhotographer(photographer) : undefined;
   } catch {
-    return getMockPhotographerById(id);
+    return undefined;
   }
 }
 
@@ -88,17 +97,25 @@ export async function getPhotographerForBooking(id?: string) {
   }
 
   if (!canUseDatabase()) {
-    return getMockPhotographerById(id);
+    return undefined;
   }
 
   try {
     const photographer = await prisma.photographerProfile.findFirst({
-      where: { id, status: "PUBLISHED" },
+      where: {
+        id,
+        status: "PUBLISHED",
+        user: {
+          email: {
+            notIn: demoPhotographerEmails
+          }
+        }
+      },
       include: photographerInclude
     });
     return photographer ? mapPhotographer(photographer) : undefined;
   } catch {
-    return getMockPhotographerById(id);
+    return undefined;
   }
 }
 

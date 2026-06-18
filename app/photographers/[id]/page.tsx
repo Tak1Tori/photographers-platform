@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { CalendarCheck, MapPin, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatPrice, getSlots, getStyleTitles, photographers } from "@/lib/mock-data";
+import { formatPrice, getStyleTitles } from "@/lib/mock-data";
 import { getPhotographerById, getPhotographerSlots } from "@/lib/data/photographers";
 import { getStyleBySlug } from "@/lib/data/styles";
 
@@ -15,10 +15,6 @@ interface PhotographerDetailPageProps {
   searchParams: {
     style?: string;
   };
-}
-
-export function generateStaticParams() {
-  return photographers.map((photographer) => ({ id: photographer.id }));
 }
 
 export default function PhotographerDetailPage({
@@ -39,7 +35,7 @@ async function PhotographerDetail({ params, searchParams }: PhotographerDetailPa
     (await getStyleBySlug(searchParams.style)) ??
     (await getStyleBySlug(photographer.specializationIds[0]));
   const dbSlots = await getPhotographerSlots(photographer.id);
-  const slots = dbSlots.length > 0 ? dbSlots : getSlots(photographer.availableSlotIds);
+  const slots = dbSlots;
 
   return (
     <>
