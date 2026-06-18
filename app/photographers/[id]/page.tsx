@@ -4,8 +4,13 @@ import { notFound } from "next/navigation";
 import { CalendarCheck, MapPin, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { PortfolioGallery } from "@/components/portfolio/portfolio-gallery";
 import { formatPrice, getStyleTitles } from "@/lib/mock-data";
-import { getPhotographerById, getPhotographerSlots } from "@/lib/data/photographers";
+import {
+  getPhotographerById,
+  getPhotographerSlots,
+  getPortfolioItems
+} from "@/lib/data/photographers";
 import { getStyleBySlug } from "@/lib/data/styles";
 
 interface PhotographerDetailPageProps {
@@ -31,11 +36,13 @@ async function PhotographerDetail({ params, searchParams }: PhotographerDetailPa
     notFound();
   }
 
-  const selectedStyle =
-    (await getStyleBySlug(searchParams.style)) ??
-    (await getStyleBySlug(photographer.specializationIds[0]));
-  const dbSlots = await getPhotographerSlots(photographer.id);
-  const slots = dbSlots;
+  const [requestedStyle, fallbackStyle, slots, portfolioItems] = await Promise.all([
+    getStyleBySlug(searchParams.style),
+    getStyleBySlug(photographer.specializationIds[0]),
+    getPhotographerSlots(photographer.id),
+    getPortfolioItems(photographer.id)
+  ]);
+  const selectedStyle = requestedStyle ?? fallbackStyle;
 
   return (
     <>
@@ -97,13 +104,10 @@ async function PhotographerDetail({ params, searchParams }: PhotographerDetailPa
         <div className="container grid gap-8 lg:grid-cols-[1fr_360px]">
           <div>
             <h2 className="text-2xl font-semibold tracking-normal">Портфолио</h2>
-            <div className="mt-5 grid gap-4 md:grid-cols-3">
-              {photographer.portfolio.map((imageUrl) => (
-                <div key={imageUrl} className="relative aspect-[4/5] overflow-hidden rounded-lg">
-                  <Image src={imageUrl} alt="Работа из портфолио" fill className="object-cover" />
-                </div>
-              ))}
-            </div>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Откройте работу, чтобы посмотреть все фотографии внутри альбома.
+            </p>
+            <PortfolioGallery items={portfolioItems} />
           </div>
           <Card>
             <CardHeader>
