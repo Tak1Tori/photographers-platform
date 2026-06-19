@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Camera, LayoutDashboard, LogIn, UserPlus } from "lucide-react";
 import { SessionProvider, useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
@@ -10,9 +11,21 @@ import { Button } from "@/components/ui/button";
 import type { NotificationDTO } from "@/lib/notifications/types";
 
 const navItems = [
-  { href: "/booking/new?type=FULL_SHOOT", label: "Фотосессия под ключ" },
-  { href: "/photographers?mode=booking", label: "Фотографы" },
-  { href: "/studios?mode=booking", label: "Студии" }
+  {
+    href: "/booking/new?type=FULL_SHOOT",
+    label: "Фотосессия под ключ",
+    sectionPath: "/booking"
+  },
+  {
+    href: "/photographers?mode=booking",
+    label: "Фотографы",
+    sectionPath: "/photographers"
+  },
+  {
+    href: "/studios?mode=booking",
+    label: "Студии",
+    sectionPath: "/studios"
+  }
 ];
 
 export function Header() {
@@ -24,6 +37,7 @@ export function Header() {
 }
 
 function HeaderContent() {
+  const pathname = usePathname();
   const { data: session, status } = useSession();
   const [notifications, setNotifications] = useState<NotificationDTO[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -65,11 +79,24 @@ function HeaderContent() {
           <span className="hidden sm:inline">Framely</span>
         </Link>
         <nav className="hidden items-center gap-6 text-sm text-muted-foreground md:flex">
-          {navItems.map((item) => (
-            <Link key={item.href} href={item.href} className="hover:text-foreground">
-              {item.label}
-            </Link>
-          ))}
+          {navItems.map((item) => {
+            const isActive = pathname.startsWith(item.sectionPath);
+
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                aria-current={isActive ? "page" : undefined}
+                className={`relative flex h-16 items-center transition-colors after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:origin-center after:bg-emerald-400 after:shadow-[0_0_12px_rgba(52,211,153,0.85)] after:transition-transform ${
+                  isActive
+                    ? "text-foreground after:scale-x-100"
+                    : "hover:text-foreground after:scale-x-0"
+                }`}
+              >
+                {item.label}
+              </Link>
+            );
+          })}
         </nav>
         <div className="flex min-w-[188px] items-center justify-end gap-2">
           {status === "loading" ? (
