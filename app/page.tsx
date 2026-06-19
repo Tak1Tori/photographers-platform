@@ -1,5 +1,4 @@
 import { BookingScenarios } from "@/components/home/booking-scenarios";
-import { BookingTypesOverview } from "@/components/home/booking-types-overview";
 import { HeroSection } from "@/components/home/hero-section";
 
 export default function HomePage() {
@@ -7,7 +6,6 @@ export default function HomePage() {
     <>
       <HeroSection />
       <BookingScenarios />
-      <BookingTypesOverview />
     </>
   );
 }

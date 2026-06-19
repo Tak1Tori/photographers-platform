@@ -6,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 const scenarios = [
   {
     title: "Фотосессия под ключ",
-    description: "Соберите стиль, фотографа, студию и удобное время в одном маршруте.",
+    description: "Вся съемка в одном маршруте.",
     href: "/booking/new?type=FULL_SHOOT",
     cta: "Собрать съемку",
     price: "от 45 000 ₸",
@@ -14,7 +14,7 @@ const scenarios = [
   },
   {
     title: "Найти фотографа",
-    description: "Забронируйте фотографа для съемки на вашей локации или мероприятии.",
+    description: "Специалист под ваш стиль и задачу.",
     href: "/photographers?mode=booking",
     cta: "Смотреть фотографов",
     price: "от 25 000 ₸/ч",
@@ -22,7 +22,7 @@ const scenarios = [
   },
   {
     title: "Найти студию",
-    description: "Подберите студию или зал для своей съемки без выбора фотографа.",
+    description: "Пространство с нужным интерьером.",
     href: "/studios?mode=booking",
     cta: "Смотреть студии",
     price: "от 12 000 ₸/ч",
@@ -32,22 +32,22 @@ const scenarios = [
 
 export function BookingScenarios() {
   return (
-    <section className="section">
+    <section className="section border-b border-border">
       <div className="container">
-        <div className="mb-6 max-w-2xl">
-          <p className="text-sm font-medium uppercase tracking-[0.18em] text-accent">
-            Сценарии бронирования
-          </p>
-          <h2 className="mt-3 text-3xl font-semibold tracking-normal">
-            Выберите, что нужно забронировать
+        <div className="mb-8 flex flex-col justify-between gap-3 md:flex-row md:items-end">
+          <h2 className="max-w-xl text-3xl font-semibold tracking-normal md:text-4xl">
+            Что бронируем?
           </h2>
+          <p className="text-sm text-muted-foreground">
+            Под ключ или только нужную часть съемки
+          </p>
         </div>
         <div className="grid gap-5 md:grid-cols-3">
           {scenarios.map((scenario) => {
             const Icon = scenario.icon;
             return (
               <Card key={scenario.href}>
-                <CardContent className="grid h-full gap-5 p-6">
+                <CardContent className="grid h-full gap-6 p-6">
                   <div className="flex items-start justify-between gap-4">
                     <span className="flex size-11 items-center justify-center rounded-md bg-secondary">
                       <Icon className="size-5" aria-hidden="true" />
@@ -56,7 +56,7 @@ export function BookingScenarios() {
                   </div>
                   <div>
                     <h3 className="text-xl font-semibold tracking-normal">{scenario.title}</h3>
-                    <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                    <p className="mt-2 text-sm text-muted-foreground">
                       {scenario.description}
                     </p>
                   </div>
