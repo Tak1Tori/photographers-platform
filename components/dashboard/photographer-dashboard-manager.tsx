@@ -43,6 +43,8 @@ type ActionState = {
   message: string;
 } | null;
 
+const maxServerActionUploadBytes = 4 * 1024 * 1024;
+
 export function PhotographerDashboardManager({
   profile,
   styles,
@@ -60,15 +62,44 @@ export function PhotographerDashboardManager({
   function run(area: string, action: (formData: FormData) => Promise<{ success: boolean; error?: string }>) {
     return (formData: FormData) => {
       setState(null);
-      startTransition(async () => {
-        const result = await action(formData);
+      const uploadBytes = Array.from(formData.values()).reduce(
+        (total, value) => total + (value instanceof File ? value.size : 0),
+        0
+      );
+
+      if (uploadBytes > maxServerActionUploadBytes) {
         setState({
           area,
-          success: result.success,
-          message: result.success ? "Изменения сохранены." : result.error ?? "Ошибка сохранения."
+          success: false,
+          message:
+            "Выбрано слишком много файлов для одного сохранения. Сохраните изменения по одному альбому."
         });
-        if (result.success) {
-          router.refresh();
+        return;
+      }
+
+      startTransition(async () => {
+        try {
+          const result = await action(formData);
+          if (!result) {
+            throw new Error("Сервер не вернул ответ.");
+          }
+          setState({
+            area,
+            success: result.success,
+            message: result.success
+              ? "Изменения сохранены."
+              : result.error ?? "Ошибка сохранения."
+          });
+          if (result.success) {
+            router.refresh();
+          }
+        } catch {
+          setState({
+            area,
+            success: false,
+            message:
+              "Не удалось отправить файлы. Уменьшите количество изображений и попробуйте снова."
+          });
         }
       });
     };

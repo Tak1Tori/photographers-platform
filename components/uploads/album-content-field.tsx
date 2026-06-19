@@ -9,8 +9,9 @@ import type { PortfolioAlbumImage } from "@/lib/types";
 
 const accept = "image/jpeg,image/png,image/webp";
 const maxBytes = 25 * 1024 * 1024;
-const maxTotalBytes = 120 * 1024 * 1024;
+const maxUploadBytes = 2.5 * 1024 * 1024;
 const maxFiles = 20;
+const maxDimension = 1920;
 
 interface SelectedImage {
   file: File;
@@ -30,6 +31,7 @@ export function AlbumContentField({
   const [removedIds, setRemovedIds] = useState<string[]>([]);
   const [error, setError] = useState("");
   const [isDragging, setIsDragging] = useState(false);
+  const [isOptimizing, setIsOptimizing] = useState(false);
 
   useEffect(() => {
     return () => {
@@ -43,14 +45,10 @@ export function AlbumContentField({
     (image) => !removedIds.includes(image.id)
   );
 
-  function addFiles(fileList: FileList | File[]) {
+  async function addFiles(fileList: FileList | File[]) {
     setError("");
     const incoming = Array.from(fileList);
     const acceptedFiles: File[] = [];
-    const currentBytes = selectedImages.reduce(
-      (total, image) => total + image.file.size,
-      0
-    );
 
     for (const file of incoming) {
       if (!accept.split(",").includes(file.type)) {
@@ -64,26 +62,36 @@ export function AlbumContentField({
       acceptedFiles.push(file);
     }
 
-    let nextTotalBytes = currentBytes;
-    const filesWithinTotalLimit = acceptedFiles.filter((file) => {
-      if (nextTotalBytes + file.size > maxTotalBytes) {
-        setError("За одно сохранение можно добавить не более 120 МБ.");
-        return false;
-      }
-      nextTotalBytes += file.size;
-      return true;
-    });
-
     const availableSlots =
       maxFiles - visibleExistingImages.length - selectedImages.length;
-    if (filesWithinTotalLimit.length > availableSlots) {
+    if (acceptedFiles.length > availableSlots) {
       setError(`В одном альбоме может быть не более ${maxFiles} изображений.`);
     }
 
-    const nextFiles = filesWithinTotalLimit.slice(0, Math.max(availableSlots, 0));
+    const nextFiles = acceptedFiles.slice(0, Math.max(availableSlots, 0));
+    if (!nextFiles.length) return;
+
+    setIsOptimizing(true);
+    let optimizedFiles: File[];
+
+    try {
+      optimizedFiles = await optimizeAlbumFiles([
+        ...selectedImages.map((image) => image.file),
+        ...nextFiles
+      ]);
+    } catch {
+      setError(
+        "Не удалось подготовить фотографии к загрузке. Попробуйте уменьшить их количество."
+      );
+      setIsOptimizing(false);
+      return;
+    }
+
+    selectedImagesRef.current.forEach((image) =>
+      URL.revokeObjectURL(image.previewUrl)
+    );
     const nextImages = [
-      ...selectedImages,
-      ...nextFiles.map((file) => ({
+      ...optimizedFiles.map((file) => ({
         file,
         previewUrl: URL.createObjectURL(file)
       }))
@@ -91,6 +99,7 @@ export function AlbumContentField({
     selectedImagesRef.current = nextImages;
     setSelectedImages(nextImages);
     syncInput(nextImages.map((image) => image.file));
+    setIsOptimizing(false);
   }
 
   function syncInput(files: File[]) {
@@ -104,7 +113,7 @@ export function AlbumContentField({
   function handleDrop(event: DragEvent<HTMLLabelElement>) {
     event.preventDefault();
     setIsDragging(false);
-    addFiles(event.dataTransfer.files);
+    void addFiles(event.dataTransfer.files);
   }
 
   function removeSelected(index: number) {
@@ -122,7 +131,7 @@ export function AlbumContentField({
         <div>
           <p className="text-sm font-medium">Содержимое альбома</p>
           <p className="text-xs text-muted-foreground">
-            До {maxFiles} изображений, каждое до 25 МБ, загрузка до 120 МБ
+            До {maxFiles} изображений, исходный файл до 25 МБ
           </p>
         </div>
         <span className="text-xs text-muted-foreground">
@@ -198,6 +207,11 @@ export function AlbumContentField({
         <span className="text-xs text-muted-foreground">
           Перетащите сразу несколько файлов или нажмите для выбора
         </span>
+        <span className="text-xs text-muted-foreground">
+          {isOptimizing
+            ? "Оптимизируем изображения..."
+            : "Перед отправкой фотографии автоматически оптимизируются"}
+        </span>
         <input
           ref={inputRef}
           type="file"
@@ -207,7 +221,7 @@ export function AlbumContentField({
           className="sr-only"
           onChange={(event) => {
             if (event.target.files) {
-              addFiles(event.target.files);
+              void addFiles(event.target.files);
             }
           }}
         />
@@ -219,4 +233,63 @@ export function AlbumContentField({
       {error ? <p className="text-sm font-medium text-rose-700">{error}</p> : null}
     </div>
   );
+}
+
+async function optimizeAlbumFiles(files: File[]) {
+  const targetBytesPerFile = Math.max(
+    90 * 1024,
+    Math.floor(maxUploadBytes / Math.max(files.length, 1))
+  );
+
+  return Promise.all(
+    files.map((file, index) => optimizeAlbumImage(file, targetBytesPerFile, index))
+  );
+}
+
+async function optimizeAlbumImage(file: File, targetBytes: number, index: number) {
+  const bitmap = await createImageBitmap(file);
+  const initialScale = Math.min(1, maxDimension / Math.max(bitmap.width, bitmap.height));
+  let width = Math.max(1, Math.round(bitmap.width * initialScale));
+  let height = Math.max(1, Math.round(bitmap.height * initialScale));
+
+  try {
+    for (const dimensionScale of [1, 0.85, 0.7, 0.55]) {
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(width * dimensionScale));
+      canvas.height = Math.max(1, Math.round(height * dimensionScale));
+      const context = canvas.getContext("2d");
+      if (!context) throw new Error("Canvas is unavailable");
+
+      context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+
+      for (const quality of [0.86, 0.74, 0.62, 0.5, 0.4, 0.32]) {
+        const blob = await canvasToBlob(canvas, quality);
+        if (blob.size <= targetBytes) {
+          return new File([blob], albumFileName(file.name, index), {
+            type: "image/webp",
+            lastModified: Date.now()
+          });
+        }
+      }
+    }
+  } finally {
+    bitmap.close();
+  }
+
+  throw new Error("Image cannot fit the upload budget");
+}
+
+function canvasToBlob(canvas: HTMLCanvasElement, quality: number) {
+  return new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => (blob ? resolve(blob) : reject(new Error("Image encoding failed"))),
+      "image/webp",
+      quality
+    );
+  });
+}
+
+function albumFileName(fileName: string, index: number) {
+  const baseName = fileName.replace(/\.[^.]+$/, "") || `album-photo-${index + 1}`;
+  return `${baseName}.webp`;
 }

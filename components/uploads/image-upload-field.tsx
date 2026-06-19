@@ -6,7 +6,7 @@ import { ImagePreview } from "@/components/uploads/image-preview";
 import { cn } from "@/lib/utils";
 
 const accept = "image/jpeg,image/png,image/webp";
-const optimizedUploadMaxBytes = 3.5 * 1024 * 1024;
+const optimizedUploadMaxBytes = 1.2 * 1024 * 1024;
 const optimizedImageMaxDimension = 2560;
 
 export function ImageUploadField({
