@@ -1,10 +1,6 @@
 import type { NextAuthOptions } from "next-auth";
 import { getServerSession } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
-import { PrismaAdapter } from "@auth/prisma-adapter";
-import { compare } from "bcryptjs";
-import { canUseDatabase } from "@/lib/data/db";
-import { prisma } from "@/lib/prisma";
 
 const demoUsers = [
   {
@@ -42,7 +38,6 @@ const demoUsers = [
 ] as const;
 
 export const authOptions: NextAuthOptions = {
-  adapter: PrismaAdapter(prisma) as NextAuthOptions["adapter"],
   secret:
     process.env.AUTH_SECRET ??
     process.env.NEXTAUTH_SECRET ??
@@ -68,7 +63,7 @@ export const authOptions: NextAuthOptions = {
           return null;
         }
 
-        if (!canUseDatabase()) {
+        if (!process.env.DATABASE_URL) {
           const demoUser = demoUsers.find((user) => user.email === email);
 
           if (!demoUser || demoUser.password !== password) {
@@ -84,6 +79,10 @@ export const authOptions: NextAuthOptions = {
           };
         }
 
+        const [{ compare }, { prisma }] = await Promise.all([
+          import("bcryptjs"),
+          import("@/lib/prisma")
+        ]);
         const user = await prisma.user.findUnique({ where: { email } });
 
         if (!user?.passwordHash) {
