@@ -1,0 +1,10 @@
+node_modules
+.next
+.git
+.git-corrupt-backup
+.agents
+.data
+.env
+.env.*
+public/uploads
+*.tsbuildinfo
