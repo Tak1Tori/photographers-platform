@@ -218,6 +218,7 @@ export function PhotographerDashboardManager({
                 name="newPortfolioImage"
                 label="Добавить новую работу"
                 previewAlt="Предпросмотр новой работы"
+                maxSizeMb={25}
               />
               <div className="grid content-start gap-3">
                 <Field label="Название" name="newPortfolioTitle" />
@@ -240,6 +241,7 @@ export function PhotographerDashboardManager({
                       label="Заменить изображение"
                       currentUrl={item.imageUrl}
                       previewAlt={item.title || "Portfolio item"}
+                      maxSizeMb={25}
                     />
                     <Field
                       label="Название"

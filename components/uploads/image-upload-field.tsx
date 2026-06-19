@@ -6,19 +6,23 @@ import { ImagePreview } from "@/components/uploads/image-preview";
 import { cn } from "@/lib/utils";
 
 const accept = "image/jpeg,image/png,image/webp";
+const optimizedUploadMaxBytes = 3.5 * 1024 * 1024;
+const optimizedImageMaxDimension = 2560;
 
 export function ImageUploadField({
   name = "image",
   label = "Image file",
   currentUrl,
   previewAlt = "Selected image",
-  required = false
+  required = false,
+  maxSizeMb = 5
 }: {
   name?: string;
   label?: string;
   currentUrl?: string;
   previewAlt?: string;
   required?: boolean;
+  maxSizeMb?: number;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [previewUrl, setPreviewUrl] = useState(currentUrl ?? "");
@@ -37,7 +41,7 @@ export function ImageUploadField({
     };
   }, [previewUrl]);
 
-  function setFile(file?: File) {
+  async function setFile(file?: File) {
     setError("");
 
     if (!file) {
@@ -48,23 +52,33 @@ export function ImageUploadField({
       setError("Поддерживаются JPEG, PNG и WebP.");
       return;
     }
-    if (file.size > 5 * 1024 * 1024) {
-      setError("Размер файла не должен превышать 5 МБ.");
+    if (file.size > maxSizeMb * 1024 * 1024) {
+      setError(`Размер файла не должен превышать ${maxSizeMb} МБ.`);
       return;
     }
 
+    let uploadFile = file;
+    if (maxSizeMb > 5 && file.size > optimizedUploadMaxBytes) {
+      try {
+        uploadFile = await optimizeImage(file);
+      } catch {
+        setError("Не удалось оптимизировать изображение. Попробуйте другой файл.");
+        return;
+      }
+    }
+
     const transfer = new DataTransfer();
-    transfer.items.add(file);
+    transfer.items.add(uploadFile);
     if (inputRef.current) {
       inputRef.current.files = transfer.files;
     }
-    setPreviewUrl(URL.createObjectURL(file));
+    setPreviewUrl(URL.createObjectURL(uploadFile));
   }
 
   function handleDrop(event: DragEvent<HTMLLabelElement>) {
     event.preventDefault();
     setIsDragging(false);
-    setFile(event.dataTransfer.files?.[0]);
+    void setFile(event.dataTransfer.files?.[0]);
   }
 
   return (
@@ -96,7 +110,14 @@ export function ImageUploadField({
         <span className="text-xs text-muted-foreground">
           Перетащите изображение сюда или нажмите для выбора
         </span>
-        <span className="text-xs text-muted-foreground">JPEG, PNG или WebP, до 5 МБ</span>
+        <span className="text-xs text-muted-foreground">
+          JPEG, PNG или WebP, до {maxSizeMb} МБ
+        </span>
+        {maxSizeMb > 5 ? (
+          <span className="text-xs text-muted-foreground">
+            Большие файлы автоматически оптимизируются перед загрузкой
+          </span>
+        ) : null}
         <input
           ref={inputRef}
           type="file"
@@ -104,10 +125,59 @@ export function ImageUploadField({
           accept={accept}
           required={required}
           className="sr-only"
-          onChange={(event) => setFile(event.target.files?.[0])}
+          onChange={(event) => void setFile(event.target.files?.[0])}
         />
       </label>
       {error ? <p className="text-sm font-medium text-rose-700">{error}</p> : null}
     </div>
   );
+}
+
+async function optimizeImage(file: File) {
+  const bitmap = await createImageBitmap(file);
+  let width = bitmap.width;
+  let height = bitmap.height;
+  const scale = Math.min(1, optimizedImageMaxDimension / Math.max(width, height));
+  width = Math.max(1, Math.round(width * scale));
+  height = Math.max(1, Math.round(height * scale));
+
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext("2d");
+
+  if (!context) {
+    bitmap.close();
+    throw new Error("Canvas is unavailable");
+  }
+
+  context.drawImage(bitmap, 0, 0, width, height);
+  bitmap.close();
+
+  for (const quality of [0.9, 0.82, 0.74, 0.66, 0.58, 0.5]) {
+    const blob = await canvasToBlob(canvas, quality);
+    if (blob.size <= optimizedUploadMaxBytes) {
+      return new File([blob], replaceExtension(file.name, "webp"), {
+        type: "image/webp",
+        lastModified: Date.now()
+      });
+    }
+  }
+
+  throw new Error("Optimized image is still too large");
+}
+
+function canvasToBlob(canvas: HTMLCanvasElement, quality: number) {
+  return new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => (blob ? resolve(blob) : reject(new Error("Image encoding failed"))),
+      "image/webp",
+      quality
+    );
+  });
+}
+
+function replaceExtension(fileName: string, extension: string) {
+  const baseName = fileName.replace(/\.[^.]+$/, "") || "album-cover";
+  return `${baseName}.${extension}`;
 }

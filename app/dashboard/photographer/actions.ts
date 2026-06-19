@@ -8,6 +8,7 @@ import { getDevStore, updateDevStore } from "@/lib/data/dev-store";
 import { notifyBookingStatusChanged } from "@/lib/notifications/notification-service";
 import { prisma } from "@/lib/prisma";
 import {
+  albumCoverMaxBytes,
   albumImageMaxBytes,
   albumUploadMaxBytes,
   deleteImageFromCloudinary,
@@ -305,13 +306,17 @@ export async function createPortfolioItemWithUploadAction(
     const file = formData.get("image") as File | null;
     const title = String(formData.get("title") ?? "").trim();
     const description = String(formData.get("description") ?? "").trim();
-    const validation = validateImageFile(file);
+    const validation = validateImageFile(file, albumCoverMaxBytes);
 
     if (!validation.valid || !file) {
       return { success: false, error: validation.error };
     }
 
-    const uploaded = await uploadImageToCloudinary(file, "photographers/portfolio");
+    const uploaded = await uploadImageToCloudinary(
+      file,
+      "photographers/portfolio",
+      albumCoverMaxBytes
+    );
 
     if (!canUseDatabase()) {
       await updateDevStore((store) => ({
@@ -370,13 +375,17 @@ export async function updatePortfolioItemAction(formData: FormData): Promise<Act
     const description = String(formData.get("description") ?? "").trim();
 
     if (hasNewImage && imageFile) {
-      const validation = validateImageFile(imageFile);
+      const validation = validateImageFile(imageFile, albumCoverMaxBytes);
 
       if (!validation.valid) {
         return { success: false, error: validation.error };
       }
 
-      const uploaded = await uploadImageToCloudinary(imageFile, "photographers/portfolio");
+      const uploaded = await uploadImageToCloudinary(
+        imageFile,
+        "photographers/portfolio",
+        albumCoverMaxBytes
+      );
       imageUrl = uploaded.secureUrl;
       newImagePublicId = uploaded.publicId;
     }
@@ -502,7 +511,7 @@ export async function savePhotographerPortfolioAction(
 
     for (const input of existingInputs) {
       if (input.file?.size) {
-        const validation = validateImageFile(input.file);
+        const validation = validateImageFile(input.file, albumCoverMaxBytes);
         if (!validation.valid) {
           return { success: false, error: validation.error };
         }
@@ -516,7 +525,7 @@ export async function savePhotographerPortfolioAction(
     }
 
     if (hasNewFile && newFile) {
-      const validation = validateImageFile(newFile);
+      const validation = validateImageFile(newFile, albumCoverMaxBytes);
       if (!validation.valid) {
         return { success: false, error: validation.error };
       }
@@ -569,7 +578,8 @@ export async function savePhotographerPortfolioAction(
         if (!input.file?.size) continue;
         const uploaded = await uploadImageToCloudinary(
           input.file,
-          "photographers/portfolio"
+          "photographers/portfolio",
+          albumCoverMaxBytes
         );
         replacements.set(input.id, uploaded);
         uploadedPublicIds.push(uploaded.publicId);
@@ -590,7 +600,11 @@ export async function savePhotographerPortfolioAction(
 
       const uploadedNew =
         hasNewFile && newFile
-          ? await uploadImageToCloudinary(newFile, "photographers/portfolio")
+          ? await uploadImageToCloudinary(
+              newFile,
+              "photographers/portfolio",
+              albumCoverMaxBytes
+            )
           : null;
       if (uploadedNew) {
         uploadedPublicIds.push(uploadedNew.publicId);
@@ -711,7 +725,8 @@ export async function savePhotographerPortfolioAction(
         if (!input.file?.size) continue;
         const uploaded = await uploadImageToCloudinary(
           input.file,
-          "photographers/portfolio"
+          "photographers/portfolio",
+          albumCoverMaxBytes
         );
         replacements.set(input.id, uploaded);
         uploadedPublicIds.push(uploaded.publicId);
@@ -732,7 +747,11 @@ export async function savePhotographerPortfolioAction(
 
       const uploadedNew =
         hasNewFile && newFile
-          ? await uploadImageToCloudinary(newFile, "photographers/portfolio")
+          ? await uploadImageToCloudinary(
+              newFile,
+              "photographers/portfolio",
+              albumCoverMaxBytes
+            )
           : null;
       if (uploadedNew) {
         uploadedPublicIds.push(uploadedNew.publicId);
