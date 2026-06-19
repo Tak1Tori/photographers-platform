@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Play, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -46,7 +46,7 @@ export function AlbumPhotoGrid({
   if (images.length === 0) {
     return (
       <div className="rounded-lg border border-dashed border-border p-12 text-center text-sm text-muted-foreground">
-        В этом альбоме пока нет дополнительных фотографий.
+        В этом альбоме пока нет фотографий или видео.
       </div>
     );
   }
@@ -73,14 +73,31 @@ export function AlbumPhotoGrid({
             className="group relative mb-4 block w-full overflow-hidden rounded-lg border border-border bg-card"
             onClick={() => setActiveIndex(index)}
           >
-            <Image
-              src={image.imageUrl}
-              alt={`${albumTitle}, фотография ${index + 1}`}
-              width={1000}
-              height={1250}
-              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-              className="h-auto w-full object-cover transition-transform duration-500 group-hover:scale-[1.02]"
-            />
+            {image.mediaType === "VIDEO" ? (
+              <div className="relative aspect-video">
+                <video
+                  src={image.imageUrl}
+                  muted
+                  playsInline
+                  preload="metadata"
+                  className="size-full object-cover transition-transform duration-500 group-hover:scale-[1.02]"
+                />
+                <span className="absolute inset-0 flex items-center justify-center bg-background/20">
+                  <span className="flex size-12 items-center justify-center rounded-full bg-background/85">
+                    <Play className="ml-0.5 size-5 fill-current" aria-hidden="true" />
+                  </span>
+                </span>
+              </div>
+            ) : (
+              <Image
+                src={image.imageUrl}
+                alt={`${albumTitle}, фотография ${index + 1}`}
+                width={1000}
+                height={1250}
+                sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                className="h-auto w-full object-cover transition-transform duration-500 group-hover:scale-[1.02]"
+              />
+            )}
           </button>
         ))}
       </div>
@@ -89,7 +106,7 @@ export function AlbumPhotoGrid({
         <div
           role="dialog"
           aria-modal="true"
-          aria-label={`${albumTitle}, просмотр фотографии`}
+          aria-label={`${albumTitle}, просмотр медиа`}
           className="fixed inset-0 z-50 flex flex-col bg-background/95 backdrop-blur-md"
         >
           <div className="flex items-center justify-between gap-4 border-b border-border px-4 py-3 md:px-6">
@@ -103,21 +120,32 @@ export function AlbumPhotoGrid({
               type="button"
               size="sm"
               variant="ghost"
-              aria-label="Закрыть фотографию"
+              aria-label="Закрыть просмотр"
               onClick={() => setActiveIndex(null)}
             >
               <X className="size-5" aria-hidden="true" />
             </Button>
           </div>
           <div className="relative min-h-0 flex-1">
-            <Image
-              src={images[activeIndex].imageUrl}
-              alt={`${albumTitle}, фотография ${activeIndex + 1}`}
-              fill
-              priority
-              sizes="100vw"
-              className="object-contain p-4 md:p-8"
-            />
+            {images[activeIndex].mediaType === "VIDEO" ? (
+              <video
+                key={images[activeIndex].id}
+                src={images[activeIndex].imageUrl}
+                controls
+                autoPlay
+                playsInline
+                className="size-full object-contain p-4 md:p-8"
+              />
+            ) : (
+              <Image
+                src={images[activeIndex].imageUrl}
+                alt={`${albumTitle}, фотография ${activeIndex + 1}`}
+                fill
+                priority
+                sizes="100vw"
+                className="object-contain p-4 md:p-8"
+              />
+            )}
             {images.length > 1 ? (
               <>
                 <Button
@@ -149,7 +177,7 @@ export function AlbumPhotoGrid({
                 <button
                   key={image.id}
                   type="button"
-                  aria-label={`Открыть фотографию ${index + 1}`}
+                  aria-label={`Открыть файл ${index + 1}`}
                   className={cn(
                     "relative aspect-square w-16 shrink-0 overflow-hidden rounded-md border",
                     index === activeIndex
@@ -158,7 +186,23 @@ export function AlbumPhotoGrid({
                   )}
                   onClick={() => setActiveIndex(index)}
                 >
-                  <Image src={image.imageUrl} alt="" fill className="object-cover" />
+                  {image.mediaType === "VIDEO" ? (
+                    <>
+                      <video
+                        src={image.imageUrl}
+                        muted
+                        playsInline
+                        preload="metadata"
+                        className="size-full object-cover"
+                      />
+                      <Play
+                        className="absolute left-1/2 top-1/2 size-4 -translate-x-1/2 -translate-y-1/2 fill-current"
+                        aria-hidden="true"
+                      />
+                    </>
+                  ) : (
+                    <Image src={image.imageUrl} alt="" fill className="object-cover" />
+                  )}
                 </button>
               ))}
             </div>

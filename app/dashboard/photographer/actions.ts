@@ -20,6 +20,11 @@ const placeholderImage =
   "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?auto=format&fit=crop&w=900&q=80";
 
 type ActionResult = { success: boolean; error?: string };
+type UploadedAlbumMedia = {
+  imageUrl: string;
+  imagePublicId: string;
+  mediaType: "IMAGE" | "VIDEO";
+};
 
 const customStyleImage =
   "https://images.unsplash.com/photo-1452780212940-6f5c0d14d848?auto=format&fit=crop&w=1200&q=80";
@@ -461,7 +466,7 @@ export async function savePhotographerPortfolioAction(
   let changesSaved = false;
 
   try {
-    const { profile } = await requirePhotographerProfile();
+    const { profile, session } = await requirePhotographerProfile();
     const itemIds = Array.from(
       new Set(formData.getAll("portfolioItemIds").map(String).filter(Boolean))
     );
@@ -470,11 +475,19 @@ export async function savePhotographerPortfolioAction(
     const newDescription = String(formData.get("newPortfolioDescription") ?? "").trim();
     const hasNewFile = Boolean(newFile?.size);
     const newAlbumFiles = getFiles(formData, "newAlbumImages");
+    const newUploadedMedia = getUploadedAlbumMedia(
+      formData,
+      "uploadedMedia:newAlbumImages",
+      session.user.id
+    );
     const removedAlbumImageIds = Array.from(
       new Set(formData.getAll("removeAlbumImageIds").map(String).filter(Boolean))
     );
 
-    if (!hasNewFile && (newTitle || newDescription || newAlbumFiles.length)) {
+    if (
+      !hasNewFile &&
+      (newTitle || newDescription || newAlbumFiles.length || newUploadedMedia.length)
+    ) {
       return {
         success: false,
         error: "Чтобы создать новый альбом, выберите обложку."
@@ -486,8 +499,19 @@ export async function savePhotographerPortfolioAction(
       title: String(formData.get(`portfolioTitle:${id}`) ?? "").trim(),
       description: String(formData.get(`portfolioDescription:${id}`) ?? "").trim(),
       file: formData.get(`portfolioImage:${id}`) as File | null,
-      albumFiles: getFiles(formData, `albumImages:${id}`)
+      albumFiles: getFiles(formData, `albumImages:${id}`),
+      uploadedMedia: getUploadedAlbumMedia(
+        formData,
+        `uploadedMedia:albumImages:${id}`,
+        session.user.id
+      )
     }));
+    uploadedPublicIds.push(
+      ...newUploadedMedia.map((media) => media.imagePublicId),
+      ...existingInputs.flatMap((input) =>
+        input.uploadedMedia.map((media) => media.imagePublicId)
+      )
+    );
     const allNewAlbumFiles = [
       ...newAlbumFiles,
       ...existingInputs.flatMap((input) => input.albumFiles)
@@ -502,7 +526,7 @@ export async function savePhotographerPortfolioAction(
         error: "За одно сохранение можно загрузить не более 120 МБ содержимого альбомов."
       };
     }
-    if (newAlbumFiles.length > 20) {
+    if (newAlbumFiles.length + newUploadedMedia.length > 20) {
       return {
         success: false,
         error: "В одном альбоме может быть не более 20 изображений."
@@ -557,7 +581,10 @@ export async function savePhotographerPortfolioAction(
           (item?.albumImages.filter((image) =>
             removedAlbumImageIds.includes(image.id)
           ).length ?? 0);
-        if (remainingCount + input.albumFiles.length > 20) {
+        if (
+          remainingCount + input.albumFiles.length + input.uploadedMedia.length >
+          20
+        ) {
           return {
             success: false,
             error: "В одном альбоме может быть не более 20 изображений."
@@ -571,7 +598,7 @@ export async function savePhotographerPortfolioAction(
       >();
       const albumUploads = new Map<
         string,
-        Array<{ secureUrl: string; publicId: string }>
+        Array<{ secureUrl: string; publicId: string; mediaType: "IMAGE" | "VIDEO" }>
       >();
 
       for (const input of existingInputs) {
@@ -585,14 +612,18 @@ export async function savePhotographerPortfolioAction(
         uploadedPublicIds.push(uploaded.publicId);
       }
       for (const input of existingInputs) {
-        const uploads: Array<{ secureUrl: string; publicId: string }> = [];
+        const uploads = input.uploadedMedia.map((media) => ({
+          secureUrl: media.imageUrl,
+          publicId: media.imagePublicId,
+          mediaType: media.mediaType
+        }));
         for (const albumFile of input.albumFiles) {
           const uploaded = await uploadImageToCloudinary(
             albumFile,
             "photographers/albums",
             albumImageMaxBytes
           );
-          uploads.push(uploaded);
+          uploads.push({ ...uploaded, mediaType: "IMAGE" });
           uploadedPublicIds.push(uploaded.publicId);
         }
         albumUploads.set(input.id, uploads);
@@ -609,14 +640,18 @@ export async function savePhotographerPortfolioAction(
       if (uploadedNew) {
         uploadedPublicIds.push(uploadedNew.publicId);
       }
-      const uploadedNewAlbum: Array<{ secureUrl: string; publicId: string }> = [];
+      const uploadedNewAlbum = newUploadedMedia.map((media) => ({
+        secureUrl: media.imageUrl,
+        publicId: media.imagePublicId,
+        mediaType: media.mediaType
+      }));
       for (const albumFile of newAlbumFiles) {
         const uploaded = await uploadImageToCloudinary(
           albumFile,
           "photographers/albums",
           albumImageMaxBytes
         );
-        uploadedNewAlbum.push(uploaded);
+        uploadedNewAlbum.push({ ...uploaded, mediaType: "IMAGE" });
         uploadedPublicIds.push(uploaded.publicId);
       }
 
@@ -641,6 +676,7 @@ export async function savePhotographerPortfolioAction(
               id: `dev-album-${Date.now()}-${item.id}-${index}`,
               imageUrl: image.secureUrl,
               imagePublicId: image.publicId,
+              mediaType: image.mediaType,
               sortOrder: remainingAlbumImages.length + index
             })
           );
@@ -665,6 +701,7 @@ export async function savePhotographerPortfolioAction(
               id: `dev-album-${Date.now()}-new-${index}`,
               imageUrl: image.secureUrl,
               imagePublicId: image.publicId,
+              mediaType: image.mediaType,
               sortOrder: index
             }))
           });
@@ -705,7 +742,10 @@ export async function savePhotographerPortfolioAction(
           (item?.albumImages.filter((image) =>
             removedAlbumImageIds.includes(image.id)
           ).length ?? 0);
-        if (remainingCount + input.albumFiles.length > 20) {
+        if (
+          remainingCount + input.albumFiles.length + input.uploadedMedia.length >
+          20
+        ) {
           return {
             success: false,
             error: "В одном альбоме может быть не более 20 изображений."
@@ -718,7 +758,7 @@ export async function savePhotographerPortfolioAction(
       >();
       const albumUploads = new Map<
         string,
-        Array<{ secureUrl: string; publicId: string }>
+        Array<{ secureUrl: string; publicId: string; mediaType: "IMAGE" | "VIDEO" }>
       >();
 
       for (const input of existingInputs) {
@@ -732,14 +772,18 @@ export async function savePhotographerPortfolioAction(
         uploadedPublicIds.push(uploaded.publicId);
       }
       for (const input of existingInputs) {
-        const uploads: Array<{ secureUrl: string; publicId: string }> = [];
+        const uploads = input.uploadedMedia.map((media) => ({
+          secureUrl: media.imageUrl,
+          publicId: media.imagePublicId,
+          mediaType: media.mediaType
+        }));
         for (const albumFile of input.albumFiles) {
           const uploaded = await uploadImageToCloudinary(
             albumFile,
             "photographers/albums",
             albumImageMaxBytes
           );
-          uploads.push(uploaded);
+          uploads.push({ ...uploaded, mediaType: "IMAGE" });
           uploadedPublicIds.push(uploaded.publicId);
         }
         albumUploads.set(input.id, uploads);
@@ -756,14 +800,18 @@ export async function savePhotographerPortfolioAction(
       if (uploadedNew) {
         uploadedPublicIds.push(uploadedNew.publicId);
       }
-      const uploadedNewAlbum: Array<{ secureUrl: string; publicId: string }> = [];
+      const uploadedNewAlbum = newUploadedMedia.map((media) => ({
+        secureUrl: media.imageUrl,
+        publicId: media.imagePublicId,
+        mediaType: media.mediaType
+      }));
       for (const albumFile of newAlbumFiles) {
         const uploaded = await uploadImageToCloudinary(
           albumFile,
           "photographers/albums",
           albumImageMaxBytes
         );
-        uploadedNewAlbum.push(uploaded);
+        uploadedNewAlbum.push({ ...uploaded, mediaType: "IMAGE" });
         uploadedPublicIds.push(uploaded.publicId);
       }
 
@@ -796,6 +844,7 @@ export async function savePhotographerPortfolioAction(
                 create: (albumUploads.get(input.id) ?? []).map((image, index) => ({
                   imageUrl: image.secureUrl,
                   imagePublicId: image.publicId,
+                  mediaType: image.mediaType,
                   sortOrder: startOrder + index
                 }))
               }
@@ -815,6 +864,7 @@ export async function savePhotographerPortfolioAction(
                 create: uploadedNewAlbum.map((image, index) => ({
                   imageUrl: image.secureUrl,
                   imagePublicId: image.publicId,
+                  mediaType: image.mediaType,
                   sortOrder: index
                 }))
               }
@@ -855,6 +905,26 @@ function getFiles(formData: FormData, name: string) {
   return formData
     .getAll(name)
     .filter((value): value is File => value instanceof File && value.size > 0);
+}
+
+function getUploadedAlbumMedia(formData: FormData, name: string, ownerId: string) {
+  return formData.getAll(name).flatMap((value) => {
+    try {
+      const parsed = JSON.parse(String(value)) as UploadedAlbumMedia;
+      if (
+        !parsed.imageUrl ||
+        !parsed.imagePublicId.startsWith(
+          `supabase:photographers/albums/${ownerId}/`
+        ) ||
+        !["IMAGE", "VIDEO"].includes(parsed.mediaType)
+      ) {
+        return [];
+      }
+      return [parsed];
+    } catch {
+      return [];
+    }
+  });
 }
 
 export async function deletePortfolioItemAction(formData: FormData): Promise<ActionResult> {

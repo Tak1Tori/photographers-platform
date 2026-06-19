@@ -94,6 +94,11 @@ enum NotificationDeliveryStatus {
   FAILED
 }
 
+enum AlbumMediaType {
+  IMAGE
+  VIDEO
+}
+
 model User {
   id                  String               @id @default(cuid())
   name                String
@@ -198,6 +203,7 @@ model PhotographerPortfolioImage {
   portfolioItemId String
   imageUrl        String
   imagePublicId   String?
+  mediaType       AlbumMediaType            @default(IMAGE)
   sortOrder       Int                       @default(0)
   createdAt       DateTime                  @default(now())
   portfolioItem   PhotographerPortfolioItem @relation(fields: [portfolioItemId], references: [id], onDelete: Cascade)

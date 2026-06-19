@@ -120,6 +120,7 @@ export interface PortfolioAlbumImage {
   id: string;
   imageUrl: string;
   imagePublicId?: string;
+  mediaType: "IMAGE" | "VIDEO";
   sortOrder: number;
 }
 

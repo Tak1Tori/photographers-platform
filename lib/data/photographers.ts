@@ -341,6 +341,7 @@ export async function getPortfolioItems(photographerId: string): Promise<Portfol
       id: image.id,
       imageUrl: image.imageUrl,
       imagePublicId: image.imagePublicId ?? undefined,
+      mediaType: image.mediaType,
       sortOrder: image.sortOrder
     }))
   }));
@@ -388,6 +389,7 @@ export async function getPublicPortfolioItem(
       id: image.id,
       imageUrl: image.imageUrl,
       imagePublicId: image.imagePublicId ?? undefined,
+      mediaType: image.mediaType,
       sortOrder: image.sortOrder
     }))
   };
@@ -516,6 +518,7 @@ function mapPortfolioItem(item: {
     id: string;
     imageUrl: string;
     imagePublicId: string | null;
+    mediaType: "IMAGE" | "VIDEO";
     sortOrder: number;
   }>;
 }): PortfolioItem {
@@ -529,6 +532,7 @@ function mapPortfolioItem(item: {
       id: image.id,
       imageUrl: image.imageUrl,
       imagePublicId: image.imagePublicId ?? undefined,
+      mediaType: image.mediaType,
       sortOrder: image.sortOrder
     }))
   };

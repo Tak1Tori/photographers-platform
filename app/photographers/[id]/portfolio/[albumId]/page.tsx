@@ -56,7 +56,7 @@ export default async function PhotographerAlbumPage({ params }: AlbumPageProps) 
             ) : null}
             <p className="mt-5 inline-flex items-center gap-2 text-sm font-medium">
               <Images className="size-4" aria-hidden="true" />
-              {album.albumImages.length} фотографий
+              {album.albumImages.length} файлов
             </p>
           </div>
         </div>
@@ -67,10 +67,10 @@ export default async function PhotographerAlbumPage({ params }: AlbumPageProps) 
           <div className="mb-7">
             <p className="text-sm font-medium text-primary">Содержимое альбома</p>
             <h2 className="mt-2 text-2xl font-semibold tracking-normal md:text-3xl">
-              Фотографии съемки
+              Фото и видео съемки
             </h2>
             <p className="mt-2 text-sm text-muted-foreground">
-              Нажмите на фотографию, чтобы открыть её на весь экран.
+              Нажмите на файл, чтобы открыть фотографию или запустить видео.
             </p>
           </div>
           <AlbumPhotoGrid
