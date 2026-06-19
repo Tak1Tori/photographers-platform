@@ -8,14 +8,18 @@ interface PhotographersPageProps {
   searchParams: {
     style?: string;
     mode?: string;
+    flow?: string;
+    photographer?: string;
+    studio?: string;
   };
 }
 
 export default async function PhotographersPage({ searchParams }: PhotographersPageProps) {
   const isBookingMode = searchParams.mode === "booking";
+  const isFullShootFlow = searchParams.flow === "full-shoot";
   const [selectedStyle, filteredPhotographers] = await Promise.all([
     getStyleBySlug(searchParams.style),
-    isBookingMode
+    isBookingMode || (isFullShootFlow && !searchParams.style)
       ? getPhotographers()
       : searchParams.style
         ? getPhotographersByStyle(searchParams.style)
@@ -26,12 +30,12 @@ export default async function PhotographersPage({ searchParams }: PhotographersP
     <>
       <PageHeader
         eyebrow="Исполнители"
-        title={isBookingMode ? "Выберите фотографа для бронирования" : selectedStyle ? `Фотографы для ${selectedStyle.title}` : "Фотографы"}
-        description={isBookingMode ? "Фотограф приедет на вашу локацию, мероприятие или выбранную площадку." : "Выберите фотографа, который подходит под стиль съемки, город и бюджет."}
+        title={isBookingMode ? "Выберите фотографа для бронирования" : isFullShootFlow ? "Добавьте фотографа в съемку" : selectedStyle ? `Фотографы для ${selectedStyle.title}` : "Фотографы"}
+        description={isBookingMode ? "Фотограф приедет на вашу локацию, мероприятие или выбранную площадку." : isFullShootFlow ? "Выбранный фотограф появится в конструкторе фотосессии под ключ." : "Выберите фотографа, который подходит под стиль съемки, город и бюджет."}
       />
       <section className="section">
         <div className="container">
-          {!isBookingMode && !searchParams.style ? (
+          {!isBookingMode && !isFullShootFlow && !searchParams.style ? (
             <EmptyState
               title="Сначала выберите стиль"
               description="Фильтр фотографов строится от выбранного стиля съемки, чтобы дальше сохранить корректный сценарий бронирования."
@@ -43,13 +47,13 @@ export default async function PhotographersPage({ searchParams }: PhotographersP
               description="Похоже, ссылка устарела или содержит неверный slug. Вернитесь к каталогу и выберите стиль заново."
             />
           ) : null}
-          {(isBookingMode || selectedStyle) && filteredPhotographers.length === 0 ? (
+          {(isBookingMode || isFullShootFlow || selectedStyle) && filteredPhotographers.length === 0 ? (
             <EmptyState
               title="Фотографы не найдены"
               description="Для выбранного стиля пока нет подходящих фотографов в базе."
             />
           ) : null}
-          {(isBookingMode || selectedStyle) && filteredPhotographers.length > 0 ? (
+          {(isBookingMode || isFullShootFlow || selectedStyle) && filteredPhotographers.length > 0 ? (
             <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
               {filteredPhotographers.map((photographer) => (
                 <PhotographerCard
@@ -57,6 +61,23 @@ export default async function PhotographersPage({ searchParams }: PhotographersP
                   photographer={photographer}
                   styleSlug={selectedStyle?.id}
                   mode={isBookingMode ? "booking" : "full-shoot"}
+                  selectionHref={
+                    isFullShootFlow
+                      ? buildFullShootHref({
+                          style: selectedStyle?.id,
+                          photographer: photographer.id,
+                          studio: searchParams.studio
+                        })
+                      : undefined
+                  }
+                  profileHrefOverride={
+                    isFullShootFlow
+                      ? `/photographers/${photographer.id}?${buildFlowParams({
+                          style: selectedStyle?.id,
+                          studio: searchParams.studio
+                        })}`
+                      : undefined
+                  }
                 />
               ))}
             </div>
@@ -65,4 +86,25 @@ export default async function PhotographersPage({ searchParams }: PhotographersP
       </section>
     </>
   );
+}
+
+function buildFullShootHref(selection: {
+  style?: string;
+  photographer: string;
+  studio?: string;
+}) {
+  const params = new URLSearchParams({
+    type: "FULL_SHOOT",
+    photographer: selection.photographer
+  });
+  if (selection.style) params.set("style", selection.style);
+  if (selection.studio) params.set("studio", selection.studio);
+  return `/booking/new?${params.toString()}`;
+}
+
+function buildFlowParams(selection: { style?: string; studio?: string }) {
+  const params = new URLSearchParams({ flow: "full-shoot" });
+  if (selection.style) params.set("style", selection.style);
+  if (selection.studio) params.set("studio", selection.studio);
+  return params.toString();
 }

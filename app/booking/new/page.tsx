@@ -1,4 +1,4 @@
-import { redirect } from "next/navigation";
+import { FullShootBuilder } from "@/components/booking/new-flow/full-shoot-builder";
 import { BookingTypeSelector } from "@/components/booking/new-flow/booking-type-selector";
 import { PhotographerOnlyForm } from "@/components/booking/new-flow/photographer-only-form";
 import { StudioOnlyForm } from "@/components/booking/new-flow/studio-only-form";
@@ -7,12 +7,15 @@ import { PageHeader } from "@/components/shared/page-header";
 import { getSession } from "@/lib/auth";
 import { getPhotographerForBooking } from "@/lib/data/photographers";
 import { getStudioForBooking, getStudioHallForBooking } from "@/lib/data/studios";
+import { getStyleBySlug } from "@/lib/data/styles";
 import type { BookingType, Studio, StudioHall } from "@/lib/types";
 
 interface BookingNewPageProps {
   searchParams: {
     type?: BookingType;
     style?: string;
+    photographer?: string;
+    studio?: string;
     photographerId?: string;
     studioId?: string;
     studioHallId?: string;
@@ -26,9 +29,14 @@ export default async function BookingNewPage({ searchParams }: BookingNewPagePro
     ? (searchParams.type as BookingType)
     : undefined;
 
-  if (type === "FULL_SHOOT") {
-    redirect(searchParams.style ? `/photographers?style=${searchParams.style}` : "/styles");
-  }
+  const fullShootSelection =
+    type === "FULL_SHOOT"
+      ? await Promise.all([
+          getStyleBySlug(searchParams.style),
+          getPhotographerForBooking(searchParams.photographer),
+          getStudioForBooking(searchParams.studio)
+        ])
+      : undefined;
 
   const photographer =
     type === "PHOTOGRAPHER_ONLY"
@@ -51,6 +59,13 @@ export default async function BookingNewPage({ searchParams }: BookingNewPagePro
       <section className="section">
         <div className="container">
           {!type ? <BookingTypeSelector /> : null}
+          {type === "FULL_SHOOT" ? (
+            <FullShootBuilder
+              style={fullShootSelection?.[0]}
+              photographer={fullShootSelection?.[1]}
+              studio={fullShootSelection?.[2]}
+            />
+          ) : null}
 
           {type === "PHOTOGRAPHER_ONLY" && searchParams.photographerId && !photographer ? (
             <EmptyState
@@ -121,7 +136,7 @@ function getTitle(type: BookingType) {
 
 function getDescription(type: BookingType) {
   const map: Record<BookingType, string> = {
-    FULL_SHOOT: "Старый flow остается рабочим: стиль, фотограф, студия, время и депозит.",
+    FULL_SHOOT: "Соберите съемку в одном месте: выберите стиль, фотографа и студию.",
     PHOTOGRAPHER_ONLY: "Базовая форма заявки на фотографа для съемки на вашей локации.",
     STUDIO_ONLY: "Базовая форма заявки на аренду студии или конкретного зала."
   };

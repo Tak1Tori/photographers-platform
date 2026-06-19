@@ -16,6 +16,7 @@ interface StudioDetailPageProps {
   searchParams: {
     style?: string;
     photographer?: string;
+    flow?: string;
   };
 }
 
@@ -41,6 +42,14 @@ async function StudioDetail({ params, searchParams }: StudioDetailPageProps) {
   const bookingHref = selectedPhotographer
     ? `/booking?style=${selectedStyle?.id ?? studio.suitableStyleIds[0]}&photographer=${selectedPhotographer.id}&studio=${studio.id}`
     : `/studios?style=${selectedStyle?.id ?? studio.suitableStyleIds[0]}`;
+  const selectionHref =
+    searchParams.flow === "full-shoot"
+      ? buildFullShootHref({
+          style: selectedStyle?.id,
+          photographer: selectedPhotographer?.id,
+          studio: studio.id
+        })
+      : bookingHref;
 
   return (
     <>
@@ -78,7 +87,7 @@ async function StudioDetail({ params, searchParams }: StudioDetailPageProps) {
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <Button asChild size="lg">
-                <Link href={bookingHref}>
+                <Link href={selectionHref}>
                   <CalendarCheck className="size-4" aria-hidden="true" />
                   Выбрать студию
                 </Link>
@@ -143,4 +152,18 @@ async function StudioDetail({ params, searchParams }: StudioDetailPageProps) {
       </section>
     </>
   );
+}
+
+function buildFullShootHref(selection: {
+  style?: string;
+  photographer?: string;
+  studio: string;
+}) {
+  const params = new URLSearchParams({
+    type: "FULL_SHOOT",
+    studio: selection.studio
+  });
+  if (selection.style) params.set("style", selection.style);
+  if (selection.photographer) params.set("photographer", selection.photographer);
+  return `/booking/new?${params.toString()}`;
 }

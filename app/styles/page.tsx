@@ -3,8 +3,17 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { PageHeader } from "@/components/shared/page-header";
 import { getStyles } from "@/lib/data/styles";
 
-export default async function StylesPage() {
+interface StylesPageProps {
+  searchParams: {
+    flow?: string;
+    photographer?: string;
+    studio?: string;
+  };
+}
+
+export default async function StylesPage({ searchParams }: StylesPageProps) {
   const styles = await getStyles();
+  const isFullShootFlow = searchParams.flow === "full-shoot";
 
   return (
     <>
@@ -23,7 +32,20 @@ export default async function StylesPage() {
           ) : (
             <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
               {styles.map((style) => (
-                <StyleCard key={style.id} style={style} />
+                <StyleCard
+                  key={style.id}
+                  style={style}
+                  ctaLabel={isFullShootFlow ? "Добавить в съемку" : undefined}
+                  selectionHref={
+                    isFullShootFlow
+                      ? buildFullShootHref({
+                          style: style.id,
+                          photographer: searchParams.photographer,
+                          studio: searchParams.studio
+                        })
+                      : undefined
+                  }
+                />
               ))}
             </div>
           )}
@@ -31,4 +53,18 @@ export default async function StylesPage() {
       </section>
     </>
   );
+}
+
+function buildFullShootHref(selection: {
+  style: string;
+  photographer?: string;
+  studio?: string;
+}) {
+  const params = new URLSearchParams({
+    type: "FULL_SHOOT",
+    style: selection.style
+  });
+  if (selection.photographer) params.set("photographer", selection.photographer);
+  if (selection.studio) params.set("studio", selection.studio);
+  return `/booking/new?${params.toString()}`;
 }

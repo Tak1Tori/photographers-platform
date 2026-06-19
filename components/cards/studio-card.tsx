@@ -11,17 +11,28 @@ interface StudioCardProps {
   styleSlug?: string;
   photographerId?: string;
   mode?: "booking" | "full-shoot";
+  selectionHref?: string;
+  detailHrefOverride?: string;
 }
 
-export function StudioCard({ studio, styleSlug, photographerId, mode = "full-shoot" }: StudioCardProps) {
+export function StudioCard({
+  studio,
+  styleSlug,
+  photographerId,
+  mode = "full-shoot",
+  selectionHref,
+  detailHrefOverride
+}: StudioCardProps) {
   const primaryHref =
-    mode === "booking"
+    selectionHref ??
+    (mode === "booking"
       ? `/booking/new?type=STUDIO_ONLY&studioId=${studio.id}`
-      : `/booking?style=${styleSlug}&photographer=${photographerId}&studio=${studio.id}`;
+      : `/booking?style=${styleSlug}&photographer=${photographerId}&studio=${studio.id}`);
   const detailHref =
-    styleSlug && photographerId
+    detailHrefOverride ??
+    (styleSlug && photographerId
       ? `/studios/${studio.id}?style=${styleSlug}&photographer=${photographerId}`
-      : `/studios/${studio.id}`;
+      : `/studios/${studio.id}`);
 
   return (
     <Card className="overflow-hidden">

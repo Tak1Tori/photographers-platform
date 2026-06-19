@@ -62,7 +62,7 @@ function HeaderContent() {
           <span className="flex size-9 items-center justify-center rounded-md bg-primary text-primary-foreground">
             <Camera className="size-5" aria-hidden="true" />
           </span>
-          <span>Framely</span>
+          <span className="hidden sm:inline">Framely</span>
         </Link>
         <nav className="hidden items-center gap-6 text-sm text-muted-foreground md:flex">
           {navItems.map((item) => (

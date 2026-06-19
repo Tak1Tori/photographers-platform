@@ -10,16 +10,27 @@ interface PhotographerCardProps {
   photographer: Photographer;
   styleSlug?: string;
   mode?: "booking" | "full-shoot";
+  selectionHref?: string;
+  profileHrefOverride?: string;
 }
 
-export function PhotographerCard({ photographer, styleSlug, mode = "full-shoot" }: PhotographerCardProps) {
+export function PhotographerCard({
+  photographer,
+  styleSlug,
+  mode = "full-shoot",
+  selectionHref,
+  profileHrefOverride
+}: PhotographerCardProps) {
   const primaryHref =
-    mode === "booking"
+    selectionHref ??
+    (mode === "booking"
       ? `/booking/new?type=PHOTOGRAPHER_ONLY&photographerId=${photographer.id}`
-      : `/studios?style=${styleSlug}&photographer=${photographer.id}`;
-  const profileHref = styleSlug
-    ? `/photographers/${photographer.id}?style=${styleSlug}`
-    : `/photographers/${photographer.id}`;
+      : `/studios?style=${styleSlug}&photographer=${photographer.id}`);
+  const profileHref =
+    profileHrefOverride ??
+    (styleSlug
+      ? `/photographers/${photographer.id}?style=${styleSlug}`
+      : `/photographers/${photographer.id}`);
 
   return (
     <Card className="overflow-hidden">

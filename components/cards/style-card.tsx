@@ -9,9 +9,14 @@ import type { PhotoStyle } from "@/lib/types";
 interface StyleCardProps {
   style: PhotoStyle;
   ctaLabel?: string;
+  selectionHref?: string;
 }
 
-export function StyleCard({ style, ctaLabel = "Выбрать стиль" }: StyleCardProps) {
+export function StyleCard({
+  style,
+  ctaLabel = "Выбрать стиль",
+  selectionHref
+}: StyleCardProps) {
   return (
     <Card className="overflow-hidden">
       <div className="relative aspect-[4/3]">
@@ -29,7 +34,7 @@ export function StyleCard({ style, ctaLabel = "Выбрать стиль" }: Sty
         <div className="mt-5 flex items-center justify-between gap-3">
           <span className="font-medium">от {formatPrice(style.startingPrice)}</span>
           <Button asChild size="sm">
-            <Link href={`/photographers?style=${style.id}`}>
+            <Link href={selectionHref ?? `/photographers?style=${style.id}`}>
               {ctaLabel}
               <ArrowRight className="size-4" aria-hidden="true" />
             </Link>

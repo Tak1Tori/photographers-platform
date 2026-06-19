@@ -16,6 +16,8 @@ interface PhotographerDetailPageProps {
   };
   searchParams: {
     style?: string;
+    flow?: string;
+    studio?: string;
   };
 }
 
@@ -39,6 +41,11 @@ async function PhotographerDetail({ params, searchParams }: PhotographerDetailPa
     photographer.specializationIds.includes(searchParams.style)
       ? searchParams.style
       : photographer.specializationIds[0];
+  const fullShootHref = buildFullShootHref({
+    style: selectedStyleSlug,
+    photographer: photographer.id,
+    studio: searchParams.studio
+  });
 
   return (
     <>
@@ -81,7 +88,11 @@ async function PhotographerDetail({ params, searchParams }: PhotographerDetailPa
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <Button asChild size="lg">
                 <Link
-                  href={`/studios?style=${selectedStyleSlug}&photographer=${photographer.id}`}
+                  href={
+                    searchParams.flow === "full-shoot"
+                      ? fullShootHref
+                      : `/studios?style=${selectedStyleSlug}&photographer=${photographer.id}`
+                  }
                 >
                   <CalendarCheck className="size-4" aria-hidden="true" />
                   Выбрать этого фотографа
@@ -134,4 +145,18 @@ async function PhotographerDetail({ params, searchParams }: PhotographerDetailPa
       </section>
     </>
   );
+}
+
+function buildFullShootHref(selection: {
+  style?: string;
+  photographer: string;
+  studio?: string;
+}) {
+  const params = new URLSearchParams({
+    type: "FULL_SHOOT",
+    photographer: selection.photographer
+  });
+  if (selection.style) params.set("style", selection.style);
+  if (selection.studio) params.set("studio", selection.studio);
+  return `/booking/new?${params.toString()}`;
 }
