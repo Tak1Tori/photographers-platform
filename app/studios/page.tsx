@@ -60,11 +60,12 @@ export default async function StudiosPage({ searchParams }: StudiosPageProps) {
             />
           ) : null}
           {(isBookingMode || isFullShootFlow || (selectedStyle && selectedPhotographer)) && filteredStudios.length > 0 ? (
-            <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-              {filteredStudios.map((studio) => (
+            <div className="grid gap-5 md:grid-cols-2">
+              {filteredStudios.map((studio, index) => (
                 <StudioCard
                   key={studio.id}
                   studio={studio}
+                  imagePriority={index < 2}
                   styleSlug={selectedStyle?.id}
                   photographerId={selectedPhotographer?.id}
                   mode={isBookingMode ? "booking" : "full-shoot"}
