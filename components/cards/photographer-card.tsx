@@ -33,17 +33,22 @@ export function PhotographerCard({
       : `/photographers/${photographer.id}`);
 
   return (
-    <Card className="overflow-hidden">
+    <Card className="group relative flex h-full flex-col overflow-hidden transition-colors hover:border-primary/45">
+      <Link
+        href={profileHref}
+        className="absolute inset-0 z-10"
+        aria-label={`Открыть профиль фотографа ${photographer.name}`}
+      />
       <div className="relative aspect-[4/3]">
         <Image
           src={photographer.imageUrl}
           alt={photographer.name}
           fill
           sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
-          className="object-cover"
+          className="object-cover transition-transform duration-500 group-hover:scale-[1.02]"
         />
       </div>
-      <CardContent className="p-5">
+      <CardContent className="flex flex-1 flex-col p-5">
         <div className="flex items-start justify-between gap-4">
           <div>
             <h3 className="font-semibold">{photographer.name}</h3>
@@ -77,23 +82,17 @@ export function PhotographerCard({
             </div>
           ))}
         </div>
-        <div className="mt-5 flex items-center justify-between gap-3">
-          <span className="text-sm font-medium">
+        <div className="mt-auto pt-6">
+          <p className="text-center text-base font-medium">
             {formatPrice(photographer.pricePerHour)} / час
-          </span>
-          <Button asChild size="sm">
-            <Link href={primaryHref}>
+          </p>
+          <Button asChild size="lg" className="relative z-20 mx-auto mt-4 flex w-full max-w-sm">
+            <Link href={primaryHref} aria-label={`Забронировать фотографа ${photographer.name}`}>
               {mode === "booking" ? "Забронировать" : "Выбрать фотографа"}
               <ArrowRight className="size-4" aria-hidden="true" />
             </Link>
           </Button>
         </div>
-        <Link
-          href={profileHref}
-          className="mt-4 inline-block text-sm font-medium text-muted-foreground hover:text-foreground"
-        >
-          Смотреть профиль
-        </Link>
       </CardContent>
     </Card>
   );
