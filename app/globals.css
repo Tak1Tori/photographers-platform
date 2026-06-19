@@ -43,24 +43,6 @@
     @apply py-14 md:py-20;
   }
 
-  .site-grid {
-    pointer-events: none;
-    position: fixed;
-    inset: 0;
-    z-index: 0;
-    background-image:
-      linear-gradient(hsl(150 18% 80% / 0.035) 1px, transparent 1px),
-      linear-gradient(90deg, hsl(150 18% 80% / 0.035) 1px, transparent 1px),
-      linear-gradient(hsl(151 58% 38% / 0.025) 1px, transparent 1px),
-      linear-gradient(90deg, hsl(151 58% 38% / 0.025) 1px, transparent 1px);
-    background-size:
-      32px 32px,
-      32px 32px,
-      128px 128px,
-      128px 128px;
-    mask-image: linear-gradient(to bottom, transparent, black 8rem, black 92%, transparent);
-  }
-
   .cursor-glow {
     pointer-events: none;
     position: fixed;

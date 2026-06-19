@@ -20,7 +20,6 @@ export default function RootLayout({
   return (
     <html lang="ru">
       <body className={inter.className}>
-        <div className="site-grid" aria-hidden="true" />
         <CursorGlow />
         <div className="relative z-10 flex min-h-screen flex-col">
           <Header />
