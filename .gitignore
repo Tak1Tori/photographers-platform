@@ -12,3 +12,4 @@ components/booking/new-flow/studio-only-form 2.tsx
 .env*.local
 *.tsbuildinfo
 next-env.d.ts
+.vercel
