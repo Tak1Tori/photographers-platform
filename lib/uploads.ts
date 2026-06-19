@@ -48,10 +48,27 @@ export async function uploadImageToCloudinary(
     throw new Error(validation.error);
   }
 
-  if (!hasCloudinaryConfig()) {
-    return saveImageLocally(file, folder);
+  if (hasCloudinaryConfig()) {
+    return uploadToCloudinary(file, folder);
   }
 
+  if (hasSupabaseStorageConfig()) {
+    return uploadToSupabaseStorage(file, folder);
+  }
+
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(
+      "Облачное хранилище изображений не настроено. Добавьте настройки Supabase Storage или Cloudinary."
+    );
+  }
+
+  return saveImageLocally(file, folder);
+}
+
+async function uploadToCloudinary(
+  file: File,
+  folder: string
+): Promise<CloudinaryUploadResult> {
   const client = configureCloudinary();
   const buffer = Buffer.from(await file.arrayBuffer());
   const result = await new Promise<UploadApiResponse>((resolve, reject) => {
@@ -107,7 +124,67 @@ export async function deleteImageFromCloudinary(publicId?: string | null) {
     return;
   }
 
+  if (publicId.startsWith("supabase:")) {
+    await deleteFromSupabaseStorage(publicId.slice("supabase:".length));
+    return;
+  }
+
   await deleteCloudinaryImage(publicId);
+}
+
+function hasSupabaseStorageConfig() {
+  return Boolean(
+    process.env.SUPABASE_STORAGE_ENDPOINT &&
+      process.env.SUPABASE_STORAGE_SECRET
+  );
+}
+
+async function uploadToSupabaseStorage(
+  file: File,
+  folder: string
+): Promise<CloudinaryUploadResult> {
+  const extensionByType: Record<string, string> = {
+    "image/jpeg": "jpg",
+    "image/png": "png",
+    "image/webp": "webp"
+  };
+  const extension = extensionByType[file.type] ?? "jpg";
+  const filePath = `${sanitizeFolder(folder)}/${randomUUID()}.${extension}`;
+  const response = await fetch(process.env.SUPABASE_STORAGE_ENDPOINT!, {
+    method: "POST",
+    headers: {
+      "content-type": file.type,
+      "x-file-path": filePath,
+      "x-framely-upload-secret": process.env.SUPABASE_STORAGE_SECRET!
+    },
+    body: await file.arrayBuffer()
+  });
+  const result = (await response.json()) as CloudinaryUploadResult & {
+    error?: string;
+  };
+
+  if (!response.ok) {
+    throw new Error(result.error ?? "Не удалось загрузить изображение в Supabase Storage.");
+  }
+
+  return result;
+}
+
+async function deleteFromSupabaseStorage(filePath: string) {
+  if (!hasSupabaseStorageConfig()) return;
+
+  const response = await fetch(process.env.SUPABASE_STORAGE_ENDPOINT!, {
+    method: "DELETE",
+    headers: {
+      "x-file-path": filePath,
+      "x-framely-upload-secret": process.env.SUPABASE_STORAGE_SECRET!
+    }
+  });
+
+  if (!response.ok) {
+    const result = (await response.json()) as { error?: string };
+    throw new Error(result.error ?? "Не удалось удалить изображение из Supabase Storage.");
+  }
 }
 
 async function saveImageLocally(file: File, folder: string): Promise<CloudinaryUploadResult> {
@@ -116,11 +193,7 @@ async function saveImageLocally(file: File, folder: string): Promise<CloudinaryU
     "image/png": "png",
     "image/webp": "webp"
   };
-  const safeFolder = folder
-    .split("/")
-    .map((part) => part.replace(/[^a-z0-9-]/gi, ""))
-    .filter(Boolean)
-    .join("/");
+  const safeFolder = sanitizeFolder(folder);
   const extension = extensionByType[file.type] ?? "jpg";
   const fileName = `${randomUUID()}.${extension}`;
   const relativePath = path.posix.join(safeFolder, fileName);
@@ -139,4 +212,12 @@ async function saveImageLocally(file: File, folder: string): Promise<CloudinaryU
     format: extension,
     bytes: buffer.length
   };
+}
+
+function sanitizeFolder(folder: string) {
+  return folder
+    .split("/")
+    .map((part) => part.replace(/[^a-z0-9-]/gi, ""))
+    .filter(Boolean)
+    .join("/");
 }
