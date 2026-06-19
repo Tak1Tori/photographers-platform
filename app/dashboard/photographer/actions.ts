@@ -8,6 +8,7 @@ import { getDevStore, updateDevStore } from "@/lib/data/dev-store";
 import { notifyBookingStatusChanged } from "@/lib/notifications/notification-service";
 import { prisma } from "@/lib/prisma";
 import {
+  avatarImageMaxBytes,
   albumCoverMaxBytes,
   albumImageMaxBytes,
   albumUploadMaxBytes,
@@ -167,13 +168,17 @@ export async function updatePhotographerProfileAction(formData: FormData): Promi
     }
 
     if (hasNewAvatar && avatarFile) {
-      const validation = validateImageFile(avatarFile);
+      const validation = validateImageFile(avatarFile, avatarImageMaxBytes);
 
       if (!validation.valid) {
         return { success: false, error: validation.error };
       }
 
-      const uploaded = await uploadImageToCloudinary(avatarFile, "photographers/avatars");
+      const uploaded = await uploadImageToCloudinary(
+        avatarFile,
+        "photographers/avatars",
+        avatarImageMaxBytes
+      );
       avatarUrl = uploaded.secureUrl;
       newAvatarPublicId = uploaded.publicId;
     }

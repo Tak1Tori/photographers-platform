@@ -11,6 +11,7 @@ import {
 
 const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
 const maxBytes = 5 * 1024 * 1024;
+export const avatarImageMaxBytes = 25 * 1024 * 1024;
 export const albumCoverMaxBytes = 4 * 1024 * 1024;
 export const albumImageMaxBytes = 25 * 1024 * 1024;
 export const albumUploadMaxBytes = 120 * 1024 * 1024;

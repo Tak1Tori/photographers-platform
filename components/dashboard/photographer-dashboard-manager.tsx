@@ -154,6 +154,7 @@ export function PhotographerDashboardManager({
                   label="Новый аватар"
                   currentUrl={profile.avatarUrl}
                   previewAlt={profile.name}
+                  maxSizeMb={25}
                 />
               </div>
               <div className="grid gap-4">
