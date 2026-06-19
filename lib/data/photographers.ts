@@ -439,7 +439,7 @@ const getCachedPublicAlbumPageData = unstable_cache(
       album: mapPortfolioItem(item)
     };
   },
-  ["public-photographer-album-v1"],
+  ["public-photographer-album-v2"],
   { revalidate: 30 }
 );
 
@@ -532,8 +532,18 @@ function mapPortfolioItem(item: {
       id: image.id,
       imageUrl: image.imageUrl,
       imagePublicId: image.imagePublicId ?? undefined,
-      mediaType: image.mediaType,
+      mediaType: resolveAlbumMediaType(image.mediaType, image.imageUrl),
       sortOrder: image.sortOrder
     }))
   };
+}
+
+function resolveAlbumMediaType(
+  mediaType: "IMAGE" | "VIDEO" | undefined,
+  imageUrl: string
+): "IMAGE" | "VIDEO" {
+  if (mediaType === "VIDEO") return "VIDEO";
+
+  const pathname = imageUrl.split(/[?#]/, 1)[0].toLowerCase();
+  return /\.(mp4|webm|mov|m4v)$/.test(pathname) ? "VIDEO" : "IMAGE";
 }

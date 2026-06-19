@@ -63,6 +63,13 @@ export function AlbumPhotoGrid({
     );
   }
 
+  function isVideo(image: PortfolioAlbumImage) {
+    if (image.mediaType === "VIDEO") return true;
+
+    const pathname = image.imageUrl.split(/[?#]/, 1)[0].toLowerCase();
+    return /\.(mp4|webm|mov|m4v)$/.test(pathname);
+  }
+
   return (
     <>
       <div className="columns-1 gap-4 sm:columns-2 lg:columns-3">
@@ -73,7 +80,7 @@ export function AlbumPhotoGrid({
             className="group relative mb-4 block w-full overflow-hidden rounded-lg border border-border bg-card"
             onClick={() => setActiveIndex(index)}
           >
-            {image.mediaType === "VIDEO" ? (
+            {isVideo(image) ? (
               <div className="relative aspect-video">
                 <video
                   src={image.imageUrl}
@@ -127,7 +134,7 @@ export function AlbumPhotoGrid({
             </Button>
           </div>
           <div className="relative min-h-0 flex-1">
-            {images[activeIndex].mediaType === "VIDEO" ? (
+            {isVideo(images[activeIndex]) ? (
               <video
                 key={images[activeIndex].id}
                 src={images[activeIndex].imageUrl}
@@ -186,7 +193,7 @@ export function AlbumPhotoGrid({
                   )}
                   onClick={() => setActiveIndex(index)}
                 >
-                  {image.mediaType === "VIDEO" ? (
+                  {isVideo(image) ? (
                     <>
                       <video
                         src={image.imageUrl}

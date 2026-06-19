@@ -450,6 +450,7 @@ export async function updatePortfolioItemAction(formData: FormData): Promise<Act
 
     revalidatePath("/dashboard/photographer");
     revalidatePath(`/photographers/${profile.id}`);
+    revalidatePath(`/photographers/${profile.id}/portfolio/${id}`);
     return { success: true };
   } catch (error) {
     if (newImagePublicId && !imageSaved) {
@@ -890,6 +891,9 @@ export async function savePhotographerPortfolioAction(
     revalidatePath("/dashboard/photographer");
     revalidatePath("/photographers");
     revalidatePath(`/photographers/${profile.id}`);
+    existingInputs.forEach((input) => {
+      revalidatePath(`/photographers/${profile.id}/portfolio/${input.id}`);
+    });
     return { success: true };
   } catch (error) {
     if (!changesSaved) {
@@ -972,6 +976,7 @@ export async function deletePortfolioItemAction(formData: FormData): Promise<Act
 
     revalidatePath("/dashboard/photographer");
     revalidatePath(`/photographers/${profile.id}`);
+    revalidatePath(`/photographers/${profile.id}/portfolio/${id}`);
     return { success: true };
   } catch (error) {
     return { success: false, error: getErrorMessage(error) };
