@@ -85,3 +85,12 @@ export async function getAdminNotificationLogs() {
     take: 100
   });
 }
+
+export async function getAdminPaymentWebhookLogs() {
+  if (!canUseDatabase()) return [];
+
+  return prisma.paymentWebhookLog.findMany({
+    orderBy: { createdAt: "desc" },
+    take: 100
+  });
+}

@@ -147,6 +147,68 @@ export async function notifyDepositPaid(bookingId: string) {
   });
 }
 
+export async function notifyFinalPaymentRequested(bookingId: string) {
+  await safeNotify(async () => {
+    const booking = await getBookingForNotification(bookingId);
+    if (!booking) return;
+
+    await createNotifications([
+      ...(booking.clientId
+        ? [{
+            userId: booking.clientId,
+            type: NotificationType.FINAL_PAYMENT_REQUESTED,
+            title: "Оплатите остаток по брони",
+            message: `По брони ${booking.bookingNumber} запрошена финальная оплата.`,
+            linkUrl: bookingLink(booking.bookingNumber)
+          }]
+        : []),
+      ...participantNotifications(booking, {
+        type: NotificationType.FINAL_PAYMENT_REQUESTED,
+        title: "Финальная оплата запрошена",
+        message: `По брони ${booking.bookingNumber} клиенту отправлен запрос на оплату остатка.`,
+        linkUrl: bookingLink(booking.bookingNumber)
+      }),
+      ...(await adminNotifications({
+        type: NotificationType.FINAL_PAYMENT_REQUESTED,
+        title: "Финальная оплата запрошена",
+        message: `По брони ${booking.bookingNumber} запрошена финальная оплата.`,
+        linkUrl: "/admin"
+      }))
+    ]);
+  });
+}
+
+export async function notifyFullyPaid(bookingId: string) {
+  await safeNotify(async () => {
+    const booking = await getBookingForNotification(bookingId);
+    if (!booking) return;
+
+    await createNotifications([
+      ...(booking.clientId
+        ? [{
+            userId: booking.clientId,
+            type: NotificationType.FULLY_PAID,
+            title: "Заказ полностью оплачен",
+            message: `Бронь ${booking.bookingNumber} полностью оплачена.`,
+            linkUrl: bookingLink(booking.bookingNumber)
+          }]
+        : []),
+      ...participantNotifications(booking, {
+        type: NotificationType.FULLY_PAID,
+        title: "Клиент оплатил остаток",
+        message: `Бронь ${booking.bookingNumber} полностью оплачена.`,
+        linkUrl: bookingLink(booking.bookingNumber)
+      }),
+      ...(await adminNotifications({
+        type: NotificationType.FULLY_PAID,
+        title: "Бронь готова к выплате",
+        message: `Бронь ${booking.bookingNumber} полностью оплачена и готова к выплате.`,
+        linkUrl: "/admin"
+      }))
+    ]);
+  });
+}
+
 export async function notifyBookingStatusChanged(bookingId: string, newStatus: BookingStatus) {
   await safeNotify(async () => {
     const booking = await getBookingForNotification(bookingId);

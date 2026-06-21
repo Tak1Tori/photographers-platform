@@ -14,6 +14,8 @@ import {
   notifyReviewCreated
 } from "@/lib/notifications/notification-service";
 import { BookingStatus } from "@prisma/client";
+import { getPendingFinalPaymentCheckout } from "@/lib/payments/payment-service";
+import { prisma } from "@/lib/prisma";
 
 type ActionResult = {
   success: boolean;
@@ -99,6 +101,40 @@ export async function createClientReviewAction(formData: FormData): Promise<Acti
     return {
       success: false,
       error: error instanceof Error ? error.message : "Не удалось сохранить отзыв"
+    };
+  }
+}
+
+export async function openFinalPaymentCheckoutAction(
+  bookingNumber: string
+): Promise<ActionResult & { checkoutUrl?: string }> {
+  try {
+    const session = await requireClientAccess();
+    const booking = await prisma.booking.findFirst({
+      where: {
+        bookingNumber,
+        ...(session.user.role === UserRole.ADMIN
+          ? {}
+          : { clientId: session.user.id })
+      },
+      select: {
+        id: true,
+        paymentStatus: true,
+        remainingAmount: true
+      }
+    });
+
+    if (!booking) throw new Error("Booking not found");
+    if (booking.paymentStatus !== "FINAL_PAYMENT_PENDING" || booking.remainingAmount <= 0) {
+      throw new Error("Final payment is not available for this booking");
+    }
+
+    const checkout = await getPendingFinalPaymentCheckout(booking.id);
+    return { success: true, checkoutUrl: checkout.checkoutUrl };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Не удалось открыть оплату"
     };
   }
 }

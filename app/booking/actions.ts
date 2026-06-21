@@ -16,9 +16,12 @@ export async function createBookingAction(
   input: CreateBookingInput
 ): Promise<CreateBookingResult> {
   const session = await getSession();
+  if (!session?.user || session.user.role !== UserRole.CLIENT) {
+    return { success: false, error: "Войдите как клиент, чтобы создать и оплатить бронь." };
+  }
   const bookingInput: CreateBookingInput = {
     ...input,
-    clientId: session?.user.role === UserRole.CLIENT ? session.user.id : undefined
+    clientId: session.user.id
   };
   const required: Array<[keyof CreateBookingInput, string]> = [
     ["clientName", "Name is required"],

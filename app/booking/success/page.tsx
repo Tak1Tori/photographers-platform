@@ -21,13 +21,23 @@ export default async function BookingSuccessPage({ searchParams }: BookingSucces
   const showClientCta = Boolean(
     session?.user.role === "CLIENT" && booking?.clientId === session.user.id
   );
+  const depositPaid = Boolean(
+    booking &&
+      ["DEPOSIT_PAID", "FINAL_PAYMENT_PENDING", "FULLY_PAID"].includes(
+        booking.paymentStatus
+      )
+  );
 
   return (
     <>
       <PageHeader
         eyebrow="Success"
         title="Бронь успешно создана"
-        description="Депозит оплачен. Исполнитель должен подтвердить бронь."
+        description={
+          depositPaid
+            ? "Webhook подтвердил оплату депозита. Исполнитель должен подтвердить бронь."
+            : "Бронь создана. Ожидаем подтверждение оплаты от платежного провайдера."
+        }
       />
       <section className="section">
         <div className="container">
@@ -41,7 +51,9 @@ export default async function BookingSuccessPage({ searchParams }: BookingSucces
                     <CheckCircle2 className="size-7" aria-hidden="true" />
                   </span>
                   <div>
-                    <h2 className="text-2xl font-semibold tracking-normal">Депозит оплачен</h2>
+                    <h2 className="text-2xl font-semibold tracking-normal">
+                      {depositPaid ? "Депозит оплачен" : "Оплата обрабатывается"}
+                    </h2>
                     <p className="mt-2 text-muted-foreground">Номер брони: <span className="font-medium text-foreground">{booking.id}</span></p>
                   </div>
                 </div>
@@ -80,11 +92,13 @@ export default async function BookingSuccessPage({ searchParams }: BookingSucces
                   <Summary label="Общая сумма" value={formatPrice(booking.totalAmount)} />
                 </div>
                 <p className="rounded-md bg-secondary px-4 py-3 text-sm font-medium">
-                  {booking.bookingType === "PHOTOGRAPHER_ONLY"
-                    ? "Ожидает подтверждения фотографа."
-                    : booking.bookingType === "STUDIO_ONLY"
-                      ? "Ожидает подтверждения студии."
-                      : "Фотограф и студия должны подтвердить бронь."}
+                  {depositPaid
+                    ? booking.bookingType === "PHOTOGRAPHER_ONLY"
+                      ? "Ожидает подтверждения фотографа."
+                      : booking.bookingType === "STUDIO_ONLY"
+                        ? "Ожидает подтверждения студии."
+                        : "Фотограф и студия должны подтвердить бронь."
+                    : "Redirect не меняет статус оплаты. Страница обновится после webhook провайдера."}
                 </p>
                 <Button asChild className="w-fit">
                   <Link href={showClientCta ? "/dashboard/client/bookings" : "/"}>

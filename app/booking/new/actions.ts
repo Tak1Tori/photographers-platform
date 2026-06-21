@@ -29,9 +29,12 @@ export async function createPhotographerOnlyBookingAction(
   formData: FormData
 ): Promise<CreateBookingResult & { fieldErrors?: FieldErrors }> {
   const session = await getSession();
+  if (!session?.user) {
+    return { success: false, error: "Войдите как клиент, чтобы создать бронь." };
+  }
 
   const allowedRoles: UserRole[] = [UserRole.CLIENT, UserRole.ADMIN];
-  if (session?.user.role && !allowedRoles.includes(session.user.role)) {
+  if (!allowedRoles.includes(session.user.role)) {
     return { success: false, error: "Создать клиентскую заявку может только клиент." };
   }
 
@@ -54,7 +57,7 @@ export async function createPhotographerOnlyBookingAction(
 
   const input: CreatePhotographerOnlyBookingInput = {
     ...parsed.input,
-    clientId: session?.user.role === UserRole.CLIENT ? session.user.id : undefined
+    clientId: session.user.id
   };
 
   try {
@@ -84,9 +87,12 @@ export async function createStudioOnlyBookingAction(
   formData: FormData
 ): Promise<CreateBookingResult & { fieldErrors?: FieldErrors }> {
   const session = await getSession();
+  if (!session?.user) {
+    return { success: false, error: "Войдите как клиент, чтобы создать бронь." };
+  }
   const allowedRoles: UserRole[] = [UserRole.CLIENT, UserRole.ADMIN];
 
-  if (session?.user.role && !allowedRoles.includes(session.user.role)) {
+  if (!allowedRoles.includes(session.user.role)) {
     return { success: false, error: "Создать клиентскую заявку может только клиент." };
   }
 
@@ -109,7 +115,7 @@ export async function createStudioOnlyBookingAction(
 
   const input: CreateStudioOnlyBookingInput = {
     ...parsed.input,
-    clientId: session?.user.role === UserRole.CLIENT ? session.user.id : undefined
+    clientId: session.user.id
   };
 
   try {

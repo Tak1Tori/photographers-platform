@@ -10,6 +10,7 @@ import {
 import {
   getAdminNotificationLogs,
   getAdminPayments,
+  getAdminPaymentWebhookLogs,
   getAdminPhotographerProfiles,
   getAdminStudioHalls,
   getAdminStudioProfiles,
@@ -26,12 +27,13 @@ export default async function AdminPage() {
   await requireSession(["ADMIN"]);
   const bookings = await getAllBookings();
   const stats = await getAdminStats();
-  const [users, photographers, studios, halls, payments, notificationLogs] = await Promise.all([
+  const [users, photographers, studios, halls, payments, webhookLogs, notificationLogs] = await Promise.all([
     getAdminUsers(),
     getAdminPhotographerProfiles(),
     getAdminStudioProfiles(),
     getAdminStudioHalls(),
     getAdminPayments(),
+    getAdminPaymentWebhookLogs(),
     getAdminNotificationLogs()
   ]);
   const photographerCommission = bookings.reduce(
@@ -130,6 +132,18 @@ export default async function AdminPage() {
               provider: payment.provider,
               type: payment.type,
               createdAt: payment.createdAt.toISOString().slice(0, 10)
+            }))}
+            webhookLogs={webhookLogs.map((log) => ({
+              id: log.id,
+              provider: log.provider,
+              eventType: log.eventType,
+              providerPaymentId: log.providerPaymentId ?? undefined,
+              paymentId: log.paymentId ?? undefined,
+              bookingId: log.bookingId ?? undefined,
+              signatureValid: log.signatureValid,
+              processed: log.processed,
+              processingError: log.processingError ?? undefined,
+              createdAt: log.createdAt.toISOString()
             }))}
             notificationLogs={notificationLogs.map((notification) => ({
               id: notification.id,

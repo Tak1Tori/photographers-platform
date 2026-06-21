@@ -92,7 +92,15 @@ type PrismaBookingLike = {
   depositAmount?: number;
   paidAmount?: number;
   remainingAmount?: number;
+  platformCommission?: number | null;
+  providerFee?: number | null;
+  netPlatformRevenue?: number | null;
   paymentStatus?: string;
+  completedAt?: Date | null;
+  finalPaymentRequestedAt?: Date | null;
+  fullyPaidAt?: Date | null;
+  payoutStatus?: string | null;
+  payoutAmount?: number | null;
   rescheduleRequestedAt?: Date | null;
   rescheduleComment?: string | null;
   status: string;
@@ -216,7 +224,15 @@ export function mapBooking(booking: PrismaBookingLike): Booking {
     depositAmount: booking.depositAmount ?? 0,
     paidAmount: booking.paidAmount ?? 0,
     remainingAmount: booking.remainingAmount ?? booking.totalPrice,
+    platformCommission: booking.platformCommission ?? undefined,
+    providerFee: booking.providerFee ?? undefined,
+    netPlatformRevenue: booking.netPlatformRevenue ?? undefined,
     paymentStatus: mapBookingPaymentStatus(booking.paymentStatus),
+    completedAt: booking.completedAt?.toISOString(),
+    finalPaymentRequestedAt: booking.finalPaymentRequestedAt?.toISOString(),
+    fullyPaidAt: booking.fullyPaidAt?.toISOString(),
+    payoutStatus: booking.payoutStatus ?? undefined,
+    payoutAmount: booking.payoutAmount ?? undefined,
     rescheduleRequestedAt: booking.rescheduleRequestedAt?.toISOString(),
     rescheduleComment: booking.rescheduleComment ?? undefined,
     status: mapBookingStatus(booking.status)
@@ -259,6 +275,7 @@ function mapBookingStatus(status: string): Booking["status"] {
   const map: Record<string, Booking["status"]> = {
     PENDING: "Pending",
     CONFIRMED: "Confirmed",
+    IN_PROGRESS: "In progress",
     COMPLETED: "Completed",
     CANCELLED: "Cancelled",
     DECLINED: "Declined"
@@ -269,8 +286,10 @@ function mapBookingStatus(status: string): Booking["status"] {
 function mapBookingPaymentStatus(status?: string): Booking["paymentStatus"] {
   const map: Record<string, Booking["paymentStatus"]> = {
     UNPAID: "UNPAID",
+    DEPOSIT_PENDING: "DEPOSIT_PENDING",
     DEPOSIT_PAID: "DEPOSIT_PAID",
-    PAID: "PAID",
+    FINAL_PAYMENT_PENDING: "FINAL_PAYMENT_PENDING",
+    FULLY_PAID: "FULLY_PAID",
     REFUNDED: "REFUNDED",
     FAILED: "FAILED"
   };

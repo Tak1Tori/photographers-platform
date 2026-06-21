@@ -253,7 +253,15 @@ function mapPrismaClientBookingListItem(
     depositAmount: booking.depositAmount,
     paidAmount: booking.paidAmount,
     remainingAmount: booking.remainingAmount,
+    platformCommission: booking.platformCommission ?? undefined,
+    providerFee: booking.providerFee ?? undefined,
+    netPlatformRevenue: booking.netPlatformRevenue ?? undefined,
     paymentStatus: mapPaymentStatus(booking.paymentStatus),
+    completedAt: booking.completedAt?.toISOString(),
+    finalPaymentRequestedAt: booking.finalPaymentRequestedAt?.toISOString(),
+    fullyPaidAt: booking.fullyPaidAt?.toISOString(),
+    payoutStatus: booking.payoutStatus ?? undefined,
+    payoutAmount: booking.payoutAmount ?? undefined,
     rescheduleRequestedAt: booking.rescheduleRequestedAt?.toISOString(),
     rescheduleComment: booking.rescheduleComment ?? undefined,
     status: mapBookingStatus(booking.status),
@@ -305,6 +313,7 @@ function mapBookingStatus(status: BookingStatus): Booking["status"] {
   const map: Record<BookingStatus, Booking["status"]> = {
     PENDING: "Pending",
     CONFIRMED: "Confirmed",
+    IN_PROGRESS: "In progress",
     COMPLETED: "Completed",
     CANCELLED: "Cancelled",
     DECLINED: "Declined"

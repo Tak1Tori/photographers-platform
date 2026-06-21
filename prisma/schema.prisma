@@ -29,6 +29,7 @@ enum HallStatus {
 enum BookingStatus {
   PENDING
   CONFIRMED
+  IN_PROGRESS
   COMPLETED
   CANCELLED
   DECLINED
@@ -36,8 +37,10 @@ enum BookingStatus {
 
 enum BookingPaymentStatus {
   UNPAID
+  DEPOSIT_PENDING
   DEPOSIT_PAID
-  PAID
+  FINAL_PAYMENT_PENDING
+  FULLY_PAID
   REFUNDED
   FAILED
 }
@@ -58,20 +61,32 @@ enum PaymentStatus {
 
 enum PaymentProvider {
   MOCK
-  CLOUDPAYMENTS
-  KASPI
   MANUAL
+  CLOUDPAYMENTS
+  FREEDOM_PAY
+  KASPI
+  PAYBOX
 }
 
 enum PaymentType {
   DEPOSIT
-  FULL_PAYMENT
+  FINAL_PAYMENT
   REFUND
+}
+
+enum PayoutStatus {
+  NOT_READY
+  PAYOUT_PENDING
+  PAID_OUT
+  ON_HOLD
+  CANCELLED
 }
 
 enum NotificationType {
   BOOKING_CREATED
   DEPOSIT_PAID
+  FINAL_PAYMENT_REQUESTED
+  FULLY_PAID
   BOOKING_CONFIRMED
   BOOKING_DECLINED
   BOOKING_CANCELLED
@@ -187,14 +202,14 @@ model PhotographerProfile {
 }
 
 model PhotographerPortfolioItem {
-  id             String              @id @default(cuid())
+  id             String                       @id @default(cuid())
   photographerId String
   imageUrl       String
   imagePublicId  String?
   title          String?
   description    String?
-  createdAt      DateTime            @default(now())
-  photographer   PhotographerProfile @relation(fields: [photographerId], references: [id], onDelete: Cascade)
+  createdAt      DateTime                     @default(now())
+  photographer   PhotographerProfile          @relation(fields: [photographerId], references: [id], onDelete: Cascade)
   albumImages    PhotographerPortfolioImage[]
 }
 
@@ -266,69 +281,129 @@ model AvailabilitySlot {
 }
 
 model Booking {
-  id                    String               @id @default(cuid())
-  bookingNumber         String               @unique
-  clientName            String
-  clientEmail           String
-  clientPhone           String
-  clientId              String?
-  clientComment         String?
-  bookingType           BookingType          @default(FULL_SHOOT)
-  styleId               String?
-  photographerId        String?
-  studioId              String?
-  studioHallId          String?
-  shootType             String?
-  shootDescription      String?
-  locationType          String?
-  city                  String?
-  district              String?
-  addressDetails        String?
-  peopleCount           Int?
-  equipmentNeeded       Json?
-  specialRequirements   String?
-  rentalPurpose         String?
-  needsEquipment        Boolean?
-  selectedAmenities     Json?
-  date                  DateTime
-  startTime             String
-  endTime               String
-  durationHours         Int
-  photographerPrice     Int
-  studioPrice           Int
-  serviceFee            Int
-  totalPrice            Int
-  depositAmount         Int                  @default(0)
-  paidAmount            Int                  @default(0)
-  remainingAmount       Int                  @default(0)
-  paymentStatus         BookingPaymentStatus @default(UNPAID)
-  rescheduleRequestedAt DateTime?
-  rescheduleComment     String?
-  status                BookingStatus        @default(PENDING)
-  createdAt             DateTime             @default(now())
-  updatedAt             DateTime             @updatedAt
-  style                 Style?               @relation(fields: [styleId], references: [id])
-  photographer          PhotographerProfile? @relation(fields: [photographerId], references: [id])
-  studio                StudioProfile?       @relation(fields: [studioId], references: [id])
-  studioHall            StudioHall?          @relation(fields: [studioHallId], references: [id])
-  client                User?                @relation("ClientBookings", fields: [clientId], references: [id], onDelete: SetNull)
-  payments              Payment[]
-  review                Review?
+  id                      String               @id @default(cuid())
+  bookingNumber           String               @unique
+  clientName              String
+  clientEmail             String
+  clientPhone             String
+  clientId                String?
+  clientComment           String?
+  bookingType             BookingType          @default(FULL_SHOOT)
+  styleId                 String?
+  photographerId          String?
+  studioId                String?
+  studioHallId            String?
+  shootType               String?
+  shootDescription        String?
+  locationType            String?
+  city                    String?
+  district                String?
+  addressDetails          String?
+  peopleCount             Int?
+  equipmentNeeded         Json?
+  specialRequirements     String?
+  rentalPurpose           String?
+  needsEquipment          Boolean?
+  selectedAmenities       Json?
+  date                    DateTime
+  startTime               String
+  endTime                 String
+  durationHours           Int
+  photographerPrice       Int
+  studioPrice             Int
+  serviceFee              Int
+  totalPrice              Int
+  depositAmount           Int                  @default(0)
+  paidAmount              Int                  @default(0)
+  remainingAmount         Int                  @default(0)
+  platformCommission      Int?
+  providerFee             Int?
+  netPlatformRevenue      Int?
+  paymentStatus           BookingPaymentStatus @default(UNPAID)
+  completedAt             DateTime?
+  finalPaymentRequestedAt DateTime?
+  fullyPaidAt             DateTime?
+  payoutStatus            PayoutStatus?
+  payoutAmount            Int?
+  rescheduleRequestedAt   DateTime?
+  rescheduleComment       String?
+  status                  BookingStatus        @default(PENDING)
+  createdAt               DateTime             @default(now())
+  updatedAt               DateTime             @updatedAt
+  style                   Style?               @relation(fields: [styleId], references: [id])
+  photographer            PhotographerProfile? @relation(fields: [photographerId], references: [id])
+  studio                  StudioProfile?       @relation(fields: [studioId], references: [id])
+  studioHall              StudioHall?          @relation(fields: [studioHallId], references: [id])
+  client                  User?                @relation("ClientBookings", fields: [clientId], references: [id], onDelete: SetNull)
+  payments                Payment[]
+  webhookLogs             PaymentWebhookLog[]
+  paymentAuditLogs        PaymentAuditLog[]
+  review                  Review?
+
+  @@index([clientId, createdAt])
+  @@index([photographerId, status])
+  @@index([studioId, status])
+  @@index([paymentStatus, createdAt])
 }
 
 model Payment {
+  id                  String              @id @default(cuid())
+  bookingId           String
+  amount              Int
+  currency            String              @default("KZT")
+  status              PaymentStatus       @default(PENDING)
+  provider            PaymentProvider     @default(MOCK)
+  providerPaymentId   String?             @unique
+  providerCheckoutUrl String?
+  type                PaymentType         @default(DEPOSIT)
+  metadata            Json?
+  paidAt              DateTime?
+  failedAt            DateTime?
+  cancelledAt         DateTime?
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  booking             Booking             @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  webhookLogs         PaymentWebhookLog[]
+  auditLogs           PaymentAuditLog[]
+
+  @@index([bookingId, type, status])
+  @@index([provider, status, createdAt])
+}
+
+model PaymentWebhookLog {
   id                String          @id @default(cuid())
-  bookingId         String
-  amount            Int
-  currency          String          @default("KZT")
-  status            PaymentStatus   @default(PENDING)
-  provider          PaymentProvider @default(MOCK)
+  provider          PaymentProvider
+  eventType         String
   providerPaymentId String?
-  type              PaymentType     @default(DEPOSIT)
-  metadata          Json?
+  paymentId         String?
+  bookingId         String?
+  payload           Json
+  signatureValid    Boolean
+  processed         Boolean         @default(false)
+  processingError   String?
   createdAt         DateTime        @default(now())
-  updatedAt         DateTime        @updatedAt
-  booking           Booking         @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  processedAt       DateTime?
+  payment           Payment?        @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+  booking           Booking?        @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+
+  @@index([provider, providerPaymentId])
+  @@index([processed, createdAt])
+  @@index([bookingId, createdAt])
+}
+
+model PaymentAuditLog {
+  id        String   @id @default(cuid())
+  paymentId String?
+  bookingId String
+  actorId   String?
+  action    String
+  metadata  Json?
+  createdAt DateTime @default(now())
+  payment   Payment? @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+  booking   Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@index([bookingId, createdAt])
+  @@index([paymentId, createdAt])
 }
 
 model Review {

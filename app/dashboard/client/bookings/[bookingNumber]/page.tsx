@@ -239,6 +239,7 @@ function getStatusText(status: ClientBookingDetails["status"]) {
   const map: Record<ClientBookingDetails["status"], string> = {
     Pending: "Ожидает подтверждения фотографа и студии",
     Confirmed: "Подтверждено",
+    "In progress": "Съемка выполняется",
     Completed: "Завершено",
     Cancelled: "Отменено",
     Declined: "Отклонено"

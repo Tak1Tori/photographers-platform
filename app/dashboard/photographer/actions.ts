@@ -5,7 +5,11 @@ import { revalidatePath } from "next/cache";
 import { getSession } from "@/lib/auth";
 import { canUseDatabase } from "@/lib/data/db";
 import { getDevStore, updateDevStore } from "@/lib/data/dev-store";
-import { notifyBookingStatusChanged } from "@/lib/notifications/notification-service";
+import {
+  notifyBookingStatusChanged,
+  notifyFinalPaymentRequested
+} from "@/lib/notifications/notification-service";
+import { createFinalPaymentForBooking } from "@/lib/payments/payment-service";
 import { prisma } from "@/lib/prisma";
 import {
   avatarImageMaxBytes,
@@ -1122,7 +1126,12 @@ export async function updatePhotographerBookingStatusAction(
       return { success: false, error: "Booking not found." };
     }
 
-    if (nextStatus === BookingStatus.CONFIRMED && !["DEPOSIT_PAID", "PAID"].includes(booking.paymentStatus)) {
+    if (
+      nextStatus === BookingStatus.CONFIRMED &&
+      !["DEPOSIT_PAID", "FINAL_PAYMENT_PENDING", "FULLY_PAID"].includes(
+        booking.paymentStatus
+      )
+    ) {
       return { success: false, error: "Нельзя подтвердить бронь до оплаты депозита." };
     }
 
@@ -1139,6 +1148,34 @@ export async function updatePhotographerBookingStatusAction(
 
     revalidatePath("/dashboard/photographer");
     revalidatePath("/dashboard/studio");
+    revalidatePath("/admin");
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: getErrorMessage(error) };
+  }
+}
+
+export async function requestPhotographerFinalPaymentAction(
+  formData: FormData
+): Promise<ActionResult> {
+  try {
+    const { session, profile } = await requirePhotographerProfile();
+    const bookingId = String(formData.get("bookingId") ?? "");
+
+    if (!canUseDatabase()) {
+      return { success: false, error: "Финальная оплата требует подключения к базе." };
+    }
+
+    const booking = await prisma.booking.findUnique({ where: { id: bookingId } });
+    if (!booking || booking.photographerId !== profile.id) {
+      return { success: false, error: "Booking not found." };
+    }
+
+    await createFinalPaymentForBooking(booking.id, { actorId: session.user.id });
+    await notifyFinalPaymentRequested(booking.id);
+    revalidatePath("/dashboard/photographer");
+    revalidatePath("/dashboard/client");
+    revalidatePath("/dashboard/client/bookings");
     revalidatePath("/admin");
     return { success: true };
   } catch (error) {
@@ -1167,7 +1204,8 @@ function parseSlot(formData: FormData) {
 function isValidStatusTransition(current: BookingStatus, next: BookingStatus) {
   const allowed: Record<BookingStatus, BookingStatus[]> = {
     PENDING: [BookingStatus.CONFIRMED, BookingStatus.DECLINED],
-    CONFIRMED: [BookingStatus.COMPLETED, BookingStatus.CANCELLED],
+    CONFIRMED: [BookingStatus.IN_PROGRESS, BookingStatus.CANCELLED],
+    IN_PROGRESS: [BookingStatus.CANCELLED],
     COMPLETED: [],
     CANCELLED: [],
     DECLINED: []

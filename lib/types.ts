@@ -8,9 +8,16 @@ export interface PhotoStyle {
 
 export type UserRole = "CLIENT" | "PHOTOGRAPHER" | "STUDIO_OWNER" | "ADMIN";
 
-export type BookingStatus = "Pending" | "Confirmed" | "Completed" | "Cancelled";
+export type BookingStatus = "Pending" | "Confirmed" | "In progress" | "Completed" | "Cancelled";
 export type ExtendedBookingStatus = BookingStatus | "Declined";
-export type BookingPaymentStatus = "UNPAID" | "DEPOSIT_PAID" | "PAID" | "REFUNDED" | "FAILED";
+export type BookingPaymentStatus =
+  | "UNPAID"
+  | "DEPOSIT_PENDING"
+  | "DEPOSIT_PAID"
+  | "FINAL_PAYMENT_PENDING"
+  | "FULLY_PAID"
+  | "REFUNDED"
+  | "FAILED";
 export type BookingType = "FULL_SHOOT" | "PHOTOGRAPHER_ONLY" | "STUDIO_ONLY";
 export type ShootType =
   | "PERSONAL"
@@ -63,8 +70,14 @@ export type StudioEquipment =
 export type BookingFlowMode = BookingType;
 export type BookingEntryPoint = "TYPE_SELECTOR" | "CATALOG" | "DETAIL_PAGE" | "LEGACY_FLOW";
 export type PaymentStatus = "PENDING" | "PAID" | "FAILED" | "CANCELLED" | "REFUNDED";
-export type PaymentProvider = "MOCK" | "CLOUDPAYMENTS" | "KASPI" | "MANUAL";
-export type PaymentType = "DEPOSIT" | "FULL_PAYMENT" | "REFUND";
+export type PaymentProvider =
+  | "MOCK"
+  | "MANUAL"
+  | "CLOUDPAYMENTS"
+  | "FREEDOM_PAY"
+  | "KASPI"
+  | "PAYBOX";
+export type PaymentType = "DEPOSIT" | "FINAL_PAYMENT" | "REFUND";
 export type ClientBookingFilter =
   | "All"
   | "Pending"
@@ -219,7 +232,15 @@ export interface Booking {
   depositAmount: number;
   paidAmount: number;
   remainingAmount: number;
+  platformCommission?: number;
+  providerFee?: number;
+  netPlatformRevenue?: number;
   paymentStatus: BookingPaymentStatus;
+  completedAt?: string;
+  finalPaymentRequestedAt?: string;
+  fullyPaidAt?: string;
+  payoutStatus?: string;
+  payoutAmount?: number;
   rescheduleRequestedAt?: string;
   rescheduleComment?: string;
   status: ExtendedBookingStatus;
@@ -337,6 +358,19 @@ export interface PaymentDTO {
   status: PaymentStatus;
   provider: PaymentProvider;
   type: PaymentType;
+  createdAt: string;
+}
+
+export interface PaymentWebhookLogDTO {
+  id: string;
+  provider: PaymentProvider;
+  eventType: string;
+  providerPaymentId?: string;
+  paymentId?: string;
+  bookingId?: string;
+  signatureValid: boolean;
+  processed: boolean;
+  processingError?: string;
   createdAt: string;
 }
 

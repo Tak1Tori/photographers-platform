@@ -2,9 +2,6 @@ import {
   BookingPaymentStatus,
   BookingStatus as PrismaBookingStatus,
   BookingType,
-  PaymentProvider,
-  PaymentStatus,
-  PaymentType,
   ProfileStatus
 } from "@prisma/client";
 import { cookies } from "next/headers";
@@ -13,7 +10,7 @@ import { availableSlots, mockBookings } from "@/lib/mock-data";
 import { canUseDatabase } from "@/lib/data/db";
 import { mapBooking, mapSlots } from "@/lib/data/mappers";
 import { calculateBookingPricing } from "@/lib/pricing";
-import { MockPaymentProvider } from "@/lib/payments/mock-provider";
+import { createDepositPaymentForBooking } from "@/lib/payments/payment-service";
 import type {
   Booking,
   BookingStatus,
@@ -29,7 +26,6 @@ const bookingInclude = {
   studioHall: true
 };
 const MOCK_BOOKINGS_COOKIE = "photo_booking_mock_bookings";
-const mockPaymentProvider = new MockPaymentProvider();
 
 export async function createBooking(input: CreateBookingInput) {
   if (!canUseDatabase()) {
@@ -38,13 +34,17 @@ export async function createBooking(input: CreateBookingInput) {
 
   const bookingNumber = `BK-${Date.now().toString().slice(-6)}`;
   const endTime = `${String(Number(input.startTime.slice(0, 2)) + input.durationHours).padStart(2, "0")}:00`;
-  const style = await prisma.style.findFirst({
-    where: { OR: [{ id: input.styleId }, { slug: input.styleId }] }
-  });
-  const studioHall =
+  const [style, photographer, studioHall] = await Promise.all([
+    prisma.style.findFirst({
+      where: { OR: [{ id: input.styleId }, { slug: input.styleId }] }
+    }),
+    prisma.photographerProfile.findUnique({
+      where: { id: input.photographerId }
+    }),
     input.studioHallId
-      ? await prisma.studioHall.findUnique({ where: { id: input.studioHallId } })
-      : await prisma.studioHall.findFirst({ where: { studioId: input.studioId } });
+      ? prisma.studioHall.findUnique({ where: { id: input.studioHallId } })
+      : prisma.studioHall.findFirst({ where: { studioId: input.studioId } })
+  ]);
 
   if (!style) {
     throw new Error("Style not found");
@@ -53,10 +53,17 @@ export async function createBooking(input: CreateBookingInput) {
   if (!studioHall) {
     throw new Error("Studio hall not found");
   }
+  if (!photographer || photographer.status !== ProfileStatus.PUBLISHED) {
+    throw new Error("Photographer is not available");
+  }
+  if (studioHall.studioId !== input.studioId || studioHall.status !== "ACTIVE") {
+    throw new Error("Studio hall is not available");
+  }
 
   const pricing = calculateBookingPricing({
-    photographerPrice: input.photographerPrice,
-    studioPrice: input.studioPrice,
+    bookingType: BookingType.FULL_SHOOT,
+    photographerPrice: photographer.hourlyRate,
+    studioPrice: studioHall.hourlyRate,
     durationHours: input.durationHours
   });
 
@@ -84,6 +91,9 @@ export async function createBooking(input: CreateBookingInput) {
       depositAmount: pricing.depositAmount,
       paidAmount: 0,
       remainingAmount: pricing.totalPrice,
+      platformCommission: pricing.platformCommission,
+      providerFee: pricing.providerFee,
+      netPlatformRevenue: pricing.netPlatformRevenue,
       paymentStatus: BookingPaymentStatus.UNPAID,
       status: PrismaBookingStatus.PENDING,
     }
@@ -110,6 +120,7 @@ export async function createPhotographerOnlyBooking(input: CreatePhotographerOnl
   }
 
   const pricing = calculateBookingPricing({
+    bookingType: BookingType.PHOTOGRAPHER_ONLY,
     photographerPrice: photographer.hourlyRate,
     studioPrice: 0,
     durationHours: input.durationHours
@@ -117,8 +128,7 @@ export async function createPhotographerOnlyBooking(input: CreatePhotographerOnl
   const bookingNumber = `BK-PH-${Date.now().toString().slice(-7)}`;
   const endTime = calculateEndTime(input.startTime, input.durationHours);
 
-  const result = await prisma.$transaction(async (tx) => {
-    const booking = await tx.booking.create({
+  const booking = await prisma.booking.create({
       data: {
         bookingNumber,
         clientId: input.clientId,
@@ -150,42 +160,18 @@ export async function createPhotographerOnlyBooking(input: CreatePhotographerOnl
         depositAmount: pricing.depositAmount,
         paidAmount: 0,
         remainingAmount: pricing.totalPrice,
+        platformCommission: pricing.platformCommission,
+        providerFee: pricing.providerFee,
+        netPlatformRevenue: pricing.netPlatformRevenue,
         paymentStatus: BookingPaymentStatus.UNPAID,
         status: PrismaBookingStatus.PENDING
       }
     });
 
-    const payment = await tx.payment.create({
-      data: {
-        bookingId: booking.id,
-        amount: booking.depositAmount,
-        currency: "KZT",
-        status: PaymentStatus.PENDING,
-        provider: PaymentProvider.MOCK,
-        type: PaymentType.DEPOSIT
-      }
-    });
-
-    return { booking, payment };
-  });
-
-  const paymentSession = await mockPaymentProvider.createPaymentSession({
-    paymentId: result.payment.id,
-    bookingNumber: result.booking.bookingNumber,
-    amount: result.payment.amount,
-    currency: result.payment.currency
-  });
-
-  await prisma.payment.update({
-    where: { id: result.payment.id },
-    data: {
-      providerPaymentId: paymentSession.providerPaymentId,
-      metadata: { checkoutUrl: paymentSession.checkoutUrl }
-    }
-  });
+  const paymentSession = await createDepositPaymentForBooking(booking.id);
 
   return {
-    booking: result.booking,
+    booking,
     paymentSession
   };
 }
@@ -221,6 +207,7 @@ export async function createStudioOnlyBooking(input: CreateStudioOnlyBookingInpu
   }
 
   const pricing = calculateBookingPricing({
+    bookingType: BookingType.STUDIO_ONLY,
     photographerPrice: 0,
     studioPrice: hall.hourlyRate,
     durationHours: input.durationHours
@@ -228,8 +215,7 @@ export async function createStudioOnlyBooking(input: CreateStudioOnlyBookingInpu
   const bookingNumber = `BK-ST-${Date.now().toString().slice(-7)}`;
   const endTime = calculateEndTime(input.startTime, input.durationHours);
 
-  const result = await prisma.$transaction(async (tx) => {
-    const booking = await tx.booking.create({
+  const booking = await prisma.booking.create({
       data: {
         bookingNumber,
         clientId: input.clientId,
@@ -258,41 +244,17 @@ export async function createStudioOnlyBooking(input: CreateStudioOnlyBookingInpu
         depositAmount: pricing.depositAmount,
         paidAmount: 0,
         remainingAmount: pricing.totalPrice,
+        platformCommission: pricing.platformCommission,
+        providerFee: pricing.providerFee,
+        netPlatformRevenue: pricing.netPlatformRevenue,
         paymentStatus: BookingPaymentStatus.UNPAID,
         status: PrismaBookingStatus.PENDING
       }
     });
 
-    const payment = await tx.payment.create({
-      data: {
-        bookingId: booking.id,
-        amount: booking.depositAmount,
-        currency: "KZT",
-        status: PaymentStatus.PENDING,
-        provider: PaymentProvider.MOCK,
-        type: PaymentType.DEPOSIT
-      }
-    });
+  const paymentSession = await createDepositPaymentForBooking(booking.id);
 
-    return { booking, payment };
-  });
-
-  const paymentSession = await mockPaymentProvider.createPaymentSession({
-    paymentId: result.payment.id,
-    bookingNumber: result.booking.bookingNumber,
-    amount: result.payment.amount,
-    currency: result.payment.currency
-  });
-
-  await prisma.payment.update({
-    where: { id: result.payment.id },
-    data: {
-      providerPaymentId: paymentSession.providerPaymentId,
-      metadata: { checkoutUrl: paymentSession.checkoutUrl }
-    }
-  });
-
-  return { booking: result.booking, paymentSession };
+  return { booking, paymentSession };
 }
 
 export async function getBookingById(id: string) {
@@ -384,6 +346,7 @@ export async function getAvailableBookingSlots(photographerId: string, studioId:
 
 export function createMockRuntimeBooking(input: CreateBookingInput, bookingNumber: string): Booking {
   const pricing = calculateBookingPricing({
+    bookingType: BookingType.FULL_SHOOT,
     photographerPrice: input.photographerPrice,
     studioPrice: input.studioPrice,
     durationHours: input.durationHours
@@ -439,7 +402,8 @@ export function markMockRuntimeBookingDepositPaid(bookingId: string) {
     ...booking,
     paidAmount: booking.depositAmount,
     remainingAmount: Math.max(booking.totalAmount - booking.depositAmount, 0),
-    paymentStatus: booking.depositAmount >= booking.totalAmount ? "PAID" : "DEPOSIT_PAID"
+    paymentStatus:
+      booking.depositAmount >= booking.totalAmount ? "FULLY_PAID" : "DEPOSIT_PAID"
   };
 
   saveMockRuntimeBooking(paidBooking);

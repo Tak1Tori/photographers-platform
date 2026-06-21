@@ -6,13 +6,12 @@ import { getSession } from "@/lib/auth";
 import { canUseDatabase } from "@/lib/data/db";
 import {
   notifyBookingStatusChanged,
-  notifyDepositPaid,
   notifyPaymentRefunded
 } from "@/lib/notifications/notification-service";
 import {
+  cancelPayment,
   markPaymentAsFailed,
-  markPaymentAsPaid,
-  refundMockPayment
+  refundManualPayment
 } from "@/lib/payments/payment-service";
 import { prisma } from "@/lib/prisma";
 
@@ -93,6 +92,15 @@ export async function adminUpdateBookingStatusAction(formData: FormData): Promis
     }
 
     const booking = await prisma.booking.findUnique({ where: { id } });
+    if (
+      status === BookingStatus.COMPLETED &&
+      booking?.paymentStatus !== "FULLY_PAID"
+    ) {
+      return {
+        success: false,
+        error: "Нельзя завершить бронь до полной оплаты."
+      };
+    }
 
     // TODO: Позже разделить подтверждение на photographerConfirmationStatus и studioConfirmationStatus.
     await prisma.booking.update({
@@ -112,24 +120,12 @@ export async function adminUpdateBookingStatusAction(formData: FormData): Promis
   }
 }
 
-export async function adminMarkPaymentAsPaidAction(formData: FormData): Promise<ActionResult> {
-  try {
-    await requireAdmin();
-    const paymentId = String(formData.get("paymentId") ?? "");
-    const payment = await markPaymentAsPaid(paymentId);
-    if (payment?.bookingId) await notifyDepositPaid(payment.bookingId);
-    revalidatePath("/admin");
-    return { success: true };
-  } catch (error) {
-    return { success: false, error: getErrorMessage(error) };
-  }
-}
-
 export async function adminMarkPaymentAsFailedAction(formData: FormData): Promise<ActionResult> {
   try {
     await requireAdmin();
+    const session = await getSession();
     const paymentId = String(formData.get("paymentId") ?? "");
-    await markPaymentAsFailed(paymentId);
+    await markPaymentAsFailed(paymentId, { actorId: session?.user.id });
     revalidatePath("/admin");
     return { success: true };
   } catch (error) {
@@ -137,11 +133,29 @@ export async function adminMarkPaymentAsFailedAction(formData: FormData): Promis
   }
 }
 
-export async function adminRefundMockPaymentAction(formData: FormData): Promise<ActionResult> {
+export async function adminCancelPaymentAction(formData: FormData): Promise<ActionResult> {
   try {
     await requireAdmin();
+    const session = await getSession();
     const paymentId = String(formData.get("paymentId") ?? "");
-    const payment = await refundMockPayment(paymentId);
+    await cancelPayment(paymentId, {
+      actorId: session?.user.id,
+      reason: "Cancelled manually by admin"
+    });
+    revalidatePath("/admin");
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: getErrorMessage(error) };
+  }
+}
+
+export async function adminRefundPaymentAction(formData: FormData): Promise<ActionResult> {
+  try {
+    await requireAdmin();
+    const session = await getSession();
+    const paymentId = String(formData.get("paymentId") ?? "");
+    const reason = String(formData.get("reason") ?? "Manual admin refund");
+    const payment = await refundManualPayment(paymentId, session!.user.id, reason);
     if (payment?.bookingId) await notifyPaymentRefunded(payment.bookingId);
     revalidatePath("/admin");
     return { success: true };

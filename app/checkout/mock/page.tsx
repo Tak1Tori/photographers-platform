@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getBookingById } from "@/lib/data/bookings";
 import { canUseDatabase } from "@/lib/data/db";
+import { getSession } from "@/lib/auth";
 import { formatPrice } from "@/lib/mock-data";
 import { getPaymentById } from "@/lib/payments/payment-service";
 
@@ -12,15 +13,21 @@ interface MockCheckoutPageProps {
   searchParams: {
     paymentId?: string;
     cancelled?: string;
+    error?: string;
   };
 }
 
 export default async function MockCheckoutPage({ searchParams }: MockCheckoutPageProps) {
   const paymentId = searchParams.paymentId;
   const payment = paymentId && canUseDatabase() ? await getPaymentById(paymentId) : undefined;
+  const session = payment ? await getSession() : undefined;
   const mockBooking = !canUseDatabase() && paymentId ? await getBookingById(paymentId) : undefined;
+  const canAccessPayment =
+    !payment ||
+    session?.user.role === "ADMIN" ||
+    (session?.user.id && payment.booking.clientId === session.user.id);
 
-  if (!paymentId || (!payment && !mockBooking)) {
+  if (!paymentId || (!payment && !mockBooking) || !canAccessPayment) {
     return (
       <>
         <PageHeader eyebrow="Checkout" title="Платеж не найден" description="Проверьте ссылку на оплату или создайте бронь заново." />
@@ -34,6 +41,15 @@ export default async function MockCheckoutPage({ searchParams }: MockCheckoutPag
       <>
         <PageHeader eyebrow="Checkout" title="Оплата отменена" description="Депозит не был списан. Можно вернуться к бронированию и попробовать снова." />
         <section className="section"><div className="container"><EmptyBox text="Оплата отменена." /></div></section>
+      </>
+    );
+  }
+
+  if (searchParams.error) {
+    return (
+      <>
+        <PageHeader eyebrow="Checkout" title="Платеж не обработан" description="Webhook не подтвердил оплату. Статус брони не изменен." />
+        <section className="section"><div className="container"><EmptyBox text="Проверьте платеж и попробуйте снова." /></div></section>
       </>
     );
   }
@@ -80,13 +96,15 @@ export default async function MockCheckoutPage({ searchParams }: MockCheckoutPag
       <PageHeader
         eyebrow="Mock checkout"
         title={
-          details?.bookingType === "PHOTOGRAPHER_ONLY"
+          payment?.type === "FINAL_PAYMENT"
+            ? "Оплата остатка"
+            : details?.bookingType === "PHOTOGRAPHER_ONLY"
             ? "Оплата депозита за бронирование фотографа"
             : details?.bookingType === "STUDIO_ONLY"
               ? "Оплата депозита за аренду студии"
               : "Оплата депозита"
         }
-        description="Это тестовый платежный экран. Реальный эквайринг пока не подключен."
+        description="Тестовый hosted checkout. Статус оплаты меняется только после подписанного mock webhook."
       />
       <section className="section">
         <div className="container grid gap-6 lg:grid-cols-[1fr_420px]">
@@ -138,7 +156,9 @@ export default async function MockCheckoutPage({ searchParams }: MockCheckoutPag
               </p>
               <form action={confirmMockPaymentAction}>
                 <input type="hidden" name="paymentId" value={paymentId} />
-                <Button className="w-full" size="lg">Оплатить депозит</Button>
+                <Button className="w-full" size="lg">
+                  {payment?.type === "FINAL_PAYMENT" ? "Оплатить остаток" : "Оплатить депозит"}
+                </Button>
               </form>
               <form action={cancelMockPaymentAction}>
                 <input type="hidden" name="paymentId" value={paymentId} />

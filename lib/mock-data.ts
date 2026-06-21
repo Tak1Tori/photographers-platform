@@ -403,7 +403,7 @@ export const mockBookings: Booking[] = [
     depositAmount: 28160,
     paidAmount: 28160,
     remainingAmount: 112640,
-    paymentStatus: "PAID",
+    paymentStatus: "FULLY_PAID",
     status: "Completed"
   },
   {

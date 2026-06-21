@@ -8,6 +8,7 @@ import {
   createCustomPhotographerStyleAction,
   deleteAvailabilitySlotAction,
   deletePortfolioItemAction,
+  requestPhotographerFinalPaymentAction,
   savePhotographerPortfolioAction,
   updateAvailabilitySlotAction,
   updatePhotographerBookingStatusAction,
@@ -425,7 +426,9 @@ function BookingStatusTable({
               <td className="px-4 py-3">
                 <div className="grid gap-1">
                   <span>{booking.clientName}</span>
-                  {["DEPOSIT_PAID", "PAID"].includes(booking.paymentStatus) ? (
+                  {["DEPOSIT_PAID", "FINAL_PAYMENT_PENDING", "FULLY_PAID"].includes(
+                    booking.paymentStatus
+                  ) && ["Confirmed", "In progress", "Completed"].includes(booking.status) ? (
                     <span className="text-xs text-muted-foreground">
                       {booking.clientPhone || "-"} · {booking.clientEmail || "-"}
                     </span>
@@ -451,6 +454,7 @@ function BookingStatusTable({
                   booking={booking}
                   disabled={isPending || !databaseReady}
                   onSubmit={run("booking", updatePhotographerBookingStatusAction)}
+                  onRequestFinal={run("booking", requestPhotographerFinalPaymentAction)}
                 />
               </td>
             </tr>
@@ -496,26 +500,28 @@ function BriefItem({ label, value }: { label: string; value: string }) {
 function StatusActions({
   booking,
   disabled,
-  onSubmit
+  onSubmit,
+  onRequestFinal
 }: {
   booking: Booking;
   disabled: boolean;
   onSubmit: (formData: FormData) => void;
+  onRequestFinal: (formData: FormData) => void;
 }) {
   const statuses =
     booking.status === "Pending"
       ? ["CONFIRMED", "DECLINED"]
       : booking.status === "Confirmed"
-        ? ["COMPLETED", "CANCELLED"]
+        ? ["IN_PROGRESS", "CANCELLED"]
         : [];
-
-  if (statuses.length === 0) {
-    return <span className="text-muted-foreground">-</span>;
-  }
+  const canRequestFinal =
+    ["Confirmed", "In progress"].includes(booking.status) &&
+    booking.paymentStatus === "DEPOSIT_PAID" &&
+    booking.remainingAmount > 0;
 
   return (
     <div className="grid gap-2">
-      {booking.status === "Pending" && !["DEPOSIT_PAID", "PAID"].includes(booking.paymentStatus) ? (
+      {booking.status === "Pending" && booking.paymentStatus !== "DEPOSIT_PAID" ? (
         <p className="text-xs text-muted-foreground">Нельзя подтвердить бронь до оплаты депозита.</p>
       ) : null}
       <div className="flex flex-wrap gap-2">
@@ -523,8 +529,8 @@ function StatusActions({
         <Button
           key={status}
           size="sm"
-          variant={status === "CONFIRMED" || status === "COMPLETED" ? "default" : "outline"}
-          disabled={disabled || (status === "CONFIRMED" && !["DEPOSIT_PAID", "PAID"].includes(booking.paymentStatus))}
+          variant={status === "CONFIRMED" || status === "IN_PROGRESS" ? "default" : "outline"}
+          disabled={disabled || (status === "CONFIRMED" && booking.paymentStatus !== "DEPOSIT_PAID")}
           onClick={() => {
             const data = new FormData();
             data.set("bookingId", booking.dbId ?? booking.id);
@@ -535,7 +541,26 @@ function StatusActions({
           {status}
         </Button>
       ))}
+      {canRequestFinal ? (
+        <Button
+          size="sm"
+          disabled={disabled}
+          onClick={() => {
+            const data = new FormData();
+            data.set("bookingId", booking.dbId ?? booking.id);
+            onRequestFinal(data);
+          }}
+        >
+          Работа завершена · запросить оплату
+        </Button>
+      ) : null}
       </div>
+      {booking.paymentStatus === "FINAL_PAYMENT_PENDING" ? (
+        <span className="text-xs text-amber-300">Остаток ожидает оплаты клиентом.</span>
+      ) : null}
+      {booking.paymentStatus === "FULLY_PAID" ? (
+        <span className="text-xs text-emerald-300">Полностью оплачено.</span>
+      ) : null}
     </div>
   );
 }

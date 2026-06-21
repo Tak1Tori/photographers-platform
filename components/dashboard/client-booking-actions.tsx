@@ -1,9 +1,11 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import {
   cancelClientBookingAction,
   createClientReviewAction,
+  openFinalPaymentCheckoutAction,
   requestBookingRescheduleAction
 } from "@/app/dashboard/client/actions";
 import { Button } from "@/components/ui/button";
@@ -15,11 +17,27 @@ type ActionState = {
 };
 
 export function ClientBookingActions({ booking }: { booking: ClientBookingDetails }) {
+  const router = useRouter();
   const [state, setState] = useState<ActionState>({});
   const [rescheduleComment, setRescheduleComment] = useState("");
   const [isPending, startTransition] = useTransition();
   const canCancel = ["Pending", "Confirmed"].includes(booking.status);
   const canReview = booking.status === "Completed" && !booking.review;
+  const canPayFinal =
+    booking.paymentStatus === "FINAL_PAYMENT_PENDING" &&
+    booking.remainingAmount > 0;
+
+  function openFinalPayment() {
+    if (!canPayFinal) return;
+    startTransition(async () => {
+      const result = await openFinalPaymentCheckoutAction(booking.id);
+      if (result.success && result.checkoutUrl) {
+        router.push(result.checkoutUrl);
+        return;
+      }
+      setState({ error: result.error ?? "Не удалось открыть оплату." });
+    });
+  }
 
   function cancelBooking() {
     if (!canCancel) return;
@@ -69,6 +87,32 @@ export function ClientBookingActions({ booking }: { booking: ClientBookingDetail
       {state.error ? (
         <p className="rounded-md bg-rose-100 px-4 py-3 text-sm font-medium text-rose-800">
           {state.error}
+        </p>
+      ) : null}
+
+      {canPayFinal ? (
+        <div className="grid gap-3 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-4">
+          <div>
+            <h3 className="font-semibold tracking-normal">Финальная оплата</h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Исполнитель завершил работу. Оплатите остаток через защищённую страницу провайдера.
+            </p>
+          </div>
+          <Button disabled={isPending} onClick={openFinalPayment}>
+            Оплатить остаток
+          </Button>
+        </div>
+      ) : null}
+
+      {booking.paymentStatus === "FULLY_PAID" ? (
+        <p className="rounded-md border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm font-medium text-emerald-200">
+          Полностью оплачено
+        </p>
+      ) : null}
+
+      {booking.paymentStatus !== "FULLY_PAID" ? (
+        <p className="rounded-md bg-secondary px-4 py-3 text-sm text-muted-foreground">
+          Финальные материалы передаются после полной оплаты через платформу.
         </p>
       ) : null}
 

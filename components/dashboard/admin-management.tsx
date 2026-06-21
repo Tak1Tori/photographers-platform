@@ -3,9 +3,9 @@
 import { useRouter } from "next/navigation";
 import { Fragment, useState, useTransition } from "react";
 import {
+  adminCancelPaymentAction,
   adminMarkPaymentAsFailedAction,
-  adminMarkPaymentAsPaidAction,
-  adminRefundMockPaymentAction,
+  adminRefundPaymentAction,
   adminUpdateBookingStatusAction,
   updatePhotographerProfileStatusAction,
   updateStudioProfileStatusAction
@@ -13,7 +13,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/dashboard/status-badge";
 import { formatPrice } from "@/lib/mock-data";
-import type { AdminNotificationDTO, Booking, PaymentDTO, PaymentStatus } from "@/lib/types";
+import type {
+  AdminNotificationDTO,
+  Booking,
+  PaymentDTO,
+  PaymentStatus,
+  PaymentWebhookLogDTO
+} from "@/lib/types";
 
 type ActionState = { success: boolean; message: string } | null;
 
@@ -49,6 +55,7 @@ interface AdminManagementProps {
   }>;
   bookings: Booking[];
   payments: PaymentDTO[];
+  webhookLogs: PaymentWebhookLogDTO[];
   notificationLogs: AdminNotificationDTO[];
 }
 
@@ -60,6 +67,7 @@ export function AdminManagement({
   halls,
   bookings,
   payments,
+  webhookLogs,
   notificationLogs
 }: AdminManagementProps) {
   const router = useRouter();
@@ -228,7 +236,7 @@ export function AdminManagement({
                     <td className="px-4 py-3"><StatusBadge status={booking.paymentStatus} /></td>
                     <td className="px-4 py-3">
                       <div className="flex flex-wrap gap-2">
-                        {["PENDING", "CONFIRMED", "COMPLETED", "CANCELLED", "DECLINED"].map((status) => (
+                        {["PENDING", "CONFIRMED", "IN_PROGRESS", "COMPLETED", "CANCELLED", "DECLINED"].map((status) => (
                           <Button
                             key={status}
                             size="sm"
@@ -333,6 +341,10 @@ export function AdminManagement({
         </div>
         <NotificationLogsTable notifications={filteredNotificationLogs} />
       </AdminSection>
+
+      <AdminSection title="Webhook Logs">
+        <WebhookLogsTable logs={webhookLogs} />
+      </AdminSection>
     </div>
   );
 }
@@ -421,11 +433,42 @@ function PaymentsTable({
               <td className="px-4 py-3">{payment.createdAt}</td>
               <td className="px-4 py-3">
                 <div className="flex flex-wrap gap-2">
-                  <PaymentAction label="Mark paid" paymentId={payment.id} disabled={disabled || payment.status === "PAID"} action={adminMarkPaymentAsPaidAction} run={run} />
                   <PaymentAction label="Mark failed" paymentId={payment.id} disabled={disabled || payment.status === "FAILED"} action={adminMarkPaymentAsFailedAction} run={run} />
-                  <PaymentAction label="Refund mock" paymentId={payment.id} disabled={disabled || payment.provider !== "MOCK" || payment.status !== "PAID"} action={adminRefundMockPaymentAction} run={run} />
+                  <PaymentAction label="Cancel" paymentId={payment.id} disabled={disabled || payment.status !== "PENDING"} action={adminCancelPaymentAction} run={run} />
+                  <PaymentAction label="Manual refund" paymentId={payment.id} disabled={disabled || payment.status !== "PAID"} action={adminRefundPaymentAction} run={run} />
                 </div>
               </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function WebhookLogsTable({ logs }: { logs: PaymentWebhookLogDTO[] }) {
+  if (logs.length === 0) return <Empty text="Webhook событий пока нет." />;
+
+  return (
+    <div className="overflow-x-auto rounded-lg border border-border bg-card">
+      <table className="w-full min-w-[980px] text-left text-sm">
+        <thead className="border-b border-border bg-secondary/60 text-muted-foreground">
+          <tr>
+            {["Created", "Provider", "Event", "Provider payment", "Signature", "Processed", "Error"].map((header) => (
+              <th key={header} className="px-4 py-3 font-medium">{header}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {logs.map((log) => (
+            <tr key={log.id} className="border-b border-border last:border-0">
+              <td className="px-4 py-3">{new Date(log.createdAt).toLocaleString("ru-RU")}</td>
+              <td className="px-4 py-3">{log.provider}</td>
+              <td className="px-4 py-3">{log.eventType}</td>
+              <td className="px-4 py-3 font-mono text-xs">{log.providerPaymentId ?? "-"}</td>
+              <td className="px-4 py-3">{log.signatureValid ? "Valid" : "Invalid"}</td>
+              <td className="px-4 py-3">{log.processed ? "Yes" : "No"}</td>
+              <td className="px-4 py-3 text-rose-300">{log.processingError ?? "-"}</td>
             </tr>
           ))}
         </tbody>
