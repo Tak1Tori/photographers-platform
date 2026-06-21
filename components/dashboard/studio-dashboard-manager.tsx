@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Fragment, useState, useTransition } from "react";
 import { Building2, CalendarDays, Check, ClipboardList, Plus, Save, Trash2 } from "lucide-react";
@@ -286,9 +287,25 @@ export function StudioDashboardManager({
       {activeSection === "schedule" ? (
       <Card>
         <CardHeader>
-          <CardTitle>Доступность залов</CardTitle>
+          <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+            <div>
+              <CardTitle>Доступность залов</CardTitle>
+              <p className="mt-1 text-sm text-muted-foreground">
+                У каждого зала отдельные рабочие часы, занятость и буфер на подготовку.
+              </p>
+            </div>
+            <Button asChild>
+              <Link href="/dashboard/studio/calendar">
+                <CalendarDays className="size-4" />
+                Открыть Smart Calendar
+              </Link>
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="grid gap-5">
+          <p className="text-sm font-medium text-muted-foreground">
+            Legacy slots: сохранены для совместимости со старыми данными.
+          </p>
           {profile.halls.length === 0 ? (
             <EmptyText text="Добавьте зал, чтобы управлять слотами." />
           ) : (

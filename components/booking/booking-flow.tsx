@@ -1,20 +1,20 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CalendarCheck, CheckCircle2, CreditCard, Mail, Phone, UserRound } from "lucide-react";
 import { createBookingAction } from "@/app/booking/actions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { SmartSlotPicker } from "@/components/booking/smart-slot-picker";
 import { formatPrice } from "@/lib/mock-data";
 import { calculateBookingPricing } from "@/lib/pricing";
-import type { AvailableSlot, Photographer, PhotoStyle, Studio } from "@/lib/types";
+import type { Photographer, PhotoStyle, Studio } from "@/lib/types";
 
 interface BookingFlowProps {
   style: PhotoStyle;
   photographer: Photographer;
   studio: Studio;
-  slots: AvailableSlot[];
   currentUser?: {
     id: string;
     name?: string | null;
@@ -25,10 +25,10 @@ interface BookingFlowProps {
 
 const durations = [1, 2, 3];
 
-export function BookingFlow({ style, photographer, studio, slots, currentUser }: BookingFlowProps) {
+export function BookingFlow({ style, photographer, studio, currentUser }: BookingFlowProps) {
   const router = useRouter();
-  const [selectedSlotId, setSelectedSlotId] = useState(slots[0]?.id ?? "");
-  const [selectedTime, setSelectedTime] = useState(slots[0]?.times[0] ?? "");
+  const [selectedDate, setSelectedDate] = useState("");
+  const [selectedTime, setSelectedTime] = useState("");
   const [duration, setDuration] = useState(1);
   const [isSuccess, setIsSuccess] = useState(false);
   const [clientName, setClientName] = useState(currentUser?.name ?? "");
@@ -39,7 +39,10 @@ export function BookingFlow({ style, photographer, studio, slots, currentUser }:
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [createdBookingNumber, setCreatedBookingNumber] = useState("");
 
-  const selectedSlot = slots.find((slot) => slot.id === selectedSlotId) ?? slots[0];
+  const handleSlotSelection = useCallback((date: string, time: string) => {
+    setSelectedDate(date);
+    setSelectedTime(time);
+  }, []);
   const pricing = calculateBookingPricing({
     photographerPrice: photographer.pricePerHour,
     studioPrice: studio.pricePerHour,
@@ -62,7 +65,7 @@ export function BookingFlow({ style, photographer, studio, slots, currentUser }:
       return;
     }
 
-    if (!selectedSlot || !selectedTime) {
+    if (!selectedDate || !selectedTime) {
       setError("Выберите дату и время.");
       return;
     }
@@ -79,7 +82,7 @@ export function BookingFlow({ style, photographer, studio, slots, currentUser }:
       photographerId: photographer.id,
       studioId: studio.id,
       studioHallId: studio.primaryHallId,
-      date: selectedSlot.date,
+      date: selectedDate,
       startTime: selectedTime,
       durationHours: duration,
       photographerPrice: photographerTotal,
@@ -127,7 +130,7 @@ export function BookingFlow({ style, photographer, studio, slots, currentUser }:
                     <SummaryItem label="Стиль" value={style.title} />
                     <SummaryItem label="Фотограф" value={photographer.name} />
                     <SummaryItem label="Студия" value={`${studio.name}, ${studio.hallName}`} />
-                    <SummaryItem label="Дата и время" value={`${selectedSlot?.label}, ${selectedTime}`} />
+                    <SummaryItem label="Дата и время" value={`${selectedDate}, ${selectedTime}`} />
                     <SummaryItem label="Длительность" value={`${duration} ч`} />
                     <SummaryItem label="Сумма" value={formatPrice(total)} />
                   </div>
@@ -167,43 +170,14 @@ export function BookingFlow({ style, photographer, studio, slots, currentUser }:
             <CardHeader>
               <CardTitle>Дата и время</CardTitle>
             </CardHeader>
-            <CardContent className="grid gap-5">
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                {slots.map((slot) => (
-                  <button
-                    key={slot.id}
-                    type="button"
-                    onClick={() => {
-                      setSelectedSlotId(slot.id);
-                      setSelectedTime(slot.times[0] ?? "");
-                    }}
-                    className={`rounded-md border px-4 py-3 text-left text-sm transition-colors ${
-                      selectedSlotId === slot.id
-                        ? "border-primary bg-primary text-primary-foreground"
-                        : "border-border bg-card hover:bg-secondary"
-                    }`}
-                  >
-                    <span className="font-medium">{slot.label}</span>
-                    <span className="mt-1 block opacity-80">{slot.times.length} слота</span>
-                  </button>
-                ))}
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {selectedSlot?.times.map((time) => (
-                  <button
-                    key={time}
-                    type="button"
-                    onClick={() => setSelectedTime(time)}
-                    className={`rounded-md border px-4 py-2 text-sm transition-colors ${
-                      selectedTime === time
-                        ? "border-primary bg-primary text-primary-foreground"
-                        : "border-border bg-card hover:bg-secondary"
-                    }`}
-                  >
-                    {time}
-                  </button>
-                ))}
-              </div>
+            <CardContent>
+              <SmartSlotPicker
+                bookingType="FULL_SHOOT"
+                photographerId={photographer.id}
+                studioHallId={studio.primaryHallId}
+                durationHours={duration}
+                onSelectionChange={handleSlotSelection}
+              />
             </CardContent>
           </Card>
 
@@ -306,7 +280,7 @@ export function BookingFlow({ style, photographer, studio, slots, currentUser }:
             <Button
               size="lg"
               className="w-full"
-              disabled={!selectedSlot || !selectedTime || isSubmitting}
+              disabled={!selectedDate || !selectedTime || isSubmitting}
               onClick={handlePayment}
             >
               <CreditCard className="size-4" aria-hidden="true" />
@@ -320,7 +294,7 @@ export function BookingFlow({ style, photographer, studio, slots, currentUser }:
             <div className="grid gap-2 text-sm text-muted-foreground">
               <span className="inline-flex items-center gap-2">
                 <CalendarCheck className="size-4" aria-hidden="true" />
-                Слот удерживается в mock-режиме
+                Выбранное время удерживается 15 минут после перехода к оплате
               </span>
               <span>Комментарий: {comment ? "добавлен" : "необязательно"}</span>
               <span>Контакты: {phone || email ? "заполнены частично" : "можно заполнить позже"}</span>

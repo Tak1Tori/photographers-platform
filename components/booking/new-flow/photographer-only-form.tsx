@@ -18,6 +18,7 @@ import {
 } from "@/lib/validation/contact-sanitizer";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { SmartSlotPicker } from "@/components/booking/smart-slot-picker";
 import { formatPrice, getStyleTitles } from "@/lib/mock-data";
 import type { Photographer } from "@/lib/types";
 
@@ -142,10 +143,8 @@ export function PhotographerOnlyForm({
               onValidate={validateTextField}
             />
 
-            <div className="grid gap-4 md:grid-cols-3">
-              <Field label="Дата" name="date" type="date" error={fieldErrors.date} />
-              <Field label="Начало" name="startTime" type="time" error={fieldErrors.startTime} />
-              <label className="grid gap-2 text-sm font-medium">
+            <div className="grid gap-4">
+              <label className="grid max-w-xs gap-2 text-sm font-medium">
                 Длительность
                 <select
                   name="durationHours"
@@ -161,6 +160,13 @@ export function PhotographerOnlyForm({
                 </select>
                 <ErrorText error={fieldErrors.durationHours} />
               </label>
+              <SmartSlotPicker
+                bookingType="PHOTOGRAPHER_ONLY"
+                photographerId={photographer.id}
+                durationHours={durationHours}
+                dateError={fieldErrors.date}
+                timeError={fieldErrors.startTime}
+              />
             </div>
 
             <div className="grid gap-2">
@@ -252,7 +258,13 @@ function PhotographerCard({ photographer }: { photographer: Photographer }) {
       <CardContent className="grid gap-5 p-6 md:grid-cols-[160px_1fr]">
         <div className="relative aspect-square overflow-hidden rounded-md bg-secondary">
           {photographer.imageUrl ? (
-            <Image src={photographer.imageUrl} alt={photographer.name} fill className="object-cover" />
+            <Image
+              src={photographer.imageUrl}
+              alt={photographer.name}
+              fill
+              priority
+              className="object-cover"
+            />
           ) : (
             <span className="flex size-full items-center justify-center">
               <Camera className="size-8 text-muted-foreground" aria-hidden="true" />

@@ -17,6 +17,7 @@ import {
 } from "@/lib/validation/contact-sanitizer";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { SmartSlotPicker } from "@/components/booking/smart-slot-picker";
 import { formatPrice } from "@/lib/mock-data";
 import type { Studio, StudioHall } from "@/lib/types";
 
@@ -161,10 +162,8 @@ export function StudioOnlyForm({ studio, hall, clientDefaults }: StudioOnlyFormP
               required
             />
 
-            <div className="grid gap-4 md:grid-cols-3">
-              <Field label="Дата" name="date" type="date" error={fieldErrors.date} />
-              <Field label="Начало" name="startTime" type="time" error={fieldErrors.startTime} />
-              <label className="grid gap-2 text-sm font-medium">
+            <div className="grid gap-4">
+              <label className="grid max-w-xs gap-2 text-sm font-medium">
                 Длительность
                 <select
                   name="durationHours"
@@ -180,6 +179,15 @@ export function StudioOnlyForm({ studio, hall, clientDefaults }: StudioOnlyFormP
                 </select>
                 <ErrorText error={fieldErrors.durationHours} />
               </label>
+              {selectedHall?.id ? (
+                <SmartSlotPicker
+                  bookingType="STUDIO_ONLY"
+                  studioHallId={selectedHall.id}
+                  durationHours={durationHours}
+                  dateError={fieldErrors.date}
+                  timeError={fieldErrors.startTime}
+                />
+              ) : null}
             </div>
 
             <div className="grid gap-4 md:grid-cols-2">

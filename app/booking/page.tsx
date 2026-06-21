@@ -1,7 +1,6 @@
 import { BookingFlow } from "@/components/booking/booking-flow";
 import { EmptyState } from "@/components/shared/empty-state";
 import { PageHeader } from "@/components/shared/page-header";
-import { getAvailableBookingSlots } from "@/lib/data/bookings";
 import { getPhotographerById } from "@/lib/data/photographers";
 import { getStudioById } from "@/lib/data/studios";
 import { getStyleBySlug } from "@/lib/data/styles";
@@ -24,11 +23,6 @@ export default async function BookingPage({ searchParams }: BookingPageProps) {
     Boolean(searchParams.style) &&
     Boolean(searchParams.photographer) &&
     Boolean(searchParams.studio);
-
-  const slots =
-    selectedPhotographer && selectedStudio
-      ? await getAvailableBookingSlots(selectedPhotographer.id, selectedStudio.id)
-      : [];
 
   return (
     <>
@@ -77,24 +71,11 @@ export default async function BookingPage({ searchParams }: BookingPageProps) {
           </div>
         </section>
       ) : null}
-      {selectedStyle && selectedPhotographer && selectedStudio && slots.length === 0 ? (
-        <section className="section">
-          <div className="container">
-            <EmptyState
-              title="Нет общих свободных слотов"
-              description="У фотографа и студии нет пересекающихся дат в mock data. Попробуйте выбрать другую студию."
-              actionLabel="Вернуться к выбору студии"
-              actionHref={`/studios?style=${selectedStyle.id}&photographer=${selectedPhotographer.id}`}
-            />
-          </div>
-        </section>
-      ) : null}
-      {selectedStyle && selectedPhotographer && selectedStudio && slots.length > 0 ? (
+      {selectedStyle && selectedPhotographer && selectedStudio ? (
         <BookingFlow
           style={selectedStyle}
           photographer={selectedPhotographer}
           studio={selectedStudio}
-          slots={slots}
           currentUser={session?.user}
         />
       ) : null}

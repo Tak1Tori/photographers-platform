@@ -10,6 +10,8 @@ import {
   notifyFinalPaymentRequested
 } from "@/lib/notifications/notification-service";
 import { createFinalPaymentForBooking } from "@/lib/payments/payment-service";
+import { cancelPlatformBookingEvent } from "@/lib/calendar/calendar-service";
+import { cancelBookingHolds } from "@/lib/calendar/hold-service";
 import { prisma } from "@/lib/prisma";
 import {
   avatarImageMaxBytes,
@@ -1144,6 +1146,15 @@ export async function updatePhotographerBookingStatusAction(
       where: { id: booking.id },
       data: { status: nextStatus }
     });
+    if (
+      nextStatus === BookingStatus.CANCELLED ||
+      nextStatus === BookingStatus.DECLINED
+    ) {
+      await Promise.all([
+        cancelPlatformBookingEvent(booking.id),
+        cancelBookingHolds(booking.id)
+      ]);
+    }
     await notifyBookingStatusChanged(booking.id, nextStatus);
 
     revalidatePath("/dashboard/photographer");

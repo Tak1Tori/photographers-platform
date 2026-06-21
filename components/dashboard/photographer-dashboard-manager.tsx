@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Fragment, useState, useTransition } from "react";
 import { CalendarDays, Images, Plus, Save, Trash2, UserRound, X } from "lucide-react";
 import {
@@ -401,9 +402,25 @@ export function PhotographerDashboardManager({
       {activeSection === "schedule" ? (
       <Card>
         <CardHeader>
-          <CardTitle>Календарь доступности</CardTitle>
+          <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+            <div>
+              <CardTitle>Календарь доступности</CardTitle>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Smart Calendar управляет рабочими часами, занятостью и бронями.
+              </p>
+            </div>
+            <Button asChild>
+              <Link href="/dashboard/photographer/calendar">
+                <CalendarDays className="size-4" />
+                Открыть Smart Calendar
+              </Link>
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="grid gap-5">
+          <p className="text-sm font-medium text-muted-foreground">
+            Legacy slots: сохранены для совместимости и постепенно заменяются правилами календаря.
+          </p>
           <form action={run("slots", createPhotographerAvailabilitySlotAction)} className="grid gap-3 rounded-lg border border-border p-4">
             <Message state={state} area="slots" />
             <div className="grid gap-3 md:grid-cols-4">

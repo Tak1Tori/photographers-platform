@@ -11,6 +11,10 @@ import { canUseDatabase } from "@/lib/data/db";
 import { mapBooking, mapSlots } from "@/lib/data/mappers";
 import { calculateBookingPricing } from "@/lib/pricing";
 import { createDepositPaymentForBooking } from "@/lib/payments/payment-service";
+import {
+  cancelBookingHolds,
+  createHoldsForBooking
+} from "@/lib/calendar/hold-service";
 import type {
   Booking,
   BookingStatus,
@@ -99,6 +103,7 @@ export async function createBooking(input: CreateBookingInput) {
     }
   });
 
+  await reserveBookingOrRollback(booking.id);
   return booking;
 }
 
@@ -168,7 +173,14 @@ export async function createPhotographerOnlyBooking(input: CreatePhotographerOnl
       }
     });
 
-  const paymentSession = await createDepositPaymentForBooking(booking.id);
+  await reserveBookingOrRollback(booking.id);
+  let paymentSession;
+  try {
+    paymentSession = await createDepositPaymentForBooking(booking.id);
+  } catch (error) {
+    await cancelBookingHolds(booking.id);
+    throw error;
+  }
 
   return {
     booking,
@@ -252,7 +264,14 @@ export async function createStudioOnlyBooking(input: CreateStudioOnlyBookingInpu
       }
     });
 
-  const paymentSession = await createDepositPaymentForBooking(booking.id);
+  await reserveBookingOrRollback(booking.id);
+  let paymentSession;
+  try {
+    paymentSession = await createDepositPaymentForBooking(booking.id);
+  } catch (error) {
+    await cancelBookingHolds(booking.id);
+    throw error;
+  }
 
   return { booking, paymentSession };
 }
@@ -434,4 +453,13 @@ function getStoredMockBookings(): Booking[] {
 function calculateEndTime(startTime: string, durationHours: number) {
   const [hour = "0"] = startTime.split(":");
   return `${String(Number(hour) + durationHours).padStart(2, "0")}:00`;
+}
+
+async function reserveBookingOrRollback(bookingId: string) {
+  try {
+    await createHoldsForBooking(bookingId);
+  } catch (error) {
+    await prisma.booking.delete({ where: { id: bookingId } }).catch(() => undefined);
+    throw error;
+  }
 }

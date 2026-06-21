@@ -2,6 +2,8 @@ import {
   BookingStatus,
   BookingPaymentStatus,
   BookingType,
+  CalendarEventSource,
+  CalendarOwnerType,
   HallStatus,
   PaymentProvider,
   PaymentStatus,
@@ -21,6 +23,9 @@ async function main() {
   await prisma.notificationDeliveryLog.deleteMany();
   await prisma.notification.deleteMany();
   await prisma.review.deleteMany();
+  await prisma.availabilityHold.deleteMany();
+  await prisma.calendarEvent.deleteMany();
+  await prisma.availabilityRule.deleteMany();
   await prisma.payment.deleteMany();
   await prisma.booking.deleteMany();
   await prisma.availabilitySlot.deleteMany();
@@ -411,6 +416,60 @@ async function main() {
     }
   }
 
+  for (const photographer of photographers) {
+    await prisma.availabilityRule.createMany({
+      data: [1, 2, 3, 4, 5, 6].map((weekday) => ({
+        ownerType: CalendarOwnerType.PHOTOGRAPHER,
+        photographerProfileId: photographer.id,
+        weekday,
+        startTime: weekday === 6 ? "11:00" : "10:00",
+        endTime: weekday === 6 ? "18:00" : "20:00",
+        minDurationMinutes: 60,
+        slotStepMinutes: 30,
+        bufferAfterMinutes: 30
+      }))
+    });
+  }
+  for (const studio of studios) {
+    for (const hall of studio.halls) {
+      await prisma.availabilityRule.createMany({
+        data: [0, 1, 2, 3, 4, 5, 6].map((weekday) => ({
+          ownerType: CalendarOwnerType.STUDIO_HALL,
+          studioHallId: hall.id,
+          weekday,
+          startTime: "09:00",
+          endTime: "22:00",
+          minDurationMinutes: 60,
+          slotStepMinutes: 30,
+          bufferAfterMinutes: 30
+        }))
+      });
+    }
+  }
+
+  await prisma.calendarEvent.createMany({
+    data: [
+      {
+        ownerType: CalendarOwnerType.PHOTOGRAPHER,
+        photographerProfileId: photographers[0].id,
+        source: CalendarEventSource.MANUAL_BUSY,
+        title: "Личная съемка",
+        privateNote: "Пример ручной занятости",
+        startTime: new Date("2026-06-24T09:00:00.000Z"),
+        endTime: new Date("2026-06-24T11:00:00.000Z")
+      },
+      {
+        ownerType: CalendarOwnerType.STUDIO_HALL,
+        studioHallId: studios[0].halls[0].id,
+        source: CalendarEventSource.MANUAL_BUSY,
+        title: "Подготовка декораций",
+        privateNote: "Пример занятости зала",
+        startTime: new Date("2026-06-25T07:00:00.000Z"),
+        endTime: new Date("2026-06-25T09:00:00.000Z")
+      }
+    ]
+  });
+
   const bookingSeeds = [
     {
       bookingNumber: "BK-1024",
@@ -456,7 +515,7 @@ async function main() {
     const serviceFee = Math.round((photographerPrice + studioPrice) * 0.1);
     const totalPrice = photographerPrice + studioPrice + serviceFee;
     const depositAmount = totalPrice <= 10000 ? totalPrice : Math.max(Math.round(totalPrice * 0.2), 10000);
-    await prisma.booking.create({
+    const booking = await prisma.booking.create({
       data: {
         bookingNumber: seed.bookingNumber,
         clientId: seed.client.id,
@@ -493,6 +552,38 @@ async function main() {
           }
         }
       }
+    });
+    await prisma.calendarEvent.createMany({
+      data: [
+        {
+          ownerType: CalendarOwnerType.PHOTOGRAPHER,
+          photographerProfileId: seed.photographer.id,
+          bookingId: booking.id,
+          source: CalendarEventSource.PLATFORM_BOOKING,
+          title: `Бронь ${booking.bookingNumber}`,
+          startTime: new Date(
+            `${seed.date.toISOString().slice(0, 10)}T${seed.startTime}:00+05:00`
+          ),
+          endTime: new Date(
+            `${seed.date.toISOString().slice(0, 10)}T${booking.endTime}:00+05:00`
+          ),
+          bufferAfterMinutes: 30
+        },
+        {
+          ownerType: CalendarOwnerType.STUDIO_HALL,
+          studioHallId: seed.hall.id,
+          bookingId: booking.id,
+          source: CalendarEventSource.PLATFORM_BOOKING,
+          title: `Бронь ${booking.bookingNumber}`,
+          startTime: new Date(
+            `${seed.date.toISOString().slice(0, 10)}T${seed.startTime}:00+05:00`
+          ),
+          endTime: new Date(
+            `${seed.date.toISOString().slice(0, 10)}T${booking.endTime}:00+05:00`
+          ),
+          bufferAfterMinutes: 30
+        }
+      ]
     });
   }
 

@@ -8,6 +8,8 @@ import {
   notifyBookingStatusChanged,
   notifyPaymentRefunded
 } from "@/lib/notifications/notification-service";
+import { cancelPlatformBookingEvent } from "@/lib/calendar/calendar-service";
+import { cancelBookingHolds } from "@/lib/calendar/hold-service";
 import {
   cancelPayment,
   markPaymentAsFailed,
@@ -103,10 +105,19 @@ export async function adminUpdateBookingStatusAction(formData: FormData): Promis
     }
 
     // TODO: Позже разделить подтверждение на photographerConfirmationStatus и studioConfirmationStatus.
-    await prisma.booking.update({
-      where: { id },
-      data: { status }
-    });
+      await prisma.booking.update({
+        where: { id },
+        data: { status }
+      });
+      if (
+        status === BookingStatus.CANCELLED ||
+        status === BookingStatus.DECLINED
+      ) {
+        await Promise.all([
+          cancelPlatformBookingEvent(id),
+          cancelBookingHolds(id)
+        ]);
+      }
     if (booking?.status !== status) {
       await notifyBookingStatusChanged(id, status);
     }

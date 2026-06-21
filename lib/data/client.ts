@@ -2,6 +2,8 @@ import { BookingPaymentStatus, BookingStatus, UserRole } from "@prisma/client";
 import { canUseDatabase } from "@/lib/data/db";
 import { getAllBookings, saveMockRuntimeBooking } from "@/lib/data/bookings";
 import { prisma } from "@/lib/prisma";
+import { cancelPlatformBookingEvent } from "@/lib/calendar/calendar-service";
+import { cancelBookingHolds } from "@/lib/calendar/hold-service";
 import type {
   Booking,
   ClientBookingDetails,
@@ -100,6 +102,10 @@ export async function cancelClientBooking(userId: string, bookingNumber: string,
     where: { id: booking.dbId },
     data: { status: BookingStatus.CANCELLED }
   });
+  await Promise.all([
+    cancelPlatformBookingEvent(updated.id),
+    cancelBookingHolds(updated.id)
+  ]);
   return updated.id;
 }
 

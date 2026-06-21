@@ -114,23 +114,48 @@ enum AlbumMediaType {
   VIDEO
 }
 
+enum CalendarOwnerType {
+  PHOTOGRAPHER
+  STUDIO_HALL
+}
+
+enum CalendarEventSource {
+  PLATFORM_BOOKING
+  MANUAL_BUSY
+  SYSTEM_HOLD
+}
+
+enum CalendarEventStatus {
+  BUSY
+  CANCELLED
+}
+
+enum AvailabilityHoldStatus {
+  ACTIVE
+  EXPIRED
+  CONVERTED
+  CANCELLED
+}
+
 model User {
-  id                  String               @id @default(cuid())
-  name                String
-  email               String               @unique
-  emailVerified       DateTime?
-  image               String?
-  phone               String?
-  passwordHash        String?
-  role                UserRole
-  createdAt           DateTime             @default(now())
-  updatedAt           DateTime             @updatedAt
-  accounts            Account[]
-  sessions            Session[]
-  photographerProfile PhotographerProfile?
-  studioProfiles      StudioProfile[]
-  bookings            Booking[]            @relation("ClientBookings")
-  notifications       Notification[]
+  id                    String               @id @default(cuid())
+  name                  String
+  email                 String               @unique
+  emailVerified         DateTime?
+  image                 String?
+  phone                 String?
+  passwordHash          String?
+  role                  UserRole
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+  accounts              Account[]
+  sessions              Session[]
+  photographerProfile   PhotographerProfile?
+  studioProfiles        StudioProfile[]
+  bookings              Booking[]            @relation("ClientBookings")
+  notifications         Notification[]
+  createdCalendarEvents CalendarEvent[]      @relation("CalendarEventCreator")
+  availabilityHolds     AvailabilityHold[]
 }
 
 model Account {
@@ -197,6 +222,9 @@ model PhotographerProfile {
   styles            Style[]                     @relation("PhotographerStyles")
   portfolioItems    PhotographerPortfolioItem[]
   availabilitySlots AvailabilitySlot[]
+  availabilityRules AvailabilityRule[]
+  calendarEvents    CalendarEvent[]
+  availabilityHolds AvailabilityHold[]
   bookings          Booking[]
   reviews           Review[]
 }
@@ -260,6 +288,9 @@ model StudioHall {
   updatedAt         DateTime           @updatedAt
   studio            StudioProfile      @relation(fields: [studioId], references: [id], onDelete: Cascade)
   availabilitySlots AvailabilitySlot[]
+  availabilityRules AvailabilityRule[]
+  calendarEvents    CalendarEvent[]
+  availabilityHolds AvailabilityHold[]
   bookings          Booking[]
 }
 
@@ -278,6 +309,78 @@ model AvailabilitySlot {
 
   @@index([photographerId])
   @@index([studioHallId])
+}
+
+model AvailabilityRule {
+  id                    String               @id @default(cuid())
+  ownerType             CalendarOwnerType
+  photographerProfileId String?
+  studioHallId          String?
+  weekday               Int
+  startTime             String
+  endTime               String
+  isActive              Boolean              @default(true)
+  minDurationMinutes    Int                  @default(60)
+  slotStepMinutes       Int                  @default(30)
+  bufferBeforeMinutes   Int                  @default(0)
+  bufferAfterMinutes    Int                  @default(0)
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+  photographerProfile   PhotographerProfile? @relation(fields: [photographerProfileId], references: [id], onDelete: Cascade)
+  studioHall            StudioHall?          @relation(fields: [studioHallId], references: [id], onDelete: Cascade)
+
+  @@index([photographerProfileId, weekday, isActive])
+  @@index([studioHallId, weekday, isActive])
+}
+
+model CalendarEvent {
+  id                    String               @id @default(cuid())
+  ownerType             CalendarOwnerType
+  photographerProfileId String?
+  studioHallId          String?
+  bookingId             String?
+  source                CalendarEventSource
+  status                CalendarEventStatus  @default(BUSY)
+  title                 String?
+  privateNote           String?
+  startTime             DateTime
+  endTime               DateTime
+  bufferBeforeMinutes   Int                  @default(0)
+  bufferAfterMinutes    Int                  @default(0)
+  createdById           String?
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+  photographerProfile   PhotographerProfile? @relation(fields: [photographerProfileId], references: [id], onDelete: Cascade)
+  studioHall            StudioHall?          @relation(fields: [studioHallId], references: [id], onDelete: Cascade)
+  booking               Booking?             @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  createdBy             User?                @relation("CalendarEventCreator", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([photographerProfileId, status, startTime, endTime])
+  @@index([studioHallId, status, startTime, endTime])
+  @@index([bookingId, source])
+}
+
+model AvailabilityHold {
+  id                    String                 @id @default(cuid())
+  ownerType             CalendarOwnerType
+  photographerProfileId String?
+  studioHallId          String?
+  bookingId             String?
+  userId                String?
+  startTime             DateTime
+  endTime               DateTime
+  status                AvailabilityHoldStatus @default(ACTIVE)
+  expiresAt             DateTime
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  photographerProfile   PhotographerProfile?   @relation(fields: [photographerProfileId], references: [id], onDelete: Cascade)
+  studioHall            StudioHall?            @relation(fields: [studioHallId], references: [id], onDelete: Cascade)
+  booking               Booking?               @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  user                  User?                  @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([photographerProfileId, status, expiresAt, startTime, endTime])
+  @@index([studioHallId, status, expiresAt, startTime, endTime])
+  @@index([bookingId, status])
 }
 
 model Booking {
@@ -338,6 +441,8 @@ model Booking {
   payments                Payment[]
   webhookLogs             PaymentWebhookLog[]
   paymentAuditLogs        PaymentAuditLog[]
+  calendarEvents          CalendarEvent[]
+  availabilityHolds       AvailabilityHold[]
   review                  Review?
 
   @@index([clientId, createdAt])

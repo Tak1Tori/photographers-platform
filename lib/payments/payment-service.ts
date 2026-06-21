@@ -25,6 +25,14 @@ import type {
   CreateCheckoutSessionResult,
   ProviderPaymentData
 } from "@/lib/payments/types";
+import {
+  cancelBookingHolds,
+  convertBookingHolds
+} from "@/lib/calendar/hold-service";
+import {
+  cancelPlatformBookingEvent,
+  createPlatformBookingEvent
+} from "@/lib/calendar/calendar-service";
 
 const paymentBookingInclude = {
   style: true,
@@ -262,6 +270,18 @@ export async function markPaymentAsPaid(
             })
           }
         });
+        const totalHolds = await tx.availabilityHold.count({
+          where: { bookingId: payment.bookingId }
+        });
+        const converted = await convertBookingHolds(payment.bookingId, tx);
+        const expectedHolds =
+          payment.booking.bookingType === "FULL_SHOOT" ? 2 : 1;
+        if (totalHolds > 0 && converted.count !== expectedHolds) {
+          throw new Error(
+            "Время больше не удерживается. Вернитесь к бронированию и выберите новый слот."
+          );
+        }
+        await createPlatformBookingEvent(payment.bookingId, tx);
       } else if (payment.type === PaymentType.FINAL_PAYMENT) {
         if (payment.amount !== payment.booking.remainingAmount) {
           throw new Error("Final payment amount does not match booking remainder");
@@ -337,6 +357,9 @@ export async function markPaymentAsFailed(
             : BookingPaymentStatus.FAILED
       }
     });
+    if (payment.type === PaymentType.DEPOSIT) {
+      await cancelBookingHolds(payment.bookingId, tx);
+    }
     await createAuditLog(tx, {
       bookingId: payment.bookingId,
       paymentId: payment.id,
@@ -381,6 +404,9 @@ export async function cancelPayment(
             : BookingPaymentStatus.UNPAID
       }
     });
+    if (payment.type === PaymentType.DEPOSIT) {
+      await cancelBookingHolds(payment.bookingId, tx);
+    }
     await createAuditLog(tx, {
       bookingId: payment.bookingId,
       paymentId: payment.id,
@@ -486,6 +512,8 @@ export async function refundManualPayment(
         )
       }
     });
+    await cancelBookingHolds(payment.bookingId, tx);
+    await cancelPlatformBookingEvent(payment.bookingId, tx);
     await createAuditLog(tx, {
       bookingId: payment.bookingId,
       paymentId: refund.id,

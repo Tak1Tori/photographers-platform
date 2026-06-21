@@ -10,6 +10,7 @@ import { getSession } from "@/lib/auth";
 import { canUseDatabase } from "@/lib/data/db";
 import { notifyBookingCreated } from "@/lib/notifications/notification-service";
 import { createDepositPaymentForBooking } from "@/lib/payments/payment-service";
+import { cancelBookingHolds } from "@/lib/calendar/hold-service";
 import type { CreateBookingInput, CreateBookingResult } from "@/lib/types";
 
 export async function createBookingAction(
@@ -52,7 +53,13 @@ export async function createBookingAction(
   try {
     const booking = await createBooking(bookingInput);
     await notifyBookingCreated(booking.id);
-    const paymentSession = await createDepositPaymentForBooking(booking.id);
+    let paymentSession;
+    try {
+      paymentSession = await createDepositPaymentForBooking(booking.id);
+    } catch (error) {
+      await cancelBookingHolds(booking.id);
+      throw error;
+    }
     return {
       success: true,
       bookingNumber: booking.bookingNumber,
