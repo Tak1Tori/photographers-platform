@@ -2,13 +2,13 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import {
   ArrowLeft,
   ArrowRight,
-  CalendarClock,
+  CalendarDays,
+  Check,
   Clock3,
-  LockKeyhole,
   Plus,
   Save,
   Trash2
@@ -19,7 +19,7 @@ import {
   updateAvailabilityRuleAction
 } from "@/app/dashboard/calendar/actions";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
 type RuleDto = {
@@ -47,23 +47,32 @@ interface CalendarDashboardProps {
   ownerType: "PHOTOGRAPHER" | "STUDIO_HALL";
   ownerId: string;
   ownerName: string;
-  weekStart: string;
-  previousWeekHref: string;
-  nextWeekHref: string;
+  monthStart: string;
+  previousMonthHref: string;
+  nextMonthHref: string;
   backHref: string;
   rules: RuleDto[];
   events: EventDto[];
 }
 
-const weekdays = ["Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб"];
+const weekdayHeaders = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
+const weekdayNames = [
+  "воскресенье",
+  "понедельник",
+  "вторник",
+  "среду",
+  "четверг",
+  "пятницу",
+  "субботу"
+];
 
 export function CalendarDashboard({
   ownerType,
   ownerId,
   ownerName,
-  weekStart,
-  previousWeekHref,
-  nextWeekHref,
+  monthStart,
+  previousMonthHref,
+  nextMonthHref,
   backHref,
   rules,
   events
@@ -71,12 +80,26 @@ export function CalendarDashboard({
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
-  const days = Array.from({ length: 7 }, (_, index) => {
-    const date = new Date(`${weekStart}T12:00:00+05:00`);
-    date.setDate(date.getDate() + index);
-    return date;
-  });
-  const ruleMap = new Map(rules.map((rule) => [rule.weekday, rule]));
+  const monthDate = useMemo(() => localDate(monthStart), [monthStart]);
+  const calendarDays = useMemo(() => buildCalendarDays(monthStart), [monthStart]);
+  const defaultSelectedDate = useMemo(() => {
+    const today = dateKey(new Date());
+    return today.startsWith(monthStart.slice(0, 7)) ? today : monthStart;
+  }, [monthStart]);
+  const [selectedDate, setSelectedDate] = useState(defaultSelectedDate);
+  const eventMap = useMemo(() => {
+    const map = new Map<string, EventDto[]>();
+    for (const event of events) {
+      const key = dateKey(new Date(event.startTime));
+      const dayEvents = map.get(key);
+      if (dayEvents) dayEvents.push(event);
+      else map.set(key, [event]);
+    }
+    return map;
+  }, [events]);
+  const selectedDay = localDate(selectedDate);
+  const selectedEvents = eventMap.get(selectedDate) ?? [];
+  const selectedRule = rules.find((rule) => rule.weekday === selectedDay.getDay());
 
   function run(action: (formData: FormData) => Promise<{ success: boolean; error?: string }>) {
     return (formData: FormData) => {
@@ -92,25 +115,21 @@ export function CalendarDashboard({
     };
   }
 
-  const platformCount = events.filter((event) => event.source === "PLATFORM_BOOKING").length;
-  const manualCount = events.filter((event) => event.source === "MANUAL_BUSY").length;
-  const holdCount = events.filter((event) => event.source === "ACTIVE_HOLD").length;
-
   return (
-    <div className="grid gap-6">
-      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+    <div className="grid gap-4">
+      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
         <div>
           <p className="text-sm text-muted-foreground">Календарь</p>
-          <h2 className="text-2xl font-semibold tracking-normal">{ownerName}</h2>
+          <h2 className="mt-1 text-2xl font-semibold tracking-normal">{ownerName}</h2>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button asChild variant="outline" size="sm">
-            <Link href={previousWeekHref} aria-label="Предыдущая неделя">
+            <Link href={previousMonthHref} aria-label="Предыдущий месяц">
               <ArrowLeft className="size-4" />
             </Link>
           </Button>
           <Button asChild variant="outline" size="sm">
-            <Link href={nextWeekHref} aria-label="Следующая неделя">
+            <Link href={nextMonthHref} aria-label="Следующий месяц">
               <ArrowRight className="size-4" />
             </Link>
           </Button>
@@ -133,147 +152,276 @@ export function CalendarDashboard({
         </p>
       ) : null}
 
-      <div className="grid gap-3 sm:grid-cols-3">
-        <Stat icon={CalendarClock} label="Событий за неделю" value={events.length} />
-        <Stat icon={Clock3} label="Брони платформы" value={platformCount} />
-        <Stat icon={LockKeyhole} label="Ручная занятость / hold" value={manualCount + holdCount} />
-      </div>
+      <Card className="overflow-hidden">
+        <CardContent className="p-0">
+          <div className="grid xl:grid-cols-[minmax(0,1fr)_340px]">
+            <div className="min-w-0 border-b border-border xl:border-b-0 xl:border-r">
+              <div className="flex flex-col justify-between gap-4 border-b border-border px-4 py-4 sm:flex-row sm:items-center sm:px-5">
+                <div>
+                  <h3 className="text-xl font-semibold capitalize">
+                    {formatMonth(monthDate)}
+                  </h3>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Выберите день, чтобы изменить расписание или добавить занятость.
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs text-muted-foreground">
+                  <Legend color="bg-emerald-400" label="Бронь" />
+                  <Legend color="bg-amber-400" label="Занято" />
+                  <Legend color="bg-sky-400" label="Удерживается" />
+                </div>
+              </div>
 
-      <Card>
-        <CardHeader className="flex-row items-center justify-between">
-          <CardTitle>Неделя</CardTitle>
-          <span className="text-sm text-muted-foreground">
-            {formatDay(days[0])} — {formatDay(days[6])}
-          </span>
-        </CardHeader>
-        <CardContent>
-          <div className="grid min-w-[820px] grid-cols-7 gap-2 overflow-x-auto pb-2">
-            {days.map((day) => {
-              const key = dateKey(day);
-              const dayEvents = events.filter((event) => dateKey(new Date(event.startTime)) === key);
-              return (
-                <div key={key} className="min-h-56 rounded-md border border-border bg-background p-2">
-                  <div className="mb-3 border-b border-border pb-2">
-                    <p className="text-xs text-muted-foreground">{weekdays[day.getDay()]}</p>
-                    <p className="font-medium">{formatDay(day)}</p>
+              <div>
+                <div>
+                  <div className="grid grid-cols-7 border-b border-border bg-secondary/25">
+                    {weekdayHeaders.map((day) => (
+                      <div
+                        key={day}
+                        className="px-3 py-2 text-center text-xs font-medium text-muted-foreground"
+                      >
+                        {day}
+                      </div>
+                    ))}
                   </div>
-                  <div className="grid gap-2">
-                    {dayEvents.length === 0 ? (
-                      <p className="py-6 text-center text-xs text-muted-foreground">Свободно</p>
-                    ) : (
-                      dayEvents.map((event) => (
-                        <div
-                          key={event.id}
+                  <div className="grid grid-cols-7">
+                    {calendarDays.map((day) => {
+                      const key = dateKey(day);
+                      const dayEvents = eventMap.get(key) ?? [];
+                      const isCurrentMonth = day.getMonth() === monthDate.getMonth();
+                      const isSelected = key === selectedDate;
+                      const isToday = key === dateKey(new Date());
+
+                      return (
+                        <button
+                          key={key}
+                          type="button"
+                          onClick={() => setSelectedDate(key)}
                           className={cn(
-                            "rounded-md border px-2 py-2 text-xs",
-                            event.source === "PLATFORM_BOOKING"
-                              ? "border-emerald-400/35 bg-emerald-400/10"
-                              : event.source === "MANUAL_BUSY"
-                                ? "border-amber-400/35 bg-amber-400/10"
-                                : "border-sky-400/35 bg-sky-400/10"
+                            "relative min-h-20 border-b border-r border-border p-1.5 text-left transition-colors last:border-r-0 hover:bg-secondary/40 sm:min-h-32 sm:p-2",
+                            isSelected && "bg-emerald-400/[0.07] ring-1 ring-inset ring-emerald-400/70",
+                            !isCurrentMonth && "bg-background/40 text-muted-foreground opacity-45"
                           )}
                         >
-                          <p className="font-medium">{event.title}</p>
-                          <p className="mt-1 text-muted-foreground">
-                            {formatTime(event.startTime)}–{formatTime(event.endTime)}
-                          </p>
+                          <span
+                            className={cn(
+                              "flex size-7 items-center justify-center rounded-md text-sm font-medium",
+                              isToday && "bg-emerald-400 text-emerald-950",
+                              isSelected && !isToday && "text-emerald-300"
+                            )}
+                          >
+                            {day.getDate()}
+                          </span>
+                          <span className="mt-1 flex gap-1 sm:hidden">
+                            {dayEvents.slice(0, 4).map((event) => (
+                              <span
+                                key={event.id}
+                                className={cn(
+                                  "size-1.5 rounded-full",
+                                  event.source === "PLATFORM_BOOKING"
+                                    ? "bg-emerald-400"
+                                    : event.source === "MANUAL_BUSY"
+                                      ? "bg-amber-400"
+                                      : "bg-sky-400"
+                                )}
+                              />
+                            ))}
+                          </span>
+                          <span className="mt-2 hidden gap-1 sm:grid">
+                            {dayEvents.slice(0, 3).map((event) => (
+                              <span
+                                key={event.id}
+                                className={cn(
+                                  "block truncate rounded border px-1.5 py-1 text-[11px] leading-tight",
+                                  eventClass(event.source)
+                                )}
+                              >
+                                {formatTime(event.startTime)} {event.title}
+                              </span>
+                            ))}
+                            {dayEvents.length > 3 ? (
+                              <span className="px-1 text-[11px] text-muted-foreground">
+                                Ещё {dayEvents.length - 3}
+                              </span>
+                            ) : null}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <aside className="grid content-start">
+              <div className="border-b border-border p-5">
+                <p className="text-sm capitalize text-muted-foreground">
+                  {formatWeekday(selectedDay)}
+                </p>
+                <h3 className="mt-1 text-2xl font-semibold">{formatSelectedDate(selectedDay)}</h3>
+                <div className="mt-4 grid gap-2">
+                  {selectedEvents.length === 0 ? (
+                    <p className="rounded-md border border-dashed border-border px-3 py-4 text-sm text-muted-foreground">
+                      На этот день событий нет.
+                    </p>
+                  ) : (
+                    selectedEvents.map((event) => (
+                      <div
+                        key={event.id}
+                        className={cn("rounded-md border p-3 text-sm", eventClass(event.source))}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="font-medium">{event.title}</p>
+                            <p className="mt-1 text-xs opacity-75">
+                              {formatTime(event.startTime)}–{formatTime(event.endTime)}
+                            </p>
+                          </div>
                           {event.canDelete ? (
                             <button
                               type="button"
-                              className="mt-2 inline-flex items-center gap-1 text-rose-300"
+                              className="text-rose-300 transition-colors hover:text-rose-200"
                               disabled={isPending}
+                              aria-label={`Удалить ${event.title}`}
                               onClick={() => {
                                 const data = baseForm(ownerType, ownerId);
                                 data.set("eventId", event.id);
                                 run(deleteManualBusyEventAction)(data);
                               }}
                             >
-                              <Trash2 className="size-3" />
-                              Удалить
+                              <Trash2 className="size-4" />
                             </button>
                           ) : null}
                         </div>
-                      ))
-                    )}
-                  </div>
+                      </div>
+                    ))
+                  )}
                 </div>
-              );
-            })}
+              </div>
+
+              <details className="group border-b border-border" open>
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-4">
+                  <span className="inline-flex items-center gap-2 font-medium">
+                    <Plus className="size-4 text-emerald-300" />
+                    Добавить занятость
+                  </span>
+                  <span className="text-muted-foreground transition-transform group-open:rotate-45">
+                    <Plus className="size-4" />
+                  </span>
+                </summary>
+                <form
+                  action={run(createManualBusyEventAction)}
+                  className="grid gap-3 px-5 pb-5"
+                >
+                  <OwnerFields ownerType={ownerType} ownerId={ownerId} />
+                  <input type="hidden" name="date" value={selectedDate} />
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field label="Начало" name="startTime" type="time" required />
+                    <Field label="Конец" name="endTime" type="time" required />
+                  </div>
+                  <Field label="Название" name="title" placeholder="Личная съемка" />
+                  <label className="grid gap-1.5 text-xs text-muted-foreground">
+                    Личная заметка
+                    <textarea
+                      name="privateNote"
+                      className="min-h-20 rounded-md border border-input bg-background p-2.5 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring"
+                      placeholder="Клиенты её не увидят"
+                    />
+                  </label>
+                  <Button disabled={isPending} size="sm">
+                    <Plus className="size-4" />
+                    Добавить
+                  </Button>
+                </form>
+              </details>
+
+              <details className="group">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-4">
+                  <span className="inline-flex items-center gap-2 font-medium">
+                    <Clock3 className="size-4 text-emerald-300" />
+                    Рабочие часы
+                  </span>
+                  <span
+                    className={cn(
+                      "inline-flex items-center gap-1 text-xs",
+                      selectedRule?.isActive ? "text-emerald-300" : "text-muted-foreground"
+                    )}
+                  >
+                    {selectedRule?.isActive ? (
+                      <>
+                        <Check className="size-3" />
+                        Рабочий день
+                      </>
+                    ) : (
+                      "Выходной"
+                    )}
+                  </span>
+                </summary>
+                <form
+                  action={run(updateAvailabilityRuleAction)}
+                  className="grid gap-3 px-5 pb-5"
+                >
+                  <OwnerFields ownerType={ownerType} ownerId={ownerId} />
+                  <input type="hidden" name="weekday" value={selectedDay.getDay()} />
+                  <p className="text-xs text-muted-foreground">
+                    Настройка применяется на каждую {weekdayNames[selectedDay.getDay()]}.
+                  </p>
+                  <label className="flex items-center gap-2 rounded-md border border-border p-3 text-sm">
+                    <input
+                      name="isActive"
+                      type="checkbox"
+                      defaultChecked={selectedRule?.isActive ?? selectedDay.getDay() !== 0}
+                    />
+                    Рабочий день
+                  </label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <CompactField
+                      label="Начало"
+                      name="startTime"
+                      type="time"
+                      value={selectedRule?.startTime ?? "10:00"}
+                    />
+                    <CompactField
+                      label="Конец"
+                      name="endTime"
+                      type="time"
+                      value={selectedRule?.endTime ?? "20:00"}
+                    />
+                    <CompactField
+                      label="Мин. бронь"
+                      name="minDurationMinutes"
+                      type="number"
+                      value={String(selectedRule?.minDurationMinutes ?? 60)}
+                    />
+                    <CompactField
+                      label="Шаг слотов"
+                      name="slotStepMinutes"
+                      type="number"
+                      value={String(selectedRule?.slotStepMinutes ?? 30)}
+                    />
+                    <CompactField
+                      label="Буфер до"
+                      name="bufferBeforeMinutes"
+                      type="number"
+                      value={String(selectedRule?.bufferBeforeMinutes ?? 0)}
+                    />
+                    <CompactField
+                      label="Буфер после"
+                      name="bufferAfterMinutes"
+                      type="number"
+                      value={String(selectedRule?.bufferAfterMinutes ?? 0)}
+                    />
+                  </div>
+                  <Button disabled={isPending} size="sm" variant="outline">
+                    <Save className="size-4" />
+                    Сохранить рабочие часы
+                  </Button>
+                </form>
+              </details>
+            </aside>
           </div>
         </CardContent>
       </Card>
-
-      <div className="grid gap-6 xl:grid-cols-[0.8fr_1.2fr]">
-        <Card>
-          <CardHeader>
-            <CardTitle>Добавить занятость</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form action={run(createManualBusyEventAction)} className="grid gap-4">
-              <OwnerFields ownerType={ownerType} ownerId={ownerId} />
-              <Field label="Дата" name="date" type="date" required />
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Начало" name="startTime" type="time" required />
-                <Field label="Конец" name="endTime" type="time" required />
-              </div>
-              <Field label="Название" name="title" placeholder="Личная съемка" />
-              <label className="grid gap-2 text-sm font-medium">
-                Личная заметка
-                <textarea
-                  name="privateNote"
-                  className="min-h-24 rounded-md border border-input bg-background p-3 text-sm outline-none focus:ring-2 focus:ring-ring"
-                  placeholder="Клиенты эту заметку не увидят"
-                />
-              </label>
-              <Button disabled={isPending}>
-                <Plus className="size-4" />
-                Добавить
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Рабочее расписание</CardTitle>
-          </CardHeader>
-          <CardContent className="grid gap-3">
-            {weekdays.map((label, weekday) => {
-              const rule = ruleMap.get(weekday);
-              return (
-                <form
-                  key={weekday}
-                  action={run(updateAvailabilityRuleAction)}
-                  className="grid gap-3 rounded-md border border-border p-3 lg:grid-cols-[50px_90px_repeat(6,minmax(80px,1fr))_auto] lg:items-end"
-                >
-                  <OwnerFields ownerType={ownerType} ownerId={ownerId} />
-                  <input type="hidden" name="weekday" value={weekday} />
-                  <span className="pb-2 font-medium">{label}</span>
-                  <label className="flex items-center gap-2 pb-2 text-sm">
-                    <input name="isActive" type="checkbox" defaultChecked={rule?.isActive ?? weekday !== 0} />
-                    Рабочий
-                  </label>
-                  <CompactField label="Начало" name="startTime" type="time" value={rule?.startTime ?? "10:00"} />
-                  <CompactField label="Конец" name="endTime" type="time" value={rule?.endTime ?? "20:00"} />
-                  <CompactField label="Мин., мин" name="minDurationMinutes" type="number" value={String(rule?.minDurationMinutes ?? 60)} />
-                  <CompactField label="Шаг, мин" name="slotStepMinutes" type="number" value={String(rule?.slotStepMinutes ?? 30)} />
-                  <CompactField label="Буфер до" name="bufferBeforeMinutes" type="number" value={String(rule?.bufferBeforeMinutes ?? 0)} />
-                  <CompactField label="Буфер после" name="bufferAfterMinutes" type="number" value={String(rule?.bufferAfterMinutes ?? 0)} />
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={isPending}
-                    title="Сохранить день"
-                    className="px-3"
-                  >
-                    <Save className="size-4" />
-                  </Button>
-                </form>
-              );
-            })}
-          </CardContent>
-        </Card>
-      </div>
     </div>
   );
 }
@@ -301,14 +449,14 @@ function Field({
   required?: boolean;
 }) {
   return (
-    <label className="grid gap-2 text-sm font-medium">
+    <label className="grid gap-1.5 text-xs text-muted-foreground">
       {label}
       <input
         name={name}
         type={type}
         placeholder={placeholder}
         required={required}
-        className="h-10 rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
+        className="h-9 rounded-md border border-input bg-background px-2.5 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring"
       />
     </label>
   );
@@ -326,38 +474,25 @@ function CompactField({
   value: string;
 }) {
   return (
-    <label className="grid gap-1 text-xs text-muted-foreground">
-      {label}
+    <label className="grid gap-1.5 text-xs text-muted-foreground">
+      {label}{type === "number" ? ", мин" : ""}
       <input
         name={name}
         type={type}
         min={type === "number" ? 0 : undefined}
         defaultValue={value}
-        className="h-9 min-w-0 rounded-md border border-input bg-background px-2 text-sm text-foreground"
+        className="h-9 min-w-0 rounded-md border border-input bg-background px-2.5 text-sm text-foreground"
       />
     </label>
   );
 }
 
-function Stat({
-  icon: Icon,
-  label,
-  value
-}: {
-  icon: typeof CalendarClock;
-  label: string;
-  value: number;
-}) {
+function Legend({ color, label }: { color: string; label: string }) {
   return (
-    <div className="flex items-center gap-3 rounded-lg border border-border bg-card p-4">
-      <span className="flex size-10 items-center justify-center rounded-md bg-emerald-400/10 text-emerald-300">
-        <Icon className="size-5" />
-      </span>
-      <div>
-        <p className="text-2xl font-semibold">{value}</p>
-        <p className="text-sm text-muted-foreground">{label}</p>
-      </div>
-    </div>
+    <span className="inline-flex items-center gap-1.5">
+      <span className={cn("size-2 rounded-full", color)} />
+      {label}
+    </span>
   );
 }
 
@@ -366,6 +501,22 @@ function baseForm(ownerType: string, ownerId: string) {
   data.set("ownerType", ownerType);
   data.set("ownerId", ownerId);
   return data;
+}
+
+function buildCalendarDays(monthStart: string) {
+  const firstDay = localDate(monthStart);
+  const mondayOffset = (firstDay.getDay() + 6) % 7;
+  const gridStart = new Date(firstDay);
+  gridStart.setDate(firstDay.getDate() - mondayOffset);
+  return Array.from({ length: 42 }, (_, index) => {
+    const day = new Date(gridStart);
+    day.setDate(gridStart.getDate() + index);
+    return day;
+  });
+}
+
+function localDate(value: string) {
+  return new Date(`${value}T12:00:00+05:00`);
 }
 
 function dateKey(date: Date) {
@@ -377,11 +528,26 @@ function dateKey(date: Date) {
   }).format(date);
 }
 
-function formatDay(date: Date) {
+function formatMonth(date: Date) {
+  return new Intl.DateTimeFormat("ru-RU", {
+    timeZone: "Asia/Almaty",
+    month: "long",
+    year: "numeric"
+  }).format(date);
+}
+
+function formatSelectedDate(date: Date) {
   return new Intl.DateTimeFormat("ru-RU", {
     timeZone: "Asia/Almaty",
     day: "numeric",
-    month: "short"
+    month: "long"
+  }).format(date);
+}
+
+function formatWeekday(date: Date) {
+  return new Intl.DateTimeFormat("ru-RU", {
+    timeZone: "Asia/Almaty",
+    weekday: "long"
   }).format(date);
 }
 
@@ -391,4 +557,14 @@ function formatTime(value: string) {
     hour: "2-digit",
     minute: "2-digit"
   }).format(new Date(value));
+}
+
+function eventClass(source: EventDto["source"]) {
+  if (source === "PLATFORM_BOOKING") {
+    return "border-emerald-400/35 bg-emerald-400/10 text-emerald-100";
+  }
+  if (source === "MANUAL_BUSY") {
+    return "border-amber-400/35 bg-amber-400/10 text-amber-100";
+  }
+  return "border-sky-400/35 bg-sky-400/10 text-sky-100";
 }
