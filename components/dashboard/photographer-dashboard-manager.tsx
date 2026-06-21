@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { Fragment, useState, useTransition } from "react";
-import { Plus, Save, Trash2, X } from "lucide-react";
+import { CalendarDays, Images, Plus, Save, Trash2, UserRound, X } from "lucide-react";
 import {
   createPhotographerAvailabilitySlotAction,
   createCustomPhotographerStyleAction,
@@ -17,6 +17,10 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusBadge } from "@/components/dashboard/status-badge";
+import {
+  DashboardSectionTabs,
+  type DashboardSectionTab
+} from "@/components/dashboard/dashboard-section-tabs";
 import { AlbumContentField } from "@/components/uploads/album-content-field";
 import { ImageUploadField } from "@/components/uploads/image-upload-field";
 import { EQUIPMENT_OPTIONS, LOCATION_TYPES, SHOOT_TYPES, getOptionLabel } from "@/lib/booking-options";
@@ -45,6 +49,7 @@ type ActionState = {
 } | null;
 
 const maxServerActionUploadBytes = 4 * 1024 * 1024;
+type PhotographerSection = "profile" | "portfolio" | "schedule" | "bookings";
 
 export function PhotographerDashboardManager({
   profile,
@@ -59,6 +64,36 @@ export function PhotographerDashboardManager({
   const [state, setState] = useState<ActionState>(null);
   const [showCustomStyle, setShowCustomStyle] = useState(false);
   const [customStyleName, setCustomStyleName] = useState("");
+  const [activeSection, setActiveSection] = useState<PhotographerSection>("profile");
+  const sections: DashboardSectionTab<PhotographerSection>[] = [
+    {
+      id: "profile",
+      label: "Профиль",
+      description: "Данные и специализации",
+      icon: UserRound
+    },
+    {
+      id: "portfolio",
+      label: "Портфолио",
+      description: "Альбомы и материалы",
+      icon: Images,
+      count: portfolioItems.length
+    },
+    {
+      id: "schedule",
+      label: "Расписание",
+      description: "Свободные даты",
+      icon: CalendarDays,
+      count: slots.length
+    },
+    {
+      id: "bookings",
+      label: "Брони",
+      description: "Заявки и оплата",
+      icon: CalendarDays,
+      count: bookings.length
+    }
+  ];
 
   function run(area: string, action: (formData: FormData) => Promise<{ success: boolean; error?: string }>) {
     return (formData: FormData) => {
@@ -138,6 +173,13 @@ export function PhotographerDashboardManager({
         <Notice message="Профиль в draft. Заполните данные и дождитесь approval от администратора." />
       ) : null}
 
+      <DashboardSectionTabs
+        value={activeSection}
+        onChange={setActiveSection}
+        items={sections}
+      />
+
+      {activeSection === "profile" ? (
       <Card>
         <CardHeader>
           <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
@@ -238,15 +280,26 @@ export function PhotographerDashboardManager({
           </form>
         </CardContent>
       </Card>
+      ) : null}
 
+      {activeSection === "portfolio" ? (
       <Card>
         <CardHeader>
-          <CardTitle>Портфолио</CardTitle>
+          <CardTitle>Портфолио фотографа</CardTitle>
         </CardHeader>
         <CardContent className="grid gap-5">
-          <form action={run("portfolio", savePhotographerPortfolioAction)} className="grid gap-5">
+          <form
+            action={run("portfolio", savePhotographerPortfolioAction)}
+            className="grid gap-5 rounded-lg border border-emerald-500/25 bg-emerald-500/[0.04] p-4 sm:p-5"
+          >
+            <div>
+              <h4 className="text-lg font-semibold tracking-normal">Новый альбом</h4>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Добавьте обложку, название и материалы новой съемки.
+              </p>
+            </div>
             <Message state={state} area="portfolio" />
-            <div className="grid gap-4 rounded-lg border border-border p-4 md:grid-cols-[minmax(220px,360px)_1fr]">
+            <div className="grid gap-4 md:grid-cols-[minmax(220px,360px)_1fr]">
               <ImageUploadField
                 name="newPortfolioImage"
                 label="Добавить новую работу"
@@ -262,9 +315,31 @@ export function PhotographerDashboardManager({
                 </p>
               </div>
             </div>
+            <Button
+              disabled={isPending || !databaseReady}
+              className="w-full sm:w-fit sm:justify-self-end"
+            >
+              <Plus className="size-4" aria-hidden="true" />
+              {isPending ? "Создаём..." : "Создать альбом"}
+            </Button>
+          </form>
+
+          <div className="border-t border-border pt-6">
+            <div className="mb-5 flex flex-col justify-between gap-2 sm:flex-row sm:items-end">
+              <div>
+                <h4 className="text-lg font-semibold tracking-normal">Существующие альбомы</h4>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Обновляйте обложки, описание и содержимое каждого альбома.
+                </p>
+              </div>
+              <span className="text-sm text-muted-foreground">
+                {portfolioItems.length} альбомов
+              </span>
+            </div>
             {portfolioItems.length === 0 ? (
               <EmptyText text="Портфолио пока пустое. Добавьте первую работу выше." />
             ) : (
+              <form action={run("portfolio", savePhotographerPortfolioAction)} className="grid gap-5">
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {portfolioItems.map((item) => (
                   <div key={item.id} className="grid gap-3 rounded-lg border border-border p-4">
@@ -309,18 +384,21 @@ export function PhotographerDashboardManager({
                   </div>
                 ))}
               </div>
+                <Button
+                  disabled={isPending || !databaseReady}
+                  className="w-full sm:w-fit sm:justify-self-end"
+                >
+                  <Save className="size-4" aria-hidden="true" />
+                  {isPending ? "Сохраняем..." : "Сохранить альбомы"}
+                </Button>
+              </form>
             )}
-            <Button
-              disabled={isPending || !databaseReady}
-              className="w-full sm:w-fit sm:justify-self-end"
-            >
-              <Save className="size-4" aria-hidden="true" />
-              {isPending ? "Сохраняем..." : "Сохранить изменения"}
-            </Button>
-          </form>
+          </div>
         </CardContent>
       </Card>
+      ) : null}
 
+      {activeSection === "schedule" ? (
       <Card>
         <CardHeader>
           <CardTitle>Календарь доступности</CardTitle>
@@ -379,11 +457,14 @@ export function PhotographerDashboardManager({
           )}
         </CardContent>
       </Card>
+      ) : null}
 
+      {activeSection === "bookings" ? (
       <section>
         <h2 className="mb-4 text-2xl font-semibold tracking-normal">Бронирования фотографа</h2>
         <BookingStatusTable bookings={bookings} run={run} databaseReady={databaseReady} isPending={isPending} />
       </section>
+      ) : null}
     </div>
   );
 }

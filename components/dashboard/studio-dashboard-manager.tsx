@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Fragment, useState, useTransition } from "react";
-import { Building2, Check, Plus, Save, Trash2 } from "lucide-react";
+import { Building2, CalendarDays, Check, ClipboardList, Plus, Save, Trash2 } from "lucide-react";
 import {
   createStudioAvailabilitySlotAction,
   createStudioHallAction,
@@ -21,6 +21,10 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusBadge } from "@/components/dashboard/status-badge";
+import {
+  DashboardSectionTabs,
+  type DashboardSectionTab
+} from "@/components/dashboard/dashboard-section-tabs";
 import { ImagePreview } from "@/components/uploads/image-preview";
 import { ImageUploadField } from "@/components/uploads/image-upload-field";
 import { UploadButton } from "@/components/uploads/upload-button";
@@ -34,6 +38,8 @@ interface StudioDashboardManagerProps {
   bookings: Booking[];
   databaseReady: boolean;
 }
+
+type StudioSection = "profile" | "schedule" | "bookings";
 
 type ActionState = {
   area: string;
@@ -50,6 +56,30 @@ export function StudioDashboardManager({
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [state, setState] = useState<ActionState>(null);
+  const [activeSection, setActiveSection] = useState<StudioSection>("profile");
+  const sections: DashboardSectionTab<StudioSection>[] = [
+    {
+      id: "profile",
+      label: "Профиль и залы",
+      description: "Данные и пространства",
+      icon: Building2,
+      count: profile.halls.length
+    },
+    {
+      id: "schedule",
+      label: "Расписание",
+      description: "Доступность залов",
+      icon: CalendarDays,
+      count: slots.length
+    },
+    {
+      id: "bookings",
+      label: "Брони",
+      description: "Заявки и оплата",
+      icon: ClipboardList,
+      count: bookings.length
+    }
+  ];
 
   function run(area: string, action: (formData: FormData) => Promise<{ success: boolean; error?: string }>) {
     return (formData: FormData) => {
@@ -75,6 +105,14 @@ export function StudioDashboardManager({
         <Notice message="Профиль студии в draft. Заполните данные и дождитесь approval от администратора." />
       ) : null}
 
+      <DashboardSectionTabs
+        value={activeSection}
+        onChange={setActiveSection}
+        items={sections}
+      />
+
+      {activeSection === "profile" ? (
+      <>
       <Card>
         <CardHeader>
           <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
@@ -242,7 +280,10 @@ export function StudioDashboardManager({
           )}
         </CardContent>
       </Card>
+      </>
+      ) : null}
 
+      {activeSection === "schedule" ? (
       <Card>
         <CardHeader>
           <CardTitle>Доступность залов</CardTitle>
@@ -321,11 +362,14 @@ export function StudioDashboardManager({
           )}
         </CardContent>
       </Card>
+      ) : null}
 
+      {activeSection === "bookings" ? (
       <section>
         <h2 className="mb-4 text-2xl font-semibold tracking-normal">Бронирования студии</h2>
         <BookingStatusTable bookings={bookings} run={run} databaseReady={databaseReady} isPending={isPending} />
       </section>
+      ) : null}
     </div>
   );
 }
