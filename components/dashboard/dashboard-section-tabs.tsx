@@ -40,10 +40,10 @@ export function DashboardSectionTabs<T extends string>({
             aria-selected={selected}
             onClick={() => onChange(item.id)}
             className={cn(
-              "flex min-h-16 flex-1 items-center gap-3 rounded-md px-4 py-3 text-left transition-colors",
+              "relative flex min-h-16 flex-1 items-center gap-3 px-4 py-3 text-left transition-colors after:absolute after:inset-x-4 after:bottom-0 after:h-0.5 after:origin-center after:bg-emerald-400 after:shadow-[0_0_12px_rgba(52,211,153,0.85)] after:transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/70 focus-visible:ring-inset",
               selected
-                ? "bg-primary text-primary-foreground"
-                : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+                ? "text-foreground after:scale-x-100"
+                : "text-muted-foreground after:scale-x-0 hover:bg-secondary/60 hover:text-foreground"
             )}
           >
             <Icon className="size-5 shrink-0" aria-hidden="true" />
@@ -54,7 +54,9 @@ export function DashboardSectionTabs<T extends string>({
                   <span
                     className={cn(
                       "rounded-md px-1.5 py-0.5 text-xs",
-                      selected ? "bg-black/20" : "bg-muted"
+                      selected
+                        ? "bg-emerald-400/15 text-emerald-300"
+                        : "bg-muted"
                     )}
                   >
                     {item.count}
@@ -64,7 +66,7 @@ export function DashboardSectionTabs<T extends string>({
               <span
                 className={cn(
                   "mt-0.5 block text-xs",
-                  selected ? "text-primary-foreground/70" : "text-muted-foreground"
+                  selected ? "text-foreground/70" : "text-muted-foreground"
                 )}
               >
                 {item.description}
