@@ -1,5 +1,6 @@
 import {
   AvailabilityHoldStatus,
+  BookingStatus,
   BookingType,
   CalendarEventSource,
   CalendarEventStatus,
@@ -17,6 +18,17 @@ import type {
 } from "@/lib/calendar/types";
 
 type DbClient = Prisma.TransactionClient | PrismaClient;
+
+const hiddenBookingStatuses = [
+  BookingStatus.COMPLETED,
+  BookingStatus.CANCELLED,
+  BookingStatus.CANCELLED_BY_CLIENT,
+  BookingStatus.CANCELLED_BY_PROVIDER,
+  BookingStatus.CANCELLED_BY_PLATFORM,
+  BookingStatus.DECLINED,
+  BookingStatus.NO_SHOW_CLIENT,
+  BookingStatus.NO_SHOW_PROVIDER
+];
 
 export function createManualBusyEvent(input: ManualBusyEventInput) {
   if (input.endTime <= input.startTime) {
@@ -64,8 +76,83 @@ export function getCalendarEventsForOwner(owner: CalendarOwner, range: TimeRange
     where: {
       ...ownerWhere(owner),
       status: CalendarEventStatus.BUSY,
+      AND: [
+        {
+          startTime: { lt: range.endTime },
+          endTime: { gt: range.startTime }
+        },
+        {
+          OR: [
+            { source: { not: CalendarEventSource.PLATFORM_BOOKING } },
+            {
+              booking: {
+                is: {
+                  status: { notIn: hiddenBookingStatuses }
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    include: {
+      booking: {
+        select: {
+          bookingNumber: true,
+          status: true,
+          rescheduleRequestedAt: true
+        }
+      }
+    },
+    orderBy: { startTime: "asc" }
+  });
+}
+
+export function getVisibleCalendarEventsForOwner(owner: CalendarOwner, range: TimeRange) {
+  return prisma.calendarEvent.findMany({
+    where: {
+      ...ownerWhere(owner),
+      status: CalendarEventStatus.BUSY,
+      AND: [
+        {
+          startTime: { lt: range.endTime },
+          endTime: { gt: range.startTime }
+        },
+        {
+          OR: [
+            { source: { not: CalendarEventSource.PLATFORM_BOOKING } },
+            {
+              booking: {
+                is: {
+                  status: { notIn: hiddenBookingStatuses }
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    orderBy: { startTime: "asc" }
+  });
+}
+
+export function getBlockingCalendarEventsForOwner(owner: CalendarOwner, range: TimeRange) {
+  return prisma.calendarEvent.findMany({
+    where: {
+      ...ownerWhere(owner),
+      status: CalendarEventStatus.BUSY,
       startTime: { lt: range.endTime },
-      endTime: { gt: range.startTime }
+      endTime: { gt: range.startTime },
+      OR: [
+        { source: { not: CalendarEventSource.PLATFORM_BOOKING } },
+        {
+          booking: {
+            is: {
+              status: { notIn: hiddenBookingStatuses }
+            }
+          }
+        }
+      ]
     },
     orderBy: { startTime: "asc" }
   });
@@ -95,12 +182,19 @@ export async function getCalendarEventsForDashboard(
       source: event.source,
       title:
         event.source === CalendarEventSource.PLATFORM_BOOKING
-          ? "Бронь платформы"
+          ? `Бронь ${event.booking?.bookingNumber ?? "платформы"}`
+          : event.source === CalendarEventSource.TELEGRAM
+            ? event.title || "Импорт"
           : event.title || "Занято",
       privateNote: event.privateNote ?? undefined,
+      bookingNumber: event.booking?.bookingNumber,
+      bookingStatus: event.booking?.status,
+      rescheduleRequestedAt: event.booking?.rescheduleRequestedAt ?? undefined,
       startTime: event.startTime,
       endTime: event.endTime,
-      canDelete: event.source === CalendarEventSource.MANUAL_BUSY
+      canDelete:
+        event.source === CalendarEventSource.MANUAL_BUSY ||
+        event.source === CalendarEventSource.TELEGRAM
     })),
     ...holds.map((hold) => ({
       id: hold.id,

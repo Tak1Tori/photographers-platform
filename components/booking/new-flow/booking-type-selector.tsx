@@ -1,35 +1,21 @@
 import Link from "next/link";
-import { Camera, Images, UserRound } from "lucide-react";
+import { UserRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 
 const options = [
   {
-    title: "Фотосессия под ключ",
-    description: "Выберите стиль, фотографа, студию и удобное время.",
-    href: "/booking/new?type=FULL_SHOOT",
-    cta: "Начать подбор",
-    icon: Camera
-  },
-  {
     title: "Забронировать фотографа",
-    description: "Выберите фотографа для съемки на вашей локации, мероприятии или в студии.",
+    description: "Выберите фотографа для съемки на вашей локации или мероприятии.",
     href: "/photographers?mode=booking",
     cta: "Выбрать фотографа",
     icon: UserRound
-  },
-  {
-    title: "Забронировать студию",
-    description: "Выберите студию или зал для своей съемки.",
-    href: "/studios?mode=booking",
-    cta: "Выбрать студию",
-    icon: Images
   }
 ];
 
 export function BookingTypeSelector() {
   return (
-    <div className="grid gap-5 md:grid-cols-3">
+    <div className="grid max-w-md gap-5">
       {options.map((option) => {
         const Icon = option.icon;
         return (

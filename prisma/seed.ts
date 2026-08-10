@@ -13,11 +13,18 @@ import {
   UserRole
 } from "@prisma/client";
 import { hash } from "bcryptjs";
+import { normalizePhone } from "../lib/phone";
 
 const prisma = new PrismaClient();
 
 const image = (id: string, width = 1200) =>
   `https://images.unsplash.com/${id}?auto=format&fit=crop&w=${width}&q=80`;
+
+const phone = (value: string) => {
+  const normalized = normalizePhone(value);
+  if (!normalized) throw new Error(`Invalid Kazakhstan phone in seed: ${value}`);
+  return normalized;
+};
 
 async function main() {
   await prisma.notificationDeliveryLog.deleteMany();
@@ -97,7 +104,7 @@ async function main() {
     data: {
       name: "Admin Framely",
       email: "admin@photo-booking.local",
-      phone: "+7 700 000 00 01",
+      phone: phone("+77000000001"),
       passwordHash: adminPasswordHash,
       role: UserRole.ADMIN
     }
@@ -108,7 +115,7 @@ async function main() {
       data: {
         name: "Тестовый клиент",
         email: "client@photo-booking.local",
-        phone: "+7 700 000 00 02",
+        phone: phone("+77000000002"),
         passwordHash: defaultPasswordHash,
         role: UserRole.CLIENT
       }
@@ -117,7 +124,7 @@ async function main() {
       data: {
         name: "Аида Нурлан",
         email: "aida@example.com",
-        phone: "+7 701 111 22 33",
+        phone: phone("+77011112233"),
         passwordHash: defaultPasswordHash,
         role: UserRole.CLIENT
       }
@@ -126,7 +133,7 @@ async function main() {
       data: {
         name: "Роман Ким",
         email: "roman@example.com",
-        phone: "+7 777 222 44 55",
+        phone: phone("+77772224455"),
         passwordHash: defaultPasswordHash,
         role: UserRole.CLIENT
       }
@@ -135,7 +142,7 @@ async function main() {
       data: {
         name: "Сара Ибраева",
         email: "sara@example.com",
-        phone: "+7 705 333 77 88",
+        phone: phone("+77053337788"),
         passwordHash: defaultPasswordHash,
         role: UserRole.CLIENT
       }
@@ -222,11 +229,13 @@ async function main() {
   ];
 
   const photographers = [];
-  for (const seed of photographerSeeds) {
+  for (let index = 0; index < photographerSeeds.length; index += 1) {
+    const seed = photographerSeeds[index];
     const user = await prisma.user.create({
       data: {
         name: seed.name,
         email: seed.email,
+        phone: phone(`+770000000${String(index + 3).padStart(2, "0")}`),
         passwordHash: defaultPasswordHash,
         role: UserRole.PHOTOGRAPHER
       }
@@ -270,6 +279,7 @@ async function main() {
     data: {
       name: "North Group",
       email: "studio@photo-booking.local",
+      phone: phone("+77000000004"),
       passwordHash: defaultPasswordHash,
       role: UserRole.STUDIO_OWNER
     }
@@ -520,7 +530,7 @@ async function main() {
         bookingNumber: seed.bookingNumber,
         clientId: seed.client.id,
         clientName: seed.client.name,
-        clientEmail: seed.client.email,
+        clientEmail: seed.client.email ?? "client@framely.local",
         clientPhone: seed.client.phone ?? "+7 700 000 00 00",
         clientComment: "Seed booking",
         bookingType: BookingType.FULL_SHOOT,
@@ -592,7 +602,7 @@ async function main() {
       bookingNumber: "BK-PHOTO-001",
       clientId: clientUsers[0].id,
       clientName: clientUsers[0].name,
-      clientEmail: clientUsers[0].email,
+      clientEmail: clientUsers[0].email ?? "client@framely.local",
       clientPhone: clientUsers[0].phone ?? "+7 700 000 00 00",
       clientComment: "Seed photographer-only request",
       bookingType: BookingType.PHOTOGRAPHER_ONLY,
@@ -633,7 +643,7 @@ async function main() {
       bookingNumber: "BK-STUDIO-001",
       clientId: clientUsers[1].id,
       clientName: clientUsers[1].name,
-      clientEmail: clientUsers[1].email,
+      clientEmail: clientUsers[1].email ?? "client@framely.local",
       clientPhone: clientUsers[1].phone ?? "+7 700 000 00 00",
       clientComment: "Seed studio-only request",
       bookingType: BookingType.STUDIO_ONLY,

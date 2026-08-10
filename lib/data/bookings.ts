@@ -2,7 +2,10 @@ import {
   BookingPaymentStatus,
   BookingStatus as PrismaBookingStatus,
   BookingType,
-  ProfileStatus
+  PlatformFeeStatus,
+  ProviderPaymentStatus,
+  ProfileStatus,
+  StudioConfirmationMode
 } from "@prisma/client";
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
@@ -10,7 +13,10 @@ import { availableSlots, mockBookings } from "@/lib/mock-data";
 import { canUseDatabase } from "@/lib/data/db";
 import { mapBooking, mapSlots } from "@/lib/data/mappers";
 import { calculateBookingPricing } from "@/lib/pricing";
-import { createDepositPaymentForBooking } from "@/lib/payments/payment-service";
+import { createPlatformFeePaymentForBooking } from "@/lib/payments/payment-service";
+import { autoCompletePastBookings } from "@/lib/bookings/status-service";
+import { createStudioConfirmationRequest } from "@/lib/studio-confirmations/studio-confirmation-service";
+import { buildStudioWaitingUrl } from "@/lib/studio-confirmations/whatsapp-message-builder";
 import {
   cancelBookingHolds,
   createHoldsForBooking
@@ -39,9 +45,11 @@ export async function createBooking(input: CreateBookingInput) {
   const bookingNumber = `BK-${Date.now().toString().slice(-6)}`;
   const endTime = `${String(Number(input.startTime.slice(0, 2)) + input.durationHours).padStart(2, "0")}:00`;
   const [style, photographer, studioHall] = await Promise.all([
-    prisma.style.findFirst({
-      where: { OR: [{ id: input.styleId }, { slug: input.styleId }] }
-    }),
+    input.styleId
+      ? prisma.style.findFirst({
+          where: { OR: [{ id: input.styleId }, { slug: input.styleId }] }
+        })
+      : Promise.resolve(null),
     prisma.photographerProfile.findUnique({
       where: { id: input.photographerId }
     }),
@@ -50,7 +58,7 @@ export async function createBooking(input: CreateBookingInput) {
       : prisma.studioHall.findFirst({ where: { studioId: input.studioId } })
   ]);
 
-  if (!style) {
+  if (input.styleId && !style) {
     throw new Error("Style not found");
   }
 
@@ -80,7 +88,7 @@ export async function createBooking(input: CreateBookingInput) {
       clientPhone: input.clientPhone,
       clientComment: input.clientComment,
       bookingType: "FULL_SHOOT",
-      styleId: style.id,
+      styleId: style?.id ?? null,
       photographerId: input.photographerId,
       studioId: input.studioId,
       studioHallId: studioHall.id,
@@ -92,14 +100,20 @@ export async function createBooking(input: CreateBookingInput) {
       studioPrice: pricing.studioTotal,
       serviceFee: pricing.serviceFee,
       totalPrice: pricing.totalPrice,
+      settlementMode: pricing.settlementMode,
+      totalServicePrice: pricing.totalServicePrice,
+      platformFeeAmount: pricing.platformFeeAmount,
+      providerAmount: pricing.providerAmount,
+      platformFeeStatus: PlatformFeeStatus.UNPAID,
+      providerPaymentStatus: ProviderPaymentStatus.EXTERNAL_PENDING,
       depositAmount: pricing.depositAmount,
       paidAmount: 0,
-      remainingAmount: pricing.totalPrice,
+      remainingAmount: pricing.remainingAmount,
       platformCommission: pricing.platformCommission,
       providerFee: pricing.providerFee,
       netPlatformRevenue: pricing.netPlatformRevenue,
       paymentStatus: BookingPaymentStatus.UNPAID,
-      status: PrismaBookingStatus.PENDING,
+      status: PrismaBookingStatus.PENDING_PLATFORM_FEE,
     }
   });
 
@@ -162,21 +176,27 @@ export async function createPhotographerOnlyBooking(input: CreatePhotographerOnl
         studioPrice: 0,
         serviceFee: pricing.serviceFee,
         totalPrice: pricing.totalPrice,
+        settlementMode: pricing.settlementMode,
+        totalServicePrice: pricing.totalServicePrice,
+        platformFeeAmount: pricing.platformFeeAmount,
+        providerAmount: pricing.providerAmount,
+        platformFeeStatus: PlatformFeeStatus.UNPAID,
+        providerPaymentStatus: ProviderPaymentStatus.EXTERNAL_PENDING,
         depositAmount: pricing.depositAmount,
         paidAmount: 0,
-        remainingAmount: pricing.totalPrice,
+        remainingAmount: pricing.remainingAmount,
         platformCommission: pricing.platformCommission,
         providerFee: pricing.providerFee,
         netPlatformRevenue: pricing.netPlatformRevenue,
         paymentStatus: BookingPaymentStatus.UNPAID,
-        status: PrismaBookingStatus.PENDING
+        status: PrismaBookingStatus.PENDING_PLATFORM_FEE
       }
     });
 
   await reserveBookingOrRollback(booking.id);
   let paymentSession;
   try {
-    paymentSession = await createDepositPaymentForBooking(booking.id);
+    paymentSession = await createPlatformFeePaymentForBooking(booking.id);
   } catch (error) {
     await cancelBookingHolds(booking.id);
     throw error;
@@ -218,6 +238,22 @@ export async function createStudioOnlyBooking(input: CreateStudioOnlyBookingInpu
     throw new Error(`Вместимость зала: ${hall.capacity} человек.`);
   }
 
+  if (
+    hall.studio.confirmationMode === StudioConfirmationMode.WHATSAPP_CONFIRMATION &&
+    hall.studio.whatsappConfirmationEnabled
+  ) {
+    const confirmationRequest = await createStudioConfirmationRequest(input);
+
+    return {
+      requiresStudioConfirmation: true,
+      confirmationRequest,
+      confirmationRequestId: confirmationRequest.id,
+      waitingUrl: buildStudioWaitingUrl(confirmationRequest.id),
+      platformFeeAmount: confirmationRequest.platformFeeAmount,
+      whatsappOpenUrl: confirmationRequest.whatsappOpenUrl ?? undefined
+    };
+  }
+
   const pricing = calculateBookingPricing({
     bookingType: BookingType.STUDIO_ONLY,
     photographerPrice: 0,
@@ -253,21 +289,27 @@ export async function createStudioOnlyBooking(input: CreateStudioOnlyBookingInpu
         studioPrice: pricing.studioTotal,
         serviceFee: pricing.serviceFee,
         totalPrice: pricing.totalPrice,
+        settlementMode: pricing.settlementMode,
+        totalServicePrice: pricing.totalServicePrice,
+        platformFeeAmount: pricing.platformFeeAmount,
+        providerAmount: pricing.providerAmount,
+        platformFeeStatus: PlatformFeeStatus.UNPAID,
+        providerPaymentStatus: ProviderPaymentStatus.EXTERNAL_PENDING,
         depositAmount: pricing.depositAmount,
         paidAmount: 0,
-        remainingAmount: pricing.totalPrice,
+        remainingAmount: pricing.remainingAmount,
         platformCommission: pricing.platformCommission,
         providerFee: pricing.providerFee,
         netPlatformRevenue: pricing.netPlatformRevenue,
         paymentStatus: BookingPaymentStatus.UNPAID,
-        status: PrismaBookingStatus.PENDING
+        status: PrismaBookingStatus.PENDING_PLATFORM_FEE
       }
     });
 
   await reserveBookingOrRollback(booking.id);
   let paymentSession;
   try {
-    paymentSession = await createDepositPaymentForBooking(booking.id);
+    paymentSession = await createPlatformFeePaymentForBooking(booking.id);
   } catch (error) {
     await cancelBookingHolds(booking.id);
     throw error;
@@ -278,17 +320,21 @@ export async function createStudioOnlyBooking(input: CreateStudioOnlyBookingInpu
 
 export async function getBookingById(id: string) {
   if (!canUseDatabase()) {
-    return getMockRuntimeBookings().find((item) => item.id === id);
+    return (await getMockRuntimeBookings()).find((item) => item.id === id);
   }
 
   try {
+    await autoCompletePastBookings();
+
     const booking = await prisma.booking.findFirst({
       where: { OR: [{ id }, { bookingNumber: id }] },
       include: bookingInclude
     });
-    return booking ? mapBooking(booking) : getMockRuntimeBookings().find((item) => item.id === id);
+    return booking
+      ? mapBooking(booking)
+      : (await getMockRuntimeBookings()).find((item) => item.id === id);
   } catch {
-    return getMockRuntimeBookings().find((item) => item.id === id);
+    return (await getMockRuntimeBookings()).find((item) => item.id === id);
   }
 }
 
@@ -298,6 +344,8 @@ export async function getAllBookings() {
   }
 
   try {
+    await autoCompletePastBookings();
+
     const bookings = await prisma.booking.findMany({
       include: bookingInclude,
       orderBy: { createdAt: "desc" }
@@ -382,7 +430,7 @@ export function createMockRuntimeBooking(input: CreateBookingInput, bookingNumbe
     bookingType: "FULL_SHOOT",
     photographerId: input.photographerId,
     studioId: input.studioId,
-    styleId: input.styleId,
+    styleId: input.styleId ?? "",
     hallName: "Selected hall",
     date: input.date,
     time: input.startTime,
@@ -393,16 +441,22 @@ export function createMockRuntimeBooking(input: CreateBookingInput, bookingNumbe
     totalAmount: pricing.totalPrice,
     depositAmount: pricing.depositAmount,
     paidAmount: 0,
-    remainingAmount: pricing.totalPrice,
+    remainingAmount: pricing.remainingAmount,
+    totalServicePrice: pricing.totalServicePrice,
+    platformFeeAmount: pricing.platformFeeAmount,
+    providerAmount: pricing.providerAmount,
+    platformFeeStatus: "UNPAID",
+    providerPaymentStatus: "EXTERNAL_PENDING",
     paymentStatus: "UNPAID",
     status: "Pending"
   };
 }
 
-export function saveMockRuntimeBooking(booking: Booking) {
-  const existing = getStoredMockBookings();
+export async function saveMockRuntimeBooking(booking: Booking) {
+  const existing = await getStoredMockBookings();
   const next = [booking, ...existing.filter((item) => item.id !== booking.id)].slice(0, 20);
-  cookies().set(MOCK_BOOKINGS_COOKIE, encodeURIComponent(JSON.stringify(next)), {
+  const cookieStore = await cookies();
+  cookieStore.set(MOCK_BOOKINGS_COOKIE, encodeURIComponent(JSON.stringify(next)), {
     httpOnly: true,
     sameSite: "lax",
     path: "/",
@@ -410,8 +464,8 @@ export function saveMockRuntimeBooking(booking: Booking) {
   });
 }
 
-export function markMockRuntimeBookingDepositPaid(bookingId: string) {
-  const booking = getMockRuntimeBookings().find((item) => item.id === bookingId);
+export async function markMockRuntimeBookingDepositPaid(bookingId: string) {
+  const booking = (await getMockRuntimeBookings()).find((item) => item.id === bookingId);
 
   if (!booking) {
     return null;
@@ -420,23 +474,25 @@ export function markMockRuntimeBookingDepositPaid(bookingId: string) {
   const paidBooking: Booking = {
     ...booking,
     paidAmount: booking.depositAmount,
-    remainingAmount: Math.max(booking.totalAmount - booking.depositAmount, 0),
-    paymentStatus:
-      booking.depositAmount >= booking.totalAmount ? "FULLY_PAID" : "DEPOSIT_PAID"
+    remainingAmount: booking.providerAmount ?? Math.max(booking.totalAmount - booking.depositAmount, 0),
+    platformFeeStatus: "PAID",
+    paymentStatus: "DEPOSIT_PAID",
+    status: "Confirmed"
   };
 
-  saveMockRuntimeBooking(paidBooking);
+  await saveMockRuntimeBooking(paidBooking);
   return paidBooking;
 }
 
-function getMockRuntimeBookings() {
-  const stored = getStoredMockBookings();
+async function getMockRuntimeBookings() {
+  const stored = await getStoredMockBookings();
   const storedIds = new Set(stored.map((booking) => booking.id));
   return [...stored, ...mockBookings.filter((booking) => !storedIds.has(booking.id))];
 }
 
-function getStoredMockBookings(): Booking[] {
-  const raw = cookies().get(MOCK_BOOKINGS_COOKIE)?.value;
+async function getStoredMockBookings(): Promise<Booking[]> {
+  const cookieStore = await cookies();
+  const raw = cookieStore.get(MOCK_BOOKINGS_COOKIE)?.value;
 
   if (!raw) {
     return [];

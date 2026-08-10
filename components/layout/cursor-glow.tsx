@@ -26,6 +26,11 @@ export function CursorGlow() {
     };
 
     const handlePointerMove = (event: PointerEvent) => {
+      if (event.target instanceof Element && event.target.closest("[data-dot-scene]")) {
+        glow.dataset.visible = "false";
+        return;
+      }
+
       targetX = event.clientX;
       targetY = event.clientY;
       glow.dataset.visible = "true";

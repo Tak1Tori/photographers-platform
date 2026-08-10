@@ -1,12 +1,14 @@
 "use server";
 
 import {
+  LegalDocumentType,
   PaymentProvider,
   PaymentStatus
 } from "@prisma/client";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { canUseDatabase } from "@/lib/data/db";
+import { recordLegalAcceptances } from "@/lib/legal-acceptance";
 import { markMockRuntimeBookingDepositPaid } from "@/lib/data/bookings";
 import {
   getPaymentById
@@ -20,17 +22,30 @@ import {
 
 export async function confirmMockPaymentAction(formData: FormData): Promise<void> {
   const paymentId = String(formData.get("paymentId") ?? "");
+  const acceptedLegal = formData.get("acceptedLegal") === "on";
 
   if (!paymentId) {
-    redirect("/styles");
+    redirect("/photographers?mode=booking");
+  }
+
+  if (!acceptedLegal) {
+    redirect(`/checkout/mock?paymentId=${encodeURIComponent(paymentId)}&error=1`);
   }
 
   if (!canUseDatabase()) {
-    markMockRuntimeBookingDepositPaid(paymentId);
+    await markMockRuntimeBookingDepositPaid(paymentId);
     redirect(`/booking/success?bookingNumber=${encodeURIComponent(paymentId)}`);
   }
 
   const payment = await requireAccessibleMockPayment(paymentId);
+  const session = await getSession();
+  if (session?.user.id) {
+    await recordLegalAcceptances({
+      userId: session.user.id,
+      documentTypes: [LegalDocumentType.OFFER, LegalDocumentType.PAYMENT_AND_REFUND],
+      source: "checkout"
+    });
+  }
   const rawBody = JSON.stringify({
     providerPaymentId: payment.providerPaymentId,
     status: PaymentStatus.PAID,
@@ -63,7 +78,7 @@ export async function cancelMockPaymentAction(formData: FormData): Promise<void>
   const paymentId = String(formData.get("paymentId") ?? "");
 
   if (!paymentId) {
-    redirect("/styles");
+    redirect("/photographers?mode=booking");
   }
 
   if (!canUseDatabase()) {

@@ -3,18 +3,29 @@ import { randomUUID } from "crypto";
 import { mkdir, unlink, writeFile } from "fs/promises";
 import path from "path";
 import {
+  cloudinaryNotConfiguredMessage,
   configureCloudinary,
   deleteCloudinaryImage,
   hasCloudinaryConfig,
   type CloudinaryUploadResult
 } from "@/lib/cloudinary";
+import {
+  albumCoverMaxBytes,
+  albumImageMaxBytes,
+  albumUploadMaxBytes,
+  avatarImageMaxBytes,
+  formatMegabytes
+} from "@/lib/upload-limits";
+
+export {
+  albumCoverMaxBytes,
+  albumImageMaxBytes,
+  albumUploadMaxBytes,
+  avatarImageMaxBytes
+} from "@/lib/upload-limits";
 
 const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
 const maxBytes = 5 * 1024 * 1024;
-export const avatarImageMaxBytes = 25 * 1024 * 1024;
-export const albumCoverMaxBytes = 4 * 1024 * 1024;
-export const albumImageMaxBytes = 25 * 1024 * 1024;
-export const albumUploadMaxBytes = 120 * 1024 * 1024;
 
 export function validateImageFile(
   file: File | null | undefined,
@@ -31,7 +42,7 @@ export function validateImageFile(
   if (file.size > sizeLimit) {
     return {
       valid: false,
-      error: `Размер изображения не должен превышать ${Math.round(sizeLimit / 1024 / 1024)} МБ.`
+      error: `Размер изображения не должен превышать ${formatMegabytes(sizeLimit)} МБ.`
     };
   }
 
@@ -53,17 +64,7 @@ export async function uploadImageToCloudinary(
     return uploadToCloudinary(file, folder);
   }
 
-  if (hasSupabaseStorageConfig()) {
-    return uploadToSupabaseStorage(file, folder);
-  }
-
-  if (process.env.NODE_ENV === "production") {
-    throw new Error(
-      "Облачное хранилище изображений не настроено. Добавьте настройки Supabase Storage или Cloudinary."
-    );
-  }
-
-  return saveImageLocally(file, folder);
+  throw new Error(cloudinaryNotConfiguredMessage);
 }
 
 async function uploadToCloudinary(
@@ -79,7 +80,16 @@ async function uploadToCloudinary(
         resource_type: "image",
         use_filename: true,
         unique_filename: true,
-        overwrite: false
+        overwrite: false,
+        format: "webp",
+        transformation: [
+          {
+            width: 1920,
+            height: 1920,
+            crop: "limit",
+            quality: "auto:good"
+          }
+        ]
       },
       (error, uploaded) => {
         if (error || !uploaded) {
@@ -99,7 +109,10 @@ async function uploadToCloudinary(
     width: result.width,
     height: result.height,
     format: result.format,
-    bytes: result.bytes
+    bytes: result.bytes,
+    originalBytes: file.size,
+    provider: "CLOUDINARY",
+    mediaType: "IMAGE"
   };
 }
 
@@ -127,6 +140,19 @@ export async function deleteImageFromCloudinary(publicId?: string | null) {
 
   if (publicId.startsWith("supabase:")) {
     await deleteFromSupabaseStorage(publicId.slice("supabase:".length));
+    return;
+  }
+
+  if (publicId.startsWith("cloudinary:video:")) {
+    await deleteCloudinaryImage(
+      publicId.slice("cloudinary:video:".length),
+      "video"
+    );
+    return;
+  }
+
+  if (publicId.startsWith("cloudinary:image:")) {
+    await deleteCloudinaryImage(publicId.slice("cloudinary:image:".length));
     return;
   }
 
@@ -168,7 +194,17 @@ async function uploadToSupabaseStorage(
     throw new Error(result.error ?? "Не удалось загрузить изображение в Supabase Storage.");
   }
 
-  return result;
+  return {
+    secureUrl: result.secureUrl,
+    publicId: result.publicId,
+    width: result.width ?? 0,
+    height: result.height ?? 0,
+    format: result.format ?? extension,
+    bytes: result.bytes ?? file.size,
+    originalBytes: result.originalBytes ?? file.size,
+    provider: "SUPABASE",
+    mediaType: "IMAGE"
+  };
 }
 
 async function deleteFromSupabaseStorage(filePath: string) {
@@ -211,7 +247,10 @@ async function saveImageLocally(file: File, folder: string): Promise<CloudinaryU
     width: 0,
     height: 0,
     format: extension,
-    bytes: buffer.length
+    bytes: buffer.length,
+    originalBytes: file.size,
+    provider: "LOCAL",
+    mediaType: "IMAGE"
   };
 }
 

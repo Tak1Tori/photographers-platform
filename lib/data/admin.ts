@@ -1,4 +1,6 @@
 import { canUseDatabase } from "@/lib/data/db";
+import { mapBooking } from "@/lib/data/mappers";
+import { autoCompletePastBookings } from "@/lib/bookings/status-service";
 import { prisma } from "@/lib/prisma";
 
 export async function getAdminUsers() {
@@ -8,7 +10,6 @@ export async function getAdminUsers() {
     select: {
       id: true,
       name: true,
-      email: true,
       phone: true,
       role: true,
       createdAt: true
@@ -17,17 +18,97 @@ export async function getAdminUsers() {
   });
 }
 
+export async function getAdminBookings() {
+  if (!canUseDatabase()) return [];
+
+  await autoCompletePastBookings();
+
+  const bookings = await prisma.booking.findMany({
+    include: {
+      style: true,
+      photographer: true,
+      studio: true,
+      studioHall: true
+    },
+    orderBy: { createdAt: "desc" }
+  });
+
+  return bookings.map(mapBooking);
+}
+
 export async function getAdminPhotographerProfiles() {
   if (!canUseDatabase()) return [];
 
   return prisma.photographerProfile.findMany({
+    where: {
+      user: {
+        role: "PHOTOGRAPHER"
+      }
+    },
     include: {
       user: true,
       styles: true,
       bookings: true,
-      portfolioItems: true
+      portfolioItems: true,
+      reviews: true
     },
     orderBy: { createdAt: "desc" }
+  });
+}
+
+export async function getAdminEditorProfiles() {
+  if (!canUseDatabase()) return [];
+
+  return prisma.photographerProfile.findMany({
+    where: {
+      user: {
+        role: "EDITOR"
+      }
+    },
+    include: {
+      user: true,
+      editorTags: true,
+      portfolioItems: true,
+      reviews: true
+    },
+    orderBy: { createdAt: "desc" }
+  });
+}
+
+export async function getAdminStyles() {
+  if (!canUseDatabase()) return [];
+
+  return prisma.style.findMany({
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      _count: {
+        select: {
+          bookings: true,
+          photographers: true
+        }
+      }
+    },
+    orderBy: { name: "asc" }
+  });
+}
+
+export async function getAdminEditorTags() {
+  if (!canUseDatabase()) return [];
+
+  return prisma.editorTag.findMany({
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      _count: {
+        select: {
+          editors: true
+        }
+      }
+    },
+    orderBy: { name: "asc" }
   });
 }
 
@@ -73,8 +154,7 @@ export async function getAdminNotificationLogs() {
     include: {
       user: {
         select: {
-          name: true,
-          email: true
+          name: true
         }
       },
       deliveryLogs: {

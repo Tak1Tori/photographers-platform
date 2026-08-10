@@ -13,15 +13,20 @@ const authSecret =
   process.env.NEXTAUTH_SECRET ??
   (process.env.NODE_ENV === "development" ? "framely-local-development-secret" : undefined);
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  if (pathname === "/admin/access") {
+    return NextResponse.next();
+  }
+
   const token = await getToken({
     req: request,
     secret: authSecret
   });
 
   if (!token) {
-    const signInUrl = new URL("/auth/sign-in", request.url);
+    const signInUrl = new URL(pathname.startsWith("/admin") ? "/admin/access" : "/auth/sign-in", request.url);
     signInUrl.searchParams.set("callbackUrl", request.nextUrl.pathname + request.nextUrl.search);
     return NextResponse.redirect(signInUrl);
   }
@@ -29,6 +34,12 @@ export async function middleware(request: NextRequest) {
   const rule = roleAccess.find((item) => pathname.startsWith(item.path));
 
   if (rule && !rule.roles.includes(String(token.role))) {
+    if (pathname.startsWith("/admin")) {
+      const adminAccessUrl = new URL("/admin/access", request.url);
+      adminAccessUrl.searchParams.set("callbackUrl", request.nextUrl.pathname + request.nextUrl.search);
+      return NextResponse.redirect(adminAccessUrl);
+    }
+
     return NextResponse.redirect(new URL("/unauthorized", request.url));
   }
 
@@ -36,5 +47,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/admin"]
+  matcher: ["/dashboard/:path*", "/admin/:path*"]
 };

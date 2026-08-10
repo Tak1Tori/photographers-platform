@@ -1,7 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { CheckCircle2 } from "lucide-react";
-import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { StatusBadge } from "@/components/dashboard/status-badge";
@@ -21,25 +20,24 @@ export default async function BookingSuccessPage({ searchParams }: BookingSucces
   const showClientCta = Boolean(
     session?.user.role === "CLIENT" && booking?.clientId === session.user.id
   );
-  const depositPaid = Boolean(
+  const platformFeePaid = Boolean(
     booking &&
-      ["DEPOSIT_PAID", "FINAL_PAYMENT_PENDING", "FULLY_PAID"].includes(
-        booking.paymentStatus
-      )
+      (booking.platformFeeStatus === "PAID" ||
+        ["DEPOSIT_PAID", "FINAL_PAYMENT_PENDING", "FULLY_PAID"].includes(
+          booking.paymentStatus
+        ))
   );
+  const successTitle = platformFeePaid
+      ? "Бронь подтверждена"
+      : "Оплата обрабатывается";
+  const successMessage = platformFeePaid
+      ? booking?.bookingType === "PHOTOGRAPHER_ONLY"
+        ? "Сервисный сбор оплачен. Ожидает подтверждения фотографа, остаток оплачивается напрямую исполнителю."
+        : "Сервисный сбор оплачен. Ожидает подтверждения исполнителя."
+      : "Redirect не меняет статус оплаты. Страница обновится после webhook провайдера.";
 
   return (
-    <>
-      <PageHeader
-        eyebrow="Success"
-        title="Бронь успешно создана"
-        description={
-          depositPaid
-            ? "Webhook подтвердил оплату депозита. Исполнитель должен подтвердить бронь."
-            : "Бронь создана. Ожидаем подтверждение оплаты от платежного провайдера."
-        }
-      />
-      <section className="section">
+      <section className="py-6 md:py-10">
         <div className="container">
           {!booking ? (
             <Card><CardContent className="p-8 text-center text-sm text-muted-foreground">Бронь не найдена.</CardContent></Card>
@@ -52,7 +50,7 @@ export default async function BookingSuccessPage({ searchParams }: BookingSucces
                   </span>
                   <div>
                     <h2 className="text-2xl font-semibold tracking-normal">
-                      {depositPaid ? "Депозит оплачен" : "Оплата обрабатывается"}
+                      {successTitle}
                     </h2>
                     <p className="mt-2 text-muted-foreground">Номер брони: <span className="font-medium text-foreground">{booking.id}</span></p>
                   </div>
@@ -64,15 +62,23 @@ export default async function BookingSuccessPage({ searchParams }: BookingSucces
                     value={
                       booking.bookingType === "PHOTOGRAPHER_ONLY"
                         ? "Бронирование фотографа"
-                        : booking.bookingType === "STUDIO_ONLY"
-                          ? "Бронирование студии"
-                          : "Фотосессия под ключ"
+                        : "Бронирование"
                     }
                   />
                   <Summary label="Статус брони" value={<StatusBadge status={booking.status} />} />
                   <Summary label="Статус оплаты" value={<StatusBadge status={booking.paymentStatus} />} />
-                  <Summary label="Депозит" value={formatPrice(booking.depositAmount)} />
-                  <Summary label="Остаток" value={formatPrice(booking.remainingAmount)} />
+                  <Summary
+                    label="Стоимость услуги"
+                    value={formatPrice(booking.totalServicePrice ?? booking.totalAmount)}
+                  />
+                  <Summary
+                    label="Сервисный сбор платформы"
+                    value={formatPrice(booking.platformFeeAmount ?? booking.depositAmount)}
+                  />
+                  <Summary
+                    label="Остаток исполнителю"
+                    value={formatPrice(booking.providerAmount ?? booking.remainingAmount)}
+                  />
                   <Summary label="Дата и время" value={`${booking.date} · ${booking.time}`} />
                   <Summary label="Длительность" value={`${booking.durationHours} ч`} />
                   {booking.bookingType === "PHOTOGRAPHER_ONLY" ? (
@@ -82,23 +88,9 @@ export default async function BookingSuccessPage({ searchParams }: BookingSucces
                       <Summary label="Локация" value={[booking.city, booking.district].filter(Boolean).join(", ") || "-"} />
                     </>
                   ) : null}
-                  {booking.bookingType === "STUDIO_ONLY" ? (
-                    <>
-                      <Summary label="Студия" value={booking.studioName ?? booking.studioId ?? "-"} />
-                      <Summary label="Зал" value={booking.hallName ?? "-"} />
-                      <Summary label="Цель аренды" value={booking.rentalPurpose ?? "-"} />
-                    </>
-                  ) : null}
-                  <Summary label="Общая сумма" value={formatPrice(booking.totalAmount)} />
                 </div>
                 <p className="rounded-md bg-secondary px-4 py-3 text-sm font-medium">
-                  {depositPaid
-                    ? booking.bookingType === "PHOTOGRAPHER_ONLY"
-                      ? "Ожидает подтверждения фотографа."
-                      : booking.bookingType === "STUDIO_ONLY"
-                        ? "Ожидает подтверждения студии."
-                        : "Фотограф и студия должны подтвердить бронь."
-                    : "Redirect не меняет статус оплаты. Страница обновится после webhook провайдера."}
+                  {successMessage}
                 </p>
                 <Button asChild className="w-fit">
                   <Link href={showClientCta ? "/dashboard/client/bookings" : "/"}>
@@ -110,7 +102,6 @@ export default async function BookingSuccessPage({ searchParams }: BookingSucces
           )}
         </div>
       </section>
-    </>
   );
 }
 

@@ -1,6 +1,11 @@
 import { randomUUID } from "crypto";
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
+import {
+  albumImageMaxBytes,
+  albumVideoMaxBytes,
+  formatMegabytes
+} from "@/lib/upload-limits";
 
 const allowedTypes = new Set([
   "image/jpeg",
@@ -10,7 +15,6 @@ const allowedTypes = new Set([
   "video/webm",
   "video/quicktime"
 ]);
-const maxBytes = 100 * 1024 * 1024;
 
 export async function POST(request: Request) {
   const session = await getSession();
@@ -30,8 +34,25 @@ export async function POST(request: Request) {
   const contentType = body.contentType ?? "";
   const size = Number(body.size ?? 0);
 
-  if (!allowedTypes.has(contentType) || !size || size > maxBytes) {
-    return NextResponse.json({ error: "Неподдерживаемый файл." }, { status: 400 });
+  if (!allowedTypes.has(contentType) || !size) {
+    return NextResponse.json(
+      { error: "Поддерживаются JPEG, PNG, WebP, MP4, WebM и MOV." },
+      { status: 400 }
+    );
+  }
+
+  const isVideo = contentType.startsWith("video/");
+  const maxBytes = isVideo ? albumVideoMaxBytes : albumImageMaxBytes;
+
+  if (size > maxBytes) {
+    return NextResponse.json(
+      {
+        error: isVideo
+          ? `Размер видео не должен превышать ${formatMegabytes(albumVideoMaxBytes)} МБ.`
+          : `Размер изображения не должен превышать ${formatMegabytes(albumImageMaxBytes)} МБ.`
+      },
+      { status: 400 }
+    );
   }
 
   const extension = extensionFor(contentType, body.fileName);

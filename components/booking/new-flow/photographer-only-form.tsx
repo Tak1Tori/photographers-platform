@@ -3,8 +3,18 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState, useTransition } from "react";
-import { AlertCircle, ArrowLeft, Camera, CreditCard, MapPin, Star, UserRound } from "lucide-react";
+import { type ChangeEvent, type FormEvent, useCallback, useMemo, useState, useTransition } from "react";
+import {
+  AlertCircle,
+  ArrowLeft,
+  CalendarDays,
+  Camera,
+  Check,
+  CreditCard,
+  MapPin,
+  Star,
+  UserRound
+} from "lucide-react";
 import { createPhotographerOnlyBookingAction } from "@/app/booking/new/actions";
 import {
   EQUIPMENT_OPTIONS,
@@ -19,16 +29,20 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SmartSlotPicker } from "@/components/booking/smart-slot-picker";
-import { formatPrice, getStyleTitles } from "@/lib/mock-data";
+import { formatPrice, getPhotographerStyleTitles } from "@/lib/mock-data";
+import { cn } from "@/lib/utils";
 import type { Photographer } from "@/lib/types";
 
 type FieldErrors = Record<string, string>;
+type CreatedBookingState = {
+  bookingNumber: string;
+  checkoutUrl: string;
+};
 
 interface PhotographerOnlyFormProps {
   photographer?: Photographer;
   clientDefaults?: {
     name?: string | null;
-    email?: string | null;
     phone?: string | null;
   };
 }
@@ -39,12 +53,29 @@ export function PhotographerOnlyForm({
 }: PhotographerOnlyFormProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const [durationHours, setDurationHours] = useState(2);
+  const [shootType, setShootType] = useState("");
+  const [locationType, setLocationType] = useState("");
+  const [equipmentNeeded, setEquipmentNeeded] = useState<string[]>(["NO_SPECIAL_EQUIPMENT"]);
+  const [durationMode, setDurationMode] = useState("2");
+  const [customDurationHours, setCustomDurationHours] = useState("6");
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
+  const [hasSubmitAttempt, setHasSubmitAttempt] = useState(false);
+  const [createdBooking, setCreatedBooking] = useState<CreatedBookingState | null>(null);
+  const [mobileStep, setMobileStep] = useState(0);
+  const [mobileSlot, setMobileSlot] = useState({ date: "", startTime: "" });
+  const durationHours = useMemo(() => {
+    const value = Number(durationMode === "CUSTOM" ? customDurationHours : durationMode);
+    return Number.isFinite(value) && value > 0 ? value : 0;
+  }, [customDurationHours, durationMode]);
+  const photographerLocationTypes = useMemo(
+    () => LOCATION_TYPES.filter((option) => option.value !== "NEED_STUDIO_HELP"),
+    []
+  );
   const pricing = useMemo(
     () =>
       calculateBookingPricing({
+        bookingType: "PHOTOGRAPHER_ONLY",
         photographerPrice: photographer?.pricePerHour ?? 0,
         studioPrice: 0,
         durationHours
@@ -52,8 +83,33 @@ export function PhotographerOnlyForm({
     [durationHours, photographer?.pricePerHour]
   );
   const hasContactErrors = Object.values(fieldErrors).some((error) => error === CONTACT_INFO_ERROR);
+  const canGoNext = mobileStep !== 1 || Boolean(mobileSlot.date && mobileSlot.startTime);
+  const clearFormError = useCallback(() => {
+    setFormError(null);
+    setHasSubmitAttempt(false);
+  }, []);
+  const handleMobileSlotChange = useCallback((date: string, startTime: string) => {
+    clearFormError();
+    setMobileSlot((current) => {
+      if (current.date === date && current.startTime === startTime) {
+        return current;
+      }
+
+      return { date, startTime };
+    });
+  }, [clearFormError]);
+  const handleEquipmentChange = useCallback((value: string, checked: boolean) => {
+    setEquipmentNeeded((current) => {
+      if (checked) {
+        return current.includes(value) ? current : [...current, value];
+      }
+
+      return current.filter((item) => item !== value);
+    });
+  }, []);
 
   function validateTextField(name: string, value: string) {
+    clearFormError();
     const result = validateNoContactInfo(value);
     setFieldErrors((current) => {
       const next = { ...current };
@@ -63,13 +119,27 @@ export function PhotographerOnlyForm({
     });
   }
 
+  function handleFormSubmit(event: FormEvent<HTMLFormElement>) {
+    if (mobileStep !== mobileSteps.length - 1) {
+      event.preventDefault();
+      return;
+    }
+
+    setHasSubmitAttempt(true);
+  }
+
   function submit(formData: FormData) {
     setFormError(null);
     setFieldErrors({});
+    setCreatedBooking(null);
     startTransition(async () => {
       const result = await createPhotographerOnlyBookingAction(formData);
       if (result.success && result.checkoutUrl) {
-        router.push(result.checkoutUrl);
+        setCreatedBooking({
+          bookingNumber: result.bookingNumber ?? "Новая бронь",
+          checkoutUrl: result.checkoutUrl
+        });
+        setMobileStep(2);
         return;
       }
 
@@ -100,155 +170,437 @@ export function PhotographerOnlyForm({
   }
 
   return (
-    <form action={submit} className="grid gap-6 lg:grid-cols-[1fr_380px]">
+    <form
+      action={submit}
+      onSubmit={handleFormSubmit}
+      onChange={clearFormError}
+      className="grid gap-6"
+    >
       <input type="hidden" name="photographerId" value={photographer.id} />
 
-      <div className="grid gap-6">
-        <PhotographerCard photographer={photographer} />
+      <div className="sticky top-16 z-20 -mx-4 border-y border-border bg-background/95 px-4 py-4 backdrop-blur sm:-mx-6 sm:px-6 md:static md:mx-0 md:rounded-xl md:border md:bg-card/70 md:px-8">
+        <MobileBookingStepper currentStep={mobileStep} />
+      </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Бриф съемки</CardTitle>
-          </CardHeader>
-          <CardContent className="grid gap-5">
-            {formError ? <Notice tone="error" message={formError} /> : null}
-            <Select label="Тип съемки" name="shootType" options={SHOOT_TYPES} error={fieldErrors.shootType} />
+      <div className="grid min-h-[calc(100svh-230px)] gap-4 pb-28 pt-2 md:min-h-0 md:pb-0">
+        {hasSubmitAttempt && formError ? <Notice tone="error" message={formError} /> : null}
 
-            <Textarea
-              label="Описание съемки"
-              name="shootDescription"
-              placeholder="Опишите, что нужно снять, сколько кадров ожидаете, какой стиль вам нравится"
-              error={fieldErrors.shootDescription}
-              onValidate={validateTextField}
-              required
-            />
+        <section className={cn("grid gap-4 lg:grid-cols-[320px_minmax(0,1fr)]", mobileStep !== 0 && "hidden")}>
+          <MobilePhotographerSummary photographer={photographer} />
 
-            <div className="grid gap-4 md:grid-cols-2">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-xl">Детали съемки</CardTitle>
+            </CardHeader>
+            <CardContent className="grid gap-4">
               <Select
-                label="Локация"
-                name="locationType"
-                options={LOCATION_TYPES}
-                error={fieldErrors.locationType}
+                label="Тип съемки"
+                name="shootType"
+                options={SHOOT_TYPES}
+                value={shootType}
+                onChange={setShootType}
+                error={fieldErrors.shootType}
+                required
               />
-              <Field label="Город" name="city" defaultValue="Алматы" error={fieldErrors.city} />
-              <Field label="Район" name="district" placeholder="Бостандыкский" />
-              <Field label="Количество людей" name="peopleCount" type="number" min={1} max={100} defaultValue="1" error={fieldErrors.peopleCount} />
-            </div>
 
-            <Textarea
-              label="Детали адреса"
-              name="addressDetails"
-              placeholder="Район, ориентир, формат площадки. Точный адрес будет доступен фотографу после оплаты депозита."
-              error={fieldErrors.addressDetails}
-              onValidate={validateTextField}
-            />
+              {shootType === "OTHER" ? (
+                <Field
+                  label="Уточните тип съемки"
+                  name="customShootType"
+                  placeholder="Например: спорт, выпускной, авто"
+                  error={fieldErrors.customShootType}
+                  required
+                />
+              ) : null}
 
-            <div className="grid gap-4">
-              <label className="grid max-w-xs gap-2 text-sm font-medium">
-                Длительность
+              <Textarea
+                label="Описание"
+                name="shootDescription"
+                placeholder="Что снимаем, какой результат нужен, референсы по настроению"
+                error={fieldErrors.shootDescription}
+                onValidate={validateTextField}
+                required
+              />
+
+              <div className="grid grid-cols-2 gap-3">
+                <Select
+                  label="Локация"
+                  name="locationType"
+                  options={photographerLocationTypes}
+                  value={locationType}
+                  onChange={setLocationType}
+                  error={fieldErrors.locationType}
+                  required
+                />
+                <Field label="Город" name="city" defaultValue="Алматы" error={fieldErrors.city} required />
+              </div>
+
+              {locationType === "OTHER" ? (
+                <Field
+                  label="Уточните локацию"
+                  name="customLocationType"
+                  placeholder="Например: загородный дом, шоурум, парковка"
+                  error={fieldErrors.customLocationType}
+                  required
+                />
+              ) : null}
+
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Район" name="district" placeholder="Бостандык" />
+                <Field
+                  label="Людей"
+                  name="peopleCount"
+                  type="number"
+                  min={1}
+                  max={100}
+                  defaultValue="1"
+                  error={fieldErrors.peopleCount}
+                  required
+                />
+              </div>
+
+              <label className="grid gap-2 text-sm font-medium">
+                <RequiredLabel label="Длительность" required />
                 <select
                   name="durationHours"
-                  value={durationHours}
-                  onChange={(event) => setDurationHours(Number(event.target.value))}
+                  value={durationMode}
+                  onChange={(event) => setDurationMode(event.target.value)}
                   className={inputClass}
                 >
-                  {[1, 2, 3, 4, 5].map((hours) => (
+                  {[1, 2, 3, 4].map((hours) => (
                     <option key={hours} value={hours}>
-                      {hours === 5 ? "5+ часов" : `${hours} ${hours === 1 ? "час" : "часа"}`}
+                      {`${hours} ${hours === 1 ? "час" : "часа"}`}
                     </option>
                   ))}
+                  <option value="CUSTOM">5+ часов</option>
                 </select>
                 <ErrorText error={fieldErrors.durationHours} />
               </label>
+
+              {durationMode === "CUSTOM" ? (
+                <label className="grid gap-2 text-sm font-medium">
+                  <RequiredLabel label="Сколько часов" required />
+                  <input
+                    name="customDurationHours"
+                    type="number"
+                    min={5}
+                    max={24}
+                    step={1}
+                    value={customDurationHours}
+                    onChange={(event) => setCustomDurationHours(event.target.value)}
+                    placeholder="Например, 6"
+                    className={inputClass}
+                  />
+                  <ErrorText error={fieldErrors.customDurationHours} />
+                </label>
+              ) : null}
+            </CardContent>
+          </Card>
+        </section>
+
+        <section className={cn("grid gap-4", mobileStep !== 1 && "hidden")}>
+          <Card className="overflow-hidden">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-xl">Дата и время</CardTitle>
+            </CardHeader>
+            <CardContent>
               <SmartSlotPicker
                 bookingType="PHOTOGRAPHER_ONLY"
                 photographerId={photographer.id}
                 durationHours={durationHours}
                 dateError={fieldErrors.date}
                 timeError={fieldErrors.startTime}
+                onSelectionChange={handleMobileSlotChange}
+                presentation="split"
               />
-            </div>
+            </CardContent>
+          </Card>
+        </section>
 
-            <div className="grid gap-2">
-              <p className="text-sm font-medium">Оборудование</p>
-              <div className="grid gap-2 rounded-md border border-border p-3 sm:grid-cols-2">
-                {EQUIPMENT_OPTIONS.map((option, index) => (
-                  <label key={option.value} className="flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      name="equipmentNeeded"
-                      value={option.value}
-                      defaultChecked={index === 0}
-                    />
-                    {option.label}
-                  </label>
-                ))}
+        <section className={cn("grid gap-4", mobileStep !== 2 && "hidden")}>
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-xl">Подтверждение</CardTitle>
+            </CardHeader>
+            <CardContent className="grid gap-4">
+              {createdBooking ? (
+                <div className="grid gap-3 rounded-lg border border-primary/40 bg-primary/10 p-4">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-300">
+                      Бронь создана
+                    </p>
+                    <h3 className="mt-2 text-xl font-semibold tracking-normal">
+                      {createdBooking.bookingNumber}
+                    </h3>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Теперь можно оплатить сервисный сбор. Если закрыть страницу, кнопка оплаты останется
+                      в личном кабинете.
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    onClick={() => router.push(createdBooking.checkoutUrl)}
+                    className="w-full bg-white text-emerald-950 hover:bg-white/90"
+                  >
+                    <CreditCard className="size-4" aria-hidden="true" />
+                    Подтвердить бронь
+                  </Button>
+                </div>
+              ) : null}
+
+              <div className="grid gap-3 rounded-lg border border-border bg-secondary/20 p-4 text-sm">
+                <MoneyLine label="Фотограф" value={photographer.name} />
+                <MoneyLine label="Длительность" value={`${durationHours} ч`} />
+                <MoneyLine label="Стоимость услуги" value={formatPrice(pricing.totalServicePrice)} strong />
+                <MoneyLine label="Сервисный сбор" value={formatPrice(pricing.platformFeeAmount)} />
+                <MoneyLine label="Остаток исполнителю" value={formatPrice(pricing.providerAmount)} />
               </div>
-            </div>
 
-            <Textarea
-              label="Особые требования"
-              name="specialRequirements"
-              placeholder="Тайминг, ограничения площадки, пожелания по свету или реквизиту"
-              error={fieldErrors.specialRequirements}
-              onValidate={validateTextField}
-            />
+              <div className="grid gap-3">
+                <Field label="Имя" name="clientName" defaultValue={clientDefaults?.name ?? ""} error={fieldErrors.clientName} required />
+                <Field label="Телефон" name="clientPhone" defaultValue={clientDefaults?.phone ?? ""} error={fieldErrors.clientPhone} required />
+              </div>
 
-            <div className="grid gap-4 rounded-lg border border-border p-4 md:grid-cols-3">
-              <Field label="Имя" name="clientName" defaultValue={clientDefaults?.name ?? ""} error={fieldErrors.clientName} />
-              <Field label="Телефон" name="clientPhone" defaultValue={clientDefaults?.phone ?? ""} error={fieldErrors.clientPhone} />
-              <Field label="Email" name="clientEmail" type="email" defaultValue={clientDefaults?.email ?? ""} error={fieldErrors.clientEmail} />
-            </div>
+              <Textarea
+                label="Точный адрес и комментарии"
+                name="addressDetails"
+                placeholder="Улица, дом, подъезд, ориентир, формат площадки"
+                error={fieldErrors.addressDetails}
+                onValidate={validateTextField}
+                required
+              />
 
-            <p className="inline-flex items-start gap-2 rounded-md bg-secondary px-4 py-3 text-sm text-muted-foreground">
-              <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-              Контакты фотографа и клиента раскрываются только после оплаты депозита. Не вставляйте телефон,
-              email, ссылки или username в свободные поля.
-            </p>
-            <p className="sr-only">
-              TODO: Позже можно добавить controlled Q&A flow без свободного чата: фотограф
-              запрашивает уточнение через structured questions, клиент отвечает через форму,
-              contact sanitizer применяется ко всем текстовым ответам.
-            </p>
-          </CardContent>
-        </Card>
+              <Textarea
+                label="Особые требования"
+                name="specialRequirements"
+                placeholder="Пожелания по свету, реквизиту, таймингу"
+                error={fieldErrors.specialRequirements}
+                onValidate={validateTextField}
+              />
+
+              <div className="grid gap-2">
+                <p className="text-sm font-medium">Оборудование</p>
+                <div className="grid gap-2 rounded-md border border-border p-3">
+                  {EQUIPMENT_OPTIONS.map((option) => (
+                    <label key={option.value} className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        name="equipmentNeeded"
+                        value={option.value}
+                        checked={equipmentNeeded.includes(option.value)}
+                        onChange={(event) => handleEquipmentChange(option.value, event.target.checked)}
+                      />
+                      {option.label}
+                    </label>
+                  ))}
+                </div>
+                {equipmentNeeded.includes("OTHER") ? (
+                  <Field
+                    label="Уточните оборудование"
+                    name="customEquipmentNeeded"
+                    placeholder="Например: дым-машина, проектор, стойки"
+                    error={fieldErrors.customEquipmentNeeded}
+                    required
+                  />
+                ) : null}
+              </div>
+
+              <p className="inline-flex items-start gap-2 rounded-md bg-secondary px-4 py-3 text-sm text-muted-foreground">
+                <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+                Контакты фотографа и клиента раскроются после оплаты сервисного сбора.
+              </p>
+              {hasContactErrors ? <ErrorText error={CONTACT_INFO_ERROR} /> : null}
+            </CardContent>
+          </Card>
+        </section>
       </div>
 
-      <aside className="grid h-fit gap-4 lg:sticky lg:top-24">
-        <Card>
-          <CardHeader>
-            <CardTitle>Стоимость</CardTitle>
-          </CardHeader>
-          <CardContent className="grid gap-4 text-sm">
-            <MoneyLine label="Ставка фотографа" value={`${formatPrice(photographer.pricePerHour)} / час`} />
-            <MoneyLine label="Длительность" value={`${durationHours} ч`} />
-            <MoneyLine label="Фотограф" value={formatPrice(pricing.photographerTotal)} />
-            <MoneyLine label="Сервисный сбор" value={formatPrice(pricing.serviceFee)} />
-            <div className="border-t border-border pt-4">
-              <MoneyLine label="Общая сумма" value={formatPrice(pricing.totalPrice)} strong />
-            </div>
-            <MoneyLine label="Депозит" value={formatPrice(pricing.depositAmount)} />
-            <MoneyLine label="Остаток" value={formatPrice(pricing.remainingAmount)} />
-            <Button
-              size="lg"
-              disabled={isPending || hasContactErrors}
-              className="w-full"
-            >
-              <CreditCard className="size-4" aria-hidden="true" />
-              {isPending ? "Создаем бронь..." : "Оплатить депозит"}
-            </Button>
-            {hasContactErrors ? <ErrorText error={CONTACT_INFO_ERROR} /> : null}
-          </CardContent>
-        </Card>
-
-        <Button asChild variant="outline">
-          <Link href="/photographers?mode=booking">
-            <ArrowLeft className="size-4" aria-hidden="true" />
-            Вернуться к выбору
-          </Link>
-        </Button>
-      </aside>
+      <MobileWizardFooter
+        currentStep={mobileStep}
+        canGoNext={canGoNext}
+        isPending={isPending}
+        hasContactErrors={hasContactErrors}
+        createdBooking={createdBooking}
+        onPayDeposit={() => {
+          if (createdBooking) router.push(createdBooking.checkoutUrl);
+        }}
+        onBack={() => {
+          clearFormError();
+          setMobileStep((step) => Math.max(step - 1, 0));
+        }}
+        onNext={() => {
+          clearFormError();
+          if (mobileStep === 1) {
+            router.push("/booking/payment-unavailable");
+            return;
+          }
+          setMobileStep((step) => Math.min(step + 1, 2));
+        }}
+      />
     </form>
+  );
+}
+
+const mobileSteps = [
+  { label: "Фотограф", icon: UserRound },
+  { label: "Дата", icon: CalendarDays },
+  { label: "Данные", icon: Check }
+];
+
+function MobileBookingStepper({ currentStep }: { currentStep: number }) {
+  const progressWidth =
+    currentStep === 0
+      ? "0%"
+      : currentStep === mobileSteps.length - 1
+        ? "calc(100% - 33.333%)"
+        : "calc((100% - 33.333%) / 2)";
+
+  return (
+    <div className="relative grid grid-cols-3 items-start gap-2">
+      <span
+        className="pointer-events-none absolute left-[16.666%] right-[16.666%] top-4 h-px bg-border"
+        aria-hidden="true"
+      />
+      <span
+        className="pointer-events-none absolute left-[16.666%] top-4 h-px bg-primary/70 transition-[width] duration-300"
+        style={{ width: progressWidth }}
+        aria-hidden="true"
+      />
+      {mobileSteps.map((step, index) => {
+        const Icon = step.icon;
+        const isActive = index === currentStep;
+        const isDone = index < currentStep;
+
+        return (
+          <div key={step.label} className="relative grid justify-items-center gap-2 text-center">
+            <span
+              className={cn(
+                "relative z-10 flex size-8 items-center justify-center rounded-full border bg-background transition-colors",
+                isActive && "border-primary text-emerald-300 shadow-[0_0_20px_hsl(var(--primary)/0.16)]",
+                isDone && "border-primary bg-primary text-emerald-950"
+              )}
+            >
+              <Icon className="size-4" aria-hidden="true" />
+            </span>
+            <span
+              className={cn(
+                "text-xs font-medium text-muted-foreground",
+                isActive && "text-foreground",
+                isDone && "text-emerald-300"
+              )}
+            >
+              {step.label}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function MobilePhotographerSummary({ photographer }: { photographer: Photographer }) {
+  return (
+    <div className="grid grid-cols-[72px_1fr] gap-3 rounded-xl border border-border bg-card p-3">
+      <div className="relative aspect-square overflow-hidden rounded-lg bg-secondary">
+        {photographer.imageUrl ? (
+          <Image
+            src={photographer.imageUrl}
+            alt={photographer.name}
+            fill
+            priority
+            className="object-cover"
+          />
+        ) : (
+          <span className="flex size-full items-center justify-center">
+            <Camera className="size-6 text-muted-foreground" aria-hidden="true" />
+          </span>
+        )}
+      </div>
+      <div className="min-w-0">
+        <h2 className="truncate text-lg font-semibold">{photographer.name}</h2>
+        <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+          <span className="inline-flex items-center gap-1">
+            <MapPin className="size-3.5" aria-hidden="true" />
+            {photographer.city}
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <Star className="size-3.5" aria-hidden="true" />
+            {photographer.rating}
+          </span>
+        </div>
+        <p className="mt-2 text-sm font-medium">{formatPrice(photographer.pricePerHour)} / час</p>
+      </div>
+    </div>
+  );
+}
+
+function MobileWizardFooter({
+  currentStep,
+  canGoNext,
+  isPending,
+  hasContactErrors,
+  createdBooking,
+  onPayDeposit,
+  onBack,
+  onNext
+}: {
+  currentStep: number;
+  canGoNext: boolean;
+  isPending: boolean;
+  hasContactErrors: boolean;
+  createdBooking: CreatedBookingState | null;
+  onPayDeposit: () => void;
+  onBack: () => void;
+  onNext: () => void;
+}) {
+  const isLastStep = currentStep === mobileSteps.length - 1;
+
+  return (
+    <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-background/95 px-4 py-3 backdrop-blur md:static md:border-0 md:bg-transparent md:px-0 md:py-0 md:backdrop-blur-0">
+      <div
+        className={cn(
+          "mx-auto grid max-w-screen-sm gap-3 md:max-w-none md:justify-center",
+          currentStep === 0
+            ? "grid-cols-1 md:grid-cols-[minmax(220px,300px)]"
+            : "grid-cols-[56px_1fr] md:grid-cols-[56px_minmax(220px,300px)]"
+        )}
+      >
+        {currentStep > 0 ? (
+          <Button
+            type="button"
+            variant="outline"
+            className="h-12 w-14 shrink-0"
+            onClick={onBack}
+            aria-label="Назад"
+          >
+            <ArrowLeft className="size-5" aria-hidden="true" />
+          </Button>
+        ) : null}
+
+        {isLastStep ? (
+          <Button
+            type={createdBooking ? "button" : "submit"}
+            size="lg"
+            disabled={isPending || hasContactErrors}
+            onClick={createdBooking ? onPayDeposit : undefined}
+            className="h-12 flex-1"
+          >
+            <CreditCard className="size-4" aria-hidden="true" />
+            {createdBooking ? "Подтвердить бронь" : isPending ? "Создаем..." : "Создать бронь"}
+          </Button>
+        ) : (
+          <Button
+            type="button"
+            size="lg"
+            disabled={!canGoNext}
+            className="h-12 flex-1"
+            onClick={onNext}
+          >
+            Далее
+          </Button>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -289,15 +641,8 @@ function PhotographerCard({ photographer }: { photographer: Photographer }) {
           <p className="text-sm text-muted-foreground">{photographer.bio}</p>
           <p className="text-sm">
             <span className="font-medium">Стили: </span>
-            {getStyleTitles(photographer.specializationIds).join(", ") || "Разные направления"}
+            {getPhotographerStyleTitles(photographer).join(", ") || "Разные направления"}
           </p>
-          <div className="grid grid-cols-3 gap-2">
-            {photographer.portfolio.slice(0, 3).map((imageUrl, index) => (
-              <div key={`${imageUrl}-${index}`} className="relative aspect-[4/3] overflow-hidden rounded-md bg-secondary">
-                <Image src={imageUrl} alt={`${photographer.name} portfolio ${index + 1}`} fill className="object-cover" />
-              </div>
-            ))}
-          </div>
         </div>
       </CardContent>
     </Card>
@@ -308,17 +653,31 @@ function Select({
   label,
   name,
   options,
-  error
+  value,
+  onChange,
+  error,
+  required
 }: {
   label: string;
   name: string;
   options: ReadonlyArray<{ value: string; label: string }>;
+  value?: string;
+  onChange?: (value: string) => void;
   error?: string;
+  required?: boolean;
 }) {
+  const selectProps =
+    value === undefined
+      ? { defaultValue: "" }
+      : {
+          value,
+          onChange: (event: ChangeEvent<HTMLSelectElement>) => onChange?.(event.target.value)
+        };
+
   return (
     <label className="grid gap-2 text-sm font-medium">
-      {label}
-      <select name={name} className={inputClass} defaultValue="">
+      <RequiredLabel label={label} required={required} />
+      <select name={name} className={inputClass} {...selectProps}>
         <option value="" disabled>Выберите</option>
         {options.map((option) => (
           <option key={option.value} value={option.value}>
@@ -339,7 +698,8 @@ function Field({
   defaultValue,
   error,
   min,
-  max
+  max,
+  required
 }: {
   label: string;
   name: string;
@@ -349,10 +709,11 @@ function Field({
   error?: string;
   min?: number;
   max?: number;
+  required?: boolean;
 }) {
   return (
     <label className="grid gap-2 text-sm font-medium">
-      {label}
+      <RequiredLabel label={label} required={required} />
       <input
         name={name}
         type={type}
@@ -384,16 +745,24 @@ function Textarea({
 }) {
   return (
     <label className="grid gap-2 text-sm font-medium">
-      {label}
+      <RequiredLabel label={label} required={required} />
       <textarea
         name={name}
-        required={required}
         placeholder={placeholder}
         onChange={(event) => onValidate(name, event.target.value)}
         className={textareaClass}
       />
       <ErrorText error={error} />
     </label>
+  );
+}
+
+function RequiredLabel({ label, required }: { label: string; required?: boolean }) {
+  return (
+    <span>
+      {label}
+      {required ? <span className="text-emerald-300"> *</span> : null}
+    </span>
   );
 }
 

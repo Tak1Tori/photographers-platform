@@ -1,16 +1,17 @@
 "use server";
 
 import { hash } from "bcryptjs";
-import { UserRole } from "@prisma/client";
+import { LegalDocumentType, Prisma, UserRole } from "@prisma/client";
 import { canUseDatabase } from "@/lib/data/db";
+import { normalizePhone } from "@/lib/phone";
 import { prisma } from "@/lib/prisma";
 
 interface RegisterInput {
   name: string;
-  email: string;
-  phone?: string;
+  phone: string;
   password: string;
-  role: "CLIENT" | "PHOTOGRAPHER" | "STUDIO_OWNER";
+  role: "CLIENT" | "PHOTOGRAPHER" | "EDITOR";
+  acceptedLegal: boolean;
 }
 
 export async function registerUserAction(input: RegisterInput) {
@@ -19,8 +20,7 @@ export async function registerUserAction(input: RegisterInput) {
   }
 
   const name = input.name.trim();
-  const email = input.email.toLowerCase().trim();
-  const phone = input.phone?.trim();
+  const phone = normalizePhone(input.phone);
   const password = input.password;
   const role = input.role;
 
@@ -28,37 +28,51 @@ export async function registerUserAction(input: RegisterInput) {
     return { success: false, error: "Name is required" };
   }
 
-  if (!email || !email.includes("@")) {
-    return { success: false, error: "Valid email is required" };
+  if (!phone) {
+    return { success: false, error: "Укажите корректный номер телефона" };
   }
 
   if (password.length < 8) {
     return { success: false, error: "Password must be at least 8 characters" };
   }
 
-  if (!["CLIENT", "PHOTOGRAPHER", "STUDIO_OWNER"].includes(role)) {
+  if (!["CLIENT", "PHOTOGRAPHER", "EDITOR"].includes(role)) {
     return { success: false, error: "Invalid role" };
   }
 
-  const existingUser = await prisma.user.findUnique({ where: { email } });
+  if (!input.acceptedLegal) {
+    return { success: false, error: "Подтвердите согласие с условиями Framely." };
+  }
+
+  const existingUser = await prisma.user.findUnique({ where: { phone } });
 
   if (existingUser) {
-    return { success: false, error: "Email is already taken" };
+    return { success: false, error: "Этот номер телефона уже зарегистрирован" };
   }
 
   const passwordHash = await hash(password, 12);
 
-  const user = await prisma.user.create({
-    data: {
-      name,
-      email,
-      phone,
-      passwordHash,
-      role: role as UserRole
+  let user;
+  try {
+    user = await prisma.user.create({
+      data: {
+        name,
+        phone,
+        passwordHash,
+        role: role as UserRole
+      }
+    });
+  } catch (error) {
+    // The read above is only for a clear fast-path. The database unique key
+    // remains the final protection when two registrations race each other.
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      return { success: false, error: "Этот номер телефона уже зарегистрирован" };
     }
-  });
 
-  if (role === "PHOTOGRAPHER") {
+    throw error;
+  }
+
+  if (role === "PHOTOGRAPHER" || role === "EDITOR") {
     await prisma.photographerProfile.create({
       data: {
         userId: user.id,
@@ -74,27 +88,26 @@ export async function registerUserAction(input: RegisterInput) {
     });
   }
 
-  if (role === "STUDIO_OWNER") {
-    await prisma.studioProfile.create({
-      data: {
-        ownerId: user.id,
-        name: `${name} Studio`,
-        city: "Алматы",
-        address: "Заполните адрес студии",
-        description: "Заполните описание студии.",
-        rules: "Заполните правила аренды",
-        status: "DRAFT"
+  await prisma.legalAcceptance.createMany({
+    data: [
+      {
+        userId: user.id,
+        documentType: LegalDocumentType.TERMS,
+        documentVersion: "2026-08-05",
+        source: "registration"
+      },
+      {
+        userId: user.id,
+        documentType: LegalDocumentType.PRIVACY,
+        documentVersion: "2026-08-03",
+        source: "registration"
       }
-    });
-  }
+    ],
+    skipDuplicates: true
+  });
 
   return {
     success: true,
-    redirectTo:
-      role === "PHOTOGRAPHER"
-        ? "/dashboard/photographer"
-        : role === "STUDIO_OWNER"
-          ? "/dashboard/studio"
-          : "/"
+    redirectTo: role === "PHOTOGRAPHER" ? "/dashboard/photographer" : "/"
   };
 }

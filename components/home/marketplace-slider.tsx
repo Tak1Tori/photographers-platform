@@ -23,6 +23,12 @@ type MarketplaceSliderProps =
   | {
       title: string;
       viewAllHref: string;
+      items: Photographer[];
+      type: "editors";
+    }
+  | {
+      title: string;
+      viewAllHref: string;
       items: Studio[];
       type: "studios";
     };
@@ -118,6 +124,8 @@ export function MarketplaceSlider(props: MarketplaceSliderProps) {
                   photographer={photographer}
                 />
               ))
+            : props.type === "editors"
+              ? props.items.map((editor) => <PhotographerSlide key={editor.id} photographer={editor} profileBasePath="/editors" professionalLabel="монтажера" />)
             : props.items.map((studio) => (
                 <StudioSlide key={studio.id} studio={studio} />
               ))}
@@ -134,10 +142,10 @@ export function MarketplaceSlider(props: MarketplaceSliderProps) {
   );
 }
 
-function PhotographerSlide({ photographer }: { photographer: Photographer }) {
+function PhotographerSlide({ photographer, profileBasePath = "/photographers", professionalLabel = "фотографа" }: { photographer: Photographer; profileBasePath?: string; professionalLabel?: string }) {
   return (
     <Link
-      href={`/photographers/${photographer.id}`}
+      href={`${profileBasePath}/${photographer.id}`}
       className="group w-[82vw] max-w-[310px] shrink-0 snap-start overflow-hidden rounded-lg border border-border bg-card transition-colors hover:border-primary/45 sm:w-[46vw] lg:w-[calc((100%_-_3rem)/4)]"
     >
       <div className="relative aspect-[4/3] overflow-hidden">
@@ -188,9 +196,6 @@ function StudioSlide({ studio }: { studio: Studio }) {
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <h3 className="truncate font-semibold">{studio.name}</h3>
-            <p className="mt-1 truncate text-sm text-muted-foreground">
-              {studio.hallName}
-            </p>
           </div>
           <span className="inline-flex shrink-0 items-center gap-1 text-sm text-accent">
             <Star className="size-4 fill-current" aria-hidden="true" />

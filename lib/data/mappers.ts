@@ -23,7 +23,8 @@ type PrismaPhotographerLike = {
   avatarUrl: string;
   hourlyRate: number;
   rating: number;
-  styles?: Array<{ slug: string }>;
+  styles?: Array<{ slug: string; name?: string }>;
+  reviews?: Array<{ rating: number }>;
   portfolioItems?: Array<{ imageUrl: string }>;
   availabilitySlots?: Array<{
     id: string;
@@ -41,6 +42,15 @@ type PrismaStudioLike = {
   description: string;
   imageUrl?: string | null;
   imagePublicId?: string | null;
+  googleMapsUrl?: string | null;
+  googleMapsEmbedUrl?: string | null;
+  twoGisUrl?: string | null;
+  twoGisEmbedUrl?: string | null;
+  confirmationMode?: string | null;
+  whatsappBookingPhone?: string | null;
+  whatsappContactName?: string | null;
+  whatsappResponseTimeoutMinutes?: number | null;
+  whatsappConfirmationEnabled?: boolean | null;
   rules: string;
   halls?: Array<{
     id: string;
@@ -49,6 +59,12 @@ type PrismaStudioLike = {
     hourlyRate: number;
     imageUrl: string;
     amenities: unknown;
+    galleryImages?: Array<{
+      id: string;
+      imageUrl: string;
+      imagePublicId?: string | null;
+      sortOrder: number;
+    }>;
     availabilitySlots?: Array<{
       id: string;
       date: Date;
@@ -89,6 +105,13 @@ type PrismaBookingLike = {
   studioPrice: number;
   serviceFee: number;
   totalPrice: number;
+  settlementMode?: string | null;
+  totalServicePrice?: number | null;
+  platformFeeAmount?: number | null;
+  providerAmount?: number | null;
+  platformFeeStatus?: string | null;
+  providerPaymentStatus?: string | null;
+  platformFeePaidAt?: Date | null;
   depositAmount?: number;
   paidAmount?: number;
   remainingAmount?: number;
@@ -121,14 +144,20 @@ export function mapStyle(style: PrismaStyleLike): PhotoStyle {
 }
 
 export function mapPhotographer(profile: PrismaPhotographerLike): Photographer {
+  const reviewRating =
+    profile.reviews && profile.reviews.length > 0
+      ? profile.reviews.reduce((sum, review) => sum + review.rating, 0) / profile.reviews.length
+      : 0;
+
   return {
     id: profile.id,
     name: profile.name,
     city: profile.city,
     bio: profile.bio,
     specializationIds: profile.styles?.map((style) => style.slug) ?? [],
+    specializationTitles: profile.styles?.map((style) => style.name ?? style.slug) ?? [],
     pricePerHour: profile.hourlyRate,
-    rating: profile.rating,
+    rating: Number(reviewRating.toFixed(1)),
     imageUrl: profile.avatarUrl,
     portfolio: profile.portfolioItems?.map((item) => item.imageUrl) ?? [],
     availableSlotIds:
@@ -151,14 +180,22 @@ export function mapStudio(studio: PrismaStudioLike): Studio {
     city: studio.city,
     district: studio.address.split(",").at(-1)?.trim() ?? studio.city,
     address: studio.address,
+    googleMapsUrl: studio.googleMapsUrl ?? undefined,
+    googleMapsEmbedUrl: studio.googleMapsEmbedUrl ?? undefined,
+    twoGisUrl: studio.twoGisUrl ?? undefined,
+    twoGisEmbedUrl: studio.twoGisEmbedUrl ?? undefined,
     description: studio.description,
     pricePerHour: primaryHall?.hourlyRate ?? 0,
     capacity: primaryHall?.capacity ?? 0,
     rating: 4.8,
     imageUrl: studio.imageUrl ?? primaryHall?.imageUrl ?? "",
-    gallery: [studio.imageUrl, ...(studio.halls?.map((hall) => hall.imageUrl) ?? [])].filter(
-      Boolean
-    ) as string[],
+    gallery: [
+      studio.imageUrl,
+      ...(studio.halls?.flatMap((hall) => [
+        hall.imageUrl,
+        ...(hall.galleryImages?.map((image) => image.imageUrl) ?? [])
+      ]) ?? [])
+    ].filter(Boolean) as string[],
     amenities,
     rules: studio.rules.split("\n").filter(Boolean),
     halls:
@@ -169,6 +206,13 @@ export function mapStudio(studio: PrismaStudioLike): Studio {
         pricePerHour: hall.hourlyRate,
         amenities: Array.isArray(hall.amenities) ? (hall.amenities as string[]) : [],
         imageUrl: hall.imageUrl,
+        galleryImages:
+          hall.galleryImages?.map((image) => ({
+            id: image.id,
+            imageUrl: image.imageUrl,
+            imagePublicId: image.imagePublicId ?? undefined,
+            sortOrder: image.sortOrder
+          })) ?? [],
         status: "Active"
       })) ?? [],
     suitableStyleIds: [],
@@ -177,7 +221,12 @@ export function mapStudio(studio: PrismaStudioLike): Studio {
         ?.flatMap((hall) => hall.availabilitySlots ?? [])
         .filter((slot) => slot.isAvailable)
         .map((slot) => slot.id) ?? [],
-    primaryHallId: primaryHall?.id
+    primaryHallId: primaryHall?.id,
+    confirmationMode: studio.confirmationMode as Studio["confirmationMode"],
+    whatsappBookingPhone: studio.whatsappBookingPhone ?? undefined,
+    whatsappContactName: studio.whatsappContactName ?? undefined,
+    whatsappResponseTimeoutMinutes: studio.whatsappResponseTimeoutMinutes ?? undefined,
+    whatsappConfirmationEnabled: studio.whatsappConfirmationEnabled ?? undefined
   };
 }
 
@@ -221,6 +270,17 @@ export function mapBooking(booking: PrismaBookingLike): Booking {
     studioTotal: booking.studioPrice,
     serviceFee: booking.serviceFee,
     totalAmount: booking.totalPrice,
+    settlementMode:
+      booking.settlementMode === "AGENT_FULL_COLLECTION" ? "AGENT_FULL_COLLECTION" : "PLATFORM_FEE_ONLY",
+    totalServicePrice: booking.totalServicePrice ?? booking.totalPrice,
+    platformFeeAmount: booking.platformFeeAmount ?? booking.depositAmount ?? booking.serviceFee,
+    providerAmount:
+      booking.providerAmount ??
+      booking.remainingAmount ??
+      Math.max((booking.totalServicePrice ?? booking.totalPrice) - (booking.platformFeeAmount ?? booking.depositAmount ?? booking.serviceFee), 0),
+    platformFeeStatus: mapPlatformFeeStatus(booking.platformFeeStatus),
+    providerPaymentStatus: mapProviderPaymentStatus(booking.providerPaymentStatus),
+    platformFeePaidAt: booking.platformFeePaidAt?.toISOString(),
     depositAmount: booking.depositAmount ?? 0,
     paidAmount: booking.paidAmount ?? 0,
     remainingAmount: booking.remainingAmount ?? booking.totalPrice,
@@ -274,10 +334,18 @@ export function mapSlots(
 function mapBookingStatus(status: string): Booking["status"] {
   const map: Record<string, Booking["status"]> = {
     PENDING: "Pending",
+    PENDING_PLATFORM_FEE: "Pending",
     CONFIRMED: "Confirmed",
+    RESCHEDULE_REQUESTED: "Pending",
+    RESCHEDULED: "Confirmed",
     IN_PROGRESS: "In progress",
     COMPLETED: "Completed",
     CANCELLED: "Cancelled",
+    CANCELLED_BY_CLIENT: "Cancelled",
+    CANCELLED_BY_PROVIDER: "Cancelled",
+    CANCELLED_BY_PLATFORM: "Cancelled",
+    NO_SHOW_CLIENT: "Cancelled",
+    NO_SHOW_PROVIDER: "Cancelled",
     DECLINED: "Declined"
   };
   return map[status] ?? "Pending";
@@ -294,4 +362,25 @@ function mapBookingPaymentStatus(status?: string): Booking["paymentStatus"] {
     FAILED: "FAILED"
   };
   return status ? map[status] ?? "UNPAID" : "UNPAID";
+}
+
+function mapPlatformFeeStatus(status?: string | null): Booking["platformFeeStatus"] {
+  const map: Record<string, NonNullable<Booking["platformFeeStatus"]>> = {
+    UNPAID: "UNPAID",
+    PAID: "PAID",
+    REFUND_REQUESTED: "REFUND_REQUESTED",
+    REFUNDED: "REFUNDED",
+    NON_REFUNDABLE: "NON_REFUNDABLE"
+  };
+  return status ? map[status] ?? "UNPAID" : "UNPAID";
+}
+
+function mapProviderPaymentStatus(status?: string | null): Booking["providerPaymentStatus"] {
+  const map: Record<string, NonNullable<Booking["providerPaymentStatus"]>> = {
+    NOT_TRACKED: "NOT_TRACKED",
+    EXTERNAL_PENDING: "EXTERNAL_PENDING",
+    EXTERNAL_PAID: "EXTERNAL_PAID",
+    EXTERNAL_CANCELLED: "EXTERNAL_CANCELLED"
+  };
+  return status ? map[status] ?? "EXTERNAL_PENDING" : "EXTERNAL_PENDING";
 }

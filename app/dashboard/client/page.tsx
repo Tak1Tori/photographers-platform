@@ -1,112 +1,186 @@
 import Link from "next/link";
-import { CalendarDays, CheckCircle2, Clock3, CreditCard, Images, ListChecks } from "lucide-react";
-import { DashboardCard } from "@/components/dashboard/dashboard-card";
-import { StatusBadge } from "@/components/dashboard/status-badge";
-import { PageHeader } from "@/components/shared/page-header";
+import Image from "next/image";
+import { KeyRound, Pencil, UserRound } from "lucide-react";
+import { SignOutButton } from "@/components/auth/sign-out-button";
+import { AccountActionsCard } from "@/components/dashboard/account-actions-card";
+import { ClientBookingCard } from "@/components/dashboard/client-booking-card";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { getClientBookings, getClientDashboardStats } from "@/lib/data/client";
-import { formatPrice } from "@/lib/mock-data";
+import { getClientBookings } from "@/lib/data/client";
+import { getAccountProfile } from "@/lib/data/account";
 import { requireSession } from "@/lib/guards";
+import type { ClientBookingListItem } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
+const defaultAvatarUrl = "/images/default-avatar.png";
 
 export default async function ClientDashboardPage() {
   const session = await requireSession(["CLIENT", "ADMIN"]);
-  const [stats, bookings] = await Promise.all([
-    getClientDashboardStats(session.user.id, session.user.role),
+  const [account, bookings] = await Promise.all([
+    getAccountProfile(session),
     getClientBookings(session.user.id, { role: session.user.role })
   ]);
-  const latestBookings = bookings.slice(0, 5);
+  const currentBookings = bookings.filter((booking) => !isHistoryBooking(booking)).slice(0, 4);
+  const historyBookings = bookings.filter(isHistoryBooking).slice(0, 4);
 
   return (
     <>
-      <PageHeader
-        eyebrow="Client dashboard"
-        title="Мои брони"
-        description="Ваши фотосессии, статусы подтверждения и оплаты в одном месте."
-      />
-      <section className="section">
-        <div className="container grid gap-8">
-          <Card>
-            <CardContent className="flex flex-col justify-between gap-5 p-6 md:flex-row md:items-center">
-              <div>
-                <p className="text-sm text-muted-foreground">Добро пожаловать</p>
-                <h2 className="mt-2 text-2xl font-semibold tracking-normal">
-                  {session.user.name ?? session.user.email}
-                </h2>
-                <div className="mt-3 grid gap-1 text-sm text-muted-foreground">
-                  <span>{session.user.email}</span>
-                  {session.user.phone ? <span>{session.user.phone}</span> : null}
-                </div>
+      <section className="section md:hidden">
+        <div className="container">
+          <div className="grid gap-8 py-4">
+            <h1 className="text-2xl font-medium tracking-normal">Личный кабинет</h1>
+
+            <div className="flex items-center gap-5">
+              <div className="relative size-24 overflow-hidden rounded-full border border-border bg-secondary">
+                <Image
+                  src={account.image || defaultAvatarUrl}
+                  alt=""
+                  fill
+                  sizes="96px"
+                  className="object-cover"
+                />
               </div>
-              <Button asChild>
-                <Link href="/styles">
-                  <Images className="size-4" aria-hidden="true" />
-                  Забронировать новую съемку
-                </Link>
-              </Button>
-            </CardContent>
-          </Card>
+              <div className="min-w-0">
+                <p className="truncate text-xl font-medium tracking-normal">{account.name}</p>
+                <p className="mt-1 truncate text-sm text-muted-foreground">
+                  {account.phone || "Телефон не указан"}
+                </p>
+              </div>
+            </div>
 
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
-            <DashboardCard label="Всего бронирований" value={String(stats.totalBookings)} icon={CalendarDays} />
-            <DashboardCard label="Ожидают подтверждения" value={String(stats.pendingBookings)} icon={Clock3} />
-            <DashboardCard label="Подтвержденные" value={String(stats.confirmedBookings)} icon={CheckCircle2} />
-            <DashboardCard label="Завершенные" value={String(stats.completedBookings)} icon={ListChecks} />
-            <DashboardCard label="Оплаченный депозит" value={formatPrice(stats.paidDepositTotal)} icon={CreditCard} />
+            <nav className="grid gap-5 text-xl font-medium tracking-normal text-foreground">
+              <Link
+                href="/dashboard/client/edit"
+                className="flex items-center gap-4 transition-colors hover:text-emerald-300"
+              >
+                <Pencil className="size-6 text-muted-foreground" aria-hidden="true" />
+                Редактировать данные
+              </Link>
+              <button
+                type="button"
+                disabled
+                className="flex cursor-not-allowed items-center gap-4 text-muted-foreground"
+              >
+                <KeyRound className="size-6" aria-hidden="true" />
+                Сменить пароль
+              </button>
+              <Link
+                href="/dashboard/client/bookings?tab=history"
+                className="flex items-center gap-4 transition-colors hover:text-emerald-300"
+              >
+                <UserRound className="size-6 text-muted-foreground" aria-hidden="true" />
+                История бронирований
+              </Link>
+              <SignOutButton
+                variant="ghost"
+                size="lg"
+                showIcon={false}
+                className="h-auto w-fit justify-start p-0 text-xl font-medium tracking-normal text-foreground hover:bg-transparent hover:text-emerald-300"
+              />
+            </nav>
           </div>
+        </div>
+      </section>
 
-          <Card>
-            <CardHeader className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-              <CardTitle>Последние бронирования</CardTitle>
-              <Button asChild variant="outline" size="sm">
-                <Link href="/dashboard/client/bookings">Все бронирования</Link>
-              </Button>
-            </CardHeader>
-            <CardContent>
-              {latestBookings.length === 0 ? (
-                <div className="rounded-lg border border-dashed border-border p-8 text-center">
-                  <h3 className="text-lg font-semibold tracking-normal">
-                    У вас пока нет бронирований
-                  </h3>
-                  <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
-                    Начните с выбора стиля съемки, а после mock-оплаты бронь появится здесь.
-                  </p>
-                  <Button asChild className="mt-5">
-                    <Link href="/styles">Выбрать стиль</Link>
-                  </Button>
-                </div>
-              ) : (
-                <div className="grid gap-3">
-                  {latestBookings.map((booking) => (
-                    <Link
-                      key={booking.id}
-                      href={`/dashboard/client/bookings/${booking.id}`}
-                      className="grid gap-3 rounded-lg border border-border p-4 transition-colors hover:bg-secondary md:grid-cols-[1fr_auto]"
-                    >
-                      <div>
-                        <p className="font-semibold">{booking.id}</p>
-                        <p className="mt-1 text-sm text-muted-foreground">
-                          {booking.styleName} · {booking.photographerName} · {booking.studioName}
-                        </p>
-                        <p className="mt-1 text-sm text-muted-foreground">
-                          {booking.date} · {booking.time} · {booking.durationHours} ч
-                        </p>
-                      </div>
-                      <div className="flex flex-wrap items-start gap-2 md:justify-end">
-                        <StatusBadge status={booking.status} />
-                        <StatusBadge status={booking.paymentStatus} />
-                        <StatusBadge status={booking.bookingType ?? "FULL_SHOOT"} />
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+      <section className="section hidden md:block">
+        <div className="container grid gap-8">
+          <AccountActionsCard
+            name={account.name}
+            phone={account.phone}
+            roleLabel="Личный кабинет"
+            editHref="/dashboard/client/edit"
+          />
+
+          <div className="grid gap-4 xl:grid-cols-2">
+            <BookingPreviewSection
+              title="Текущие записи"
+              description="Активные брони, которые ожидают подтверждения, оплаты или проведения."
+              bookings={currentBookings}
+              emptyTitle="Нет текущих записей"
+              emptyDescription="Выберите фотографа для новой съемки, и бронь появится в этом разделе."
+              actionHref="/dashboard/client/bookings"
+              actionLabel="Все текущие"
+              emptyActionHref="/photographers?mode=booking"
+              emptyActionLabel="Начать поиск"
+            />
+
+            <BookingPreviewSection
+              title="История бронирований"
+              description="Завершенные, отмененные и отклоненные бронирования."
+              bookings={historyBookings}
+              emptyTitle="История пока пуста"
+              emptyDescription="После завершения или отмены записи будут попадать сюда."
+              actionHref="/dashboard/client/bookings?tab=history"
+              actionLabel="Вся история"
+            />
+          </div>
         </div>
       </section>
     </>
   );
+}
+
+function BookingPreviewSection({
+  title,
+  description,
+  bookings,
+  emptyTitle,
+  emptyDescription,
+  actionHref,
+  actionLabel,
+  emptyActionHref,
+  emptyActionLabel
+}: {
+  title: string;
+  description: string;
+  bookings: ClientBookingListItem[];
+  emptyTitle: string;
+  emptyDescription: string;
+  actionHref: string;
+  actionLabel: string;
+  emptyActionHref?: string;
+  emptyActionLabel?: string;
+}) {
+  return (
+    <Card className="h-full">
+      <CardHeader className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
+        <div>
+          <CardTitle>{title}</CardTitle>
+          <p className="mt-2 text-sm text-muted-foreground">{description}</p>
+        </div>
+        <Button asChild variant="outline" size="sm" className="shrink-0">
+          <Link href={actionHref}>{actionLabel}</Link>
+        </Button>
+      </CardHeader>
+      <CardContent>
+        {bookings.length === 0 ? (
+          <div className="rounded-lg border border-dashed border-border p-8 text-center">
+            <h3 className="text-lg font-semibold tracking-normal">{emptyTitle}</h3>
+            <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
+              {emptyDescription}
+            </p>
+            {emptyActionHref && emptyActionLabel ? (
+              <Button asChild className="mt-5">
+                <Link href={emptyActionHref}>{emptyActionLabel}</Link>
+              </Button>
+            ) : null}
+          </div>
+        ) : (
+          <div className="grid gap-3">
+            {bookings.map((booking) => (
+              <ClientBookingCard
+                key={booking.id}
+                booking={booking}
+                isHistory={isHistoryBooking(booking)}
+              />
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function isHistoryBooking(booking: ClientBookingListItem) {
+  return ["Completed", "Cancelled", "Declined"].includes(booking.status);
 }

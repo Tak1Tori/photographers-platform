@@ -1,17 +1,9 @@
 import Link from "next/link";
-import { Building2, Camera, UserRound } from "lucide-react";
+import { UserRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 
 const scenarios = [
-  {
-    title: "Фотосессия под ключ",
-    description: "Вся съемка в одном маршруте.",
-    href: "/booking/new?type=FULL_SHOOT",
-    cta: "Собрать съемку",
-    price: "от 45 000 ₸",
-    icon: Camera
-  },
   {
     title: "Найти фотографа",
     description: "Специалист под ваш стиль и задачу.",
@@ -19,14 +11,6 @@ const scenarios = [
     cta: "Смотреть фотографов",
     price: "от 25 000 ₸/ч",
     icon: UserRound
-  },
-  {
-    title: "Найти студию",
-    description: "Пространство с нужным интерьером.",
-    href: "/studios?mode=booking",
-    cta: "Смотреть студии",
-    price: "от 12 000 ₸/ч",
-    icon: Building2
   }
 ];
 
@@ -38,11 +22,8 @@ export function BookingScenarios() {
           <h2 className="max-w-xl text-3xl font-semibold tracking-normal md:text-4xl">
             Что бронируем?
           </h2>
-          <p className="text-sm text-muted-foreground">
-            Под ключ или только нужную часть съемки
-          </p>
         </div>
-        <div className="grid gap-5 md:grid-cols-3">
+        <div className="grid gap-5 md:max-w-xl">
           {scenarios.map((scenario) => {
             const Icon = scenario.icon;
             return (

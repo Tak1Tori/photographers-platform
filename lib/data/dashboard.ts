@@ -1,40 +1,67 @@
+import { BookingStatus as PrismaBookingStatus } from "@prisma/client";
 import { getAllBookings } from "@/lib/data/bookings";
 import { canUseDatabase } from "@/lib/data/db";
 import { prisma } from "@/lib/prisma";
-import { photographers, studios } from "@/lib/mock-data";
+
+const cancelledBookingStatuses = [
+  PrismaBookingStatus.CANCELLED,
+  PrismaBookingStatus.CANCELLED_BY_CLIENT,
+  PrismaBookingStatus.CANCELLED_BY_PROVIDER,
+  PrismaBookingStatus.CANCELLED_BY_PLATFORM,
+  PrismaBookingStatus.NO_SHOW_CLIENT,
+  PrismaBookingStatus.NO_SHOW_PROVIDER
+];
+
+const emptyAdminStats = {
+  totalBookings: 0,
+  pendingBookings: 0,
+  activePhotographers: 0,
+  activeStudios: 0,
+  gmv: 0,
+  serviceFee: 0,
+  platformRevenue: 0
+};
 
 export async function getAdminStats() {
-  const bookings = await getAllBookings();
-  const gmv = bookings
-    .filter((booking) => booking.status !== "Cancelled")
-    .reduce((sum, booking) => sum + booking.totalAmount, 0);
-  const serviceFee = bookings.reduce((sum, booking) => sum + booking.serviceFee, 0);
-  let activePhotographers = photographers.length;
-  let activeStudios = studios.length;
+  if (!canUseDatabase()) return emptyAdminStats;
 
-  try {
-    if (!canUseDatabase()) {
-      throw new Error("DATABASE_URL is not configured");
-    }
+  const [totalBookings, pendingBookings, activePhotographers, activeStudios, amounts] = await Promise.all([
+    prisma.booking.count(),
+    prisma.booking.count({
+      where: {
+        status: {
+          in: [
+            PrismaBookingStatus.PENDING,
+            PrismaBookingStatus.PENDING_PLATFORM_FEE,
+            PrismaBookingStatus.RESCHEDULE_REQUESTED
+          ]
+        }
+      }
+    }),
+    prisma.photographerProfile.count({
+      where: { status: "PUBLISHED", user: { role: "PHOTOGRAPHER" } }
+    }),
+    prisma.studioProfile.count({ where: { status: "PUBLISHED" } }),
+    prisma.booking.aggregate({
+      where: { status: { notIn: cancelledBookingStatuses } },
+      _sum: {
+        totalPrice: true,
+        serviceFee: true
+      }
+    })
+  ]);
 
-    const [photographerCount, studioCount] = await Promise.all([
-      prisma.photographerProfile.count({ where: { status: "PUBLISHED" } }),
-      prisma.studioProfile.count({ where: { status: "PUBLISHED" } })
-    ]);
-    activePhotographers = photographerCount || activePhotographers;
-    activeStudios = studioCount || activeStudios;
-  } catch {
-    // Fallback keeps dashboards renderable before DATABASE_URL/migrations are configured.
-  }
+  const gmv = amounts._sum.totalPrice ?? 0;
+  const serviceFee = amounts._sum.serviceFee ?? 0;
 
   return {
-    totalBookings: bookings.length,
-    pendingBookings: bookings.filter((booking) => booking.status === "Pending").length,
+    totalBookings,
+    pendingBookings,
     activePhotographers,
     activeStudios,
     gmv,
     serviceFee,
-    estimatedPlatformRevenue: serviceFee
+    platformRevenue: serviceFee
   };
 }
 

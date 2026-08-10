@@ -1,8 +1,9 @@
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, Building2, MapPin, Users, Star } from "lucide-react";
+import { Building2, MapPin, Users, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { StudioMap } from "@/components/studios/studio-map";
 import { formatPrice } from "@/lib/mock-data";
 import type { Studio } from "@/lib/types";
 
@@ -95,35 +96,16 @@ export function StudioCard({
             </span>
           ))}
         </div>
-
-        {visibleHalls.length > 0 ? (
-          <div className="mt-5 grid gap-3 sm:grid-cols-2">
-            {visibleHalls.map((hall) => (
-              <div
-                key={hall.id ?? hall.name}
-                className="overflow-hidden rounded-md border border-border bg-muted/35"
-              >
-                {hall.imageUrl ? (
-                  <div className="relative aspect-[16/9]">
-                    <Image
-                      src={hall.imageUrl}
-                      alt={`Зал ${hall.name}`}
-                      fill
-                      sizes="(max-width: 640px) 100vw, 25vw"
-                      className="object-cover"
-                    />
-                  </div>
-                ) : null}
-                <div className="p-3">
-                  <p className="font-medium">{hall.name}</p>
-                  <div className="mt-1 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
-                    <span>до {hall.capacity} человек</span>
-                    <span>{formatPrice(hall.pricePerHour)} / час</span>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
+        {studio.twoGisEmbedUrl ? (
+          <StudioMap
+            title={studio.name}
+            address={studio.address}
+            city={studio.city}
+            twoGisUrl={studio.twoGisUrl}
+            twoGisEmbedUrl={studio.twoGisEmbedUrl}
+            compact
+            className="relative z-20 mt-4"
+          />
         ) : null}
 
         <div className="mt-auto pt-6">
@@ -133,7 +115,7 @@ export function StudioCard({
           <Button asChild size="lg" className="relative z-20 mx-auto mt-4 flex w-full max-w-md">
             <Link href={primaryHref} aria-label={`Забронировать студию ${studio.name}`}>
               {mode === "booking" ? "Забронировать студию" : "Выбрать студию"}
-              <ArrowRight className="size-4" aria-hidden="true" />
+              {/* <ArrowRight className="size-4" aria-hidden="true" /> */}
             </Link>
           </Button>
         </div>

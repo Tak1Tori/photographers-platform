@@ -6,7 +6,6 @@ import { useMemo, useState, useTransition } from "react";
 import {
   ArrowLeft,
   ArrowRight,
-  CalendarDays,
   Check,
   Clock3,
   Plus,
@@ -19,6 +18,7 @@ import {
   updateAvailabilityRuleAction
 } from "@/app/dashboard/calendar/actions";
 import { Button } from "@/components/ui/button";
+import { SuccessToast } from "@/components/shared/success-toast";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
@@ -35,22 +35,28 @@ type RuleDto = {
 
 type EventDto = {
   id: string;
-  source: "PLATFORM_BOOKING" | "MANUAL_BUSY" | "SYSTEM_HOLD" | "ACTIVE_HOLD";
+  source: "PLATFORM_BOOKING" | "MANUAL_BUSY" | "SYSTEM_HOLD" | "TELEGRAM" | "ACTIVE_HOLD";
   title: string;
   privateNote?: string;
+  bookingNumber?: string;
+  bookingStatus?: string;
+  rescheduleRequestedAt?: string;
   startTime: string;
   endTime: string;
   canDelete: boolean;
 };
 
-interface CalendarDashboardProps {
+export interface CalendarDashboardProps {
   ownerType: "PHOTOGRAPHER" | "STUDIO_HALL";
   ownerId: string;
   ownerName: string;
   monthStart: string;
   previousMonthHref: string;
   nextMonthHref: string;
-  backHref: string;
+  backHref?: string;
+  bookingDetailsBaseHref?: string;
+  showBackLink?: boolean;
+  className?: string;
   rules: RuleDto[];
   events: EventDto[];
 }
@@ -74,6 +80,9 @@ export function CalendarDashboard({
   previousMonthHref,
   nextMonthHref,
   backHref,
+  bookingDetailsBaseHref,
+  showBackLink = true,
+  className,
   rules,
   events
 }: CalendarDashboardProps) {
@@ -116,7 +125,7 @@ export function CalendarDashboard({
   }
 
   return (
-    <div className="grid gap-4">
+    <div className={cn("grid gap-4", className)}>
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
         <div>
           <p className="text-sm text-muted-foreground">Календарь</p>
@@ -133,30 +142,31 @@ export function CalendarDashboard({
               <ArrowRight className="size-4" />
             </Link>
           </Button>
-          <Button asChild variant="outline" size="sm">
-            <Link href={backHref}>В кабинет</Link>
-          </Button>
+          {showBackLink && backHref ? (
+            <Button asChild variant="outline" size="sm">
+              <Link href={backHref}>В кабинет</Link>
+            </Button>
+          ) : null}
         </div>
       </div>
 
-      {message ? (
+      {message?.ok ? <SuccessToast message={message.text} /> : null}
+      {message && !message.ok ? (
         <p
           className={cn(
             "rounded-md px-4 py-3 text-sm font-medium",
-            message.ok
-              ? "bg-emerald-500/10 text-emerald-300"
-              : "bg-rose-500/10 text-rose-300"
+            "bg-rose-500/10 text-rose-300"
           )}
         >
           {message.text}
         </p>
       ) : null}
 
-      <Card className="overflow-hidden">
-        <CardContent className="p-0">
-          <div className="grid xl:grid-cols-[minmax(0,1fr)_340px]">
+      <Card className="overflow-hidden xl:max-h-[calc(100svh-7.5rem)]">
+        <CardContent className="p-0 xl:h-full">
+          <div className="grid xl:h-full xl:grid-cols-[minmax(0,1fr)_320px] 2xl:grid-cols-[minmax(0,1fr)_340px]">
             <div className="min-w-0 border-b border-border xl:border-b-0 xl:border-r">
-              <div className="flex flex-col justify-between gap-4 border-b border-border px-4 py-4 sm:flex-row sm:items-center sm:px-5">
+              <div className="flex flex-col justify-between gap-3 border-b border-border px-4 py-3 sm:flex-row sm:items-center sm:px-5 xl:min-h-[88px]">
                 <div>
                   <h3 className="text-xl font-semibold capitalize">
                     {formatMonth(monthDate)}
@@ -166,9 +176,10 @@ export function CalendarDashboard({
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs text-muted-foreground">
-                  <Legend color="bg-emerald-400" label="Бронь" />
-                  <Legend color="bg-amber-400" label="Занято" />
-                  <Legend color="bg-sky-400" label="Удерживается" />
+                  <Legend color="bg-primary" label="Подтверждена" />
+                  <Legend color="bg-amber-400" label="Ждет подтверждения" />
+                  <Legend color="bg-blue-400" label="Ручная бронь" />
+                  <Legend color="bg-cyan-400" label="Импорт" />
                 </div>
               </div>
 
@@ -178,7 +189,7 @@ export function CalendarDashboard({
                     {weekdayHeaders.map((day) => (
                       <div
                         key={day}
-                        className="px-3 py-2 text-center text-xs font-medium text-muted-foreground"
+                        className="px-3 py-2 text-center text-xs font-medium text-muted-foreground xl:py-1.5"
                       >
                         {day}
                       </div>
@@ -198,15 +209,15 @@ export function CalendarDashboard({
                           type="button"
                           onClick={() => setSelectedDate(key)}
                           className={cn(
-                            "relative min-h-20 border-b border-r border-border p-1.5 text-left transition-colors last:border-r-0 hover:bg-secondary/40 sm:min-h-32 sm:p-2",
-                            isSelected && "bg-emerald-400/[0.07] ring-1 ring-inset ring-emerald-400/70",
+                            "relative min-h-20 border-b border-r border-border p-1.5 text-left transition-colors last:border-r-0 hover:bg-secondary/40 sm:min-h-28 sm:p-2 xl:min-h-[clamp(70px,calc((100svh-22rem)/6),112px)]",
+                            isSelected && "bg-primary/[0.07] ring-1 ring-inset ring-primary/70",
                             !isCurrentMonth && "bg-background/40 text-muted-foreground opacity-45"
                           )}
                         >
                           <span
                             className={cn(
                               "flex size-7 items-center justify-center rounded-md text-sm font-medium",
-                              isToday && "bg-emerald-400 text-emerald-950",
+                              isToday && "bg-primary text-primary-foreground",
                               isSelected && !isToday && "text-emerald-300"
                             )}
                           >
@@ -218,22 +229,18 @@ export function CalendarDashboard({
                                 key={event.id}
                                 className={cn(
                                   "size-1.5 rounded-full",
-                                  event.source === "PLATFORM_BOOKING"
-                                    ? "bg-emerald-400"
-                                    : event.source === "MANUAL_BUSY"
-                                      ? "bg-amber-400"
-                                      : "bg-sky-400"
+                                  eventDotClass(event)
                                 )}
                               />
                             ))}
                           </span>
-                          <span className="mt-2 hidden gap-1 sm:grid">
+                          <span className="mt-2 hidden gap-1 sm:grid xl:mt-1">
                             {dayEvents.slice(0, 3).map((event) => (
                               <span
                                 key={event.id}
                                 className={cn(
-                                  "block truncate rounded border px-1.5 py-1 text-[11px] leading-tight",
-                                  eventClass(event.source)
+                                  "block truncate rounded border px-1.5 py-1 text-[11px] leading-tight xl:py-0.5",
+                                  eventClass(event)
                                 )}
                               >
                                 {formatTime(event.startTime)} {event.title}
@@ -253,29 +260,66 @@ export function CalendarDashboard({
               </div>
             </div>
 
-            <aside className="grid content-start">
-              <div className="border-b border-border p-5">
+            <aside className="grid content-start xl:max-h-[calc(100svh-7.5rem)] xl:overflow-y-auto">
+              <div className="border-b border-border p-4 xl:p-5">
                 <p className="text-sm capitalize text-muted-foreground">
                   {formatWeekday(selectedDay)}
                 </p>
                 <h3 className="mt-1 text-2xl font-semibold">{formatSelectedDate(selectedDay)}</h3>
-                <div className="mt-4 grid gap-2">
+                <div className="mt-4 grid gap-2 xl:mt-3">
                   {selectedEvents.length === 0 ? (
                     <p className="rounded-md border border-dashed border-border px-3 py-4 text-sm text-muted-foreground">
                       На этот день событий нет.
                     </p>
                   ) : (
-                    selectedEvents.map((event) => (
+                    selectedEvents.map((event) => {
+                      const detailsHref =
+                        bookingDetailsBaseHref && event.bookingNumber
+                          ? `${bookingDetailsBaseHref}/${encodeURIComponent(event.bookingNumber)}`
+                          : undefined;
+
+                      return (
                       <div
                         key={event.id}
-                        className={cn("rounded-md border p-3 text-sm", eventClass(event.source))}
+                        role={detailsHref ? "button" : undefined}
+                        tabIndex={detailsHref ? 0 : undefined}
+                        onClick={() => {
+                          if (detailsHref) router.push(detailsHref);
+                        }}
+                        onKeyDown={(keyEvent) => {
+                          if (!detailsHref) return;
+                          if (keyEvent.key === "Enter" || keyEvent.key === " ") {
+                            keyEvent.preventDefault();
+                            router.push(detailsHref);
+                          }
+                        }}
+                        className={cn(
+                          "rounded-md border p-3 text-sm",
+                          eventClass(event),
+                          detailsHref && "cursor-pointer transition hover:border-foreground/35 hover:bg-secondary/35"
+                        )}
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div>
-                            <p className="font-medium">{event.title}</p>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="font-medium">{event.title}</p>
+                              <span className="rounded-full border border-current/25 px-2 py-0.5 text-[10px] uppercase opacity-80">
+                                {sourceLabel(event)}
+                              </span>
+                              {event.rescheduleRequestedAt ? (
+                                <span className="rounded-full border border-amber-300/35 bg-amber-300/10 px-2 py-0.5 text-[10px] font-medium uppercase text-amber-100">
+                                  перенос
+                                </span>
+                              ) : null}
+                            </div>
                             <p className="mt-1 text-xs opacity-75">
                               {formatTime(event.startTime)}–{formatTime(event.endTime)}
                             </p>
+                            {event.privateNote ? (
+                              <p className="mt-2 rounded border border-current/15 px-2 py-1 text-xs opacity-75">
+                                {event.privateNote}
+                              </p>
+                            ) : null}
                           </div>
                           {event.canDelete ? (
                             <button
@@ -283,7 +327,8 @@ export function CalendarDashboard({
                               className="text-rose-300 transition-colors hover:text-rose-200"
                               disabled={isPending}
                               aria-label={`Удалить ${event.title}`}
-                              onClick={() => {
+                              onClick={(clickEvent) => {
+                                clickEvent.stopPropagation();
                                 const data = baseForm(ownerType, ownerId);
                                 data.set("eventId", event.id);
                                 run(deleteManualBusyEventAction)(data);
@@ -294,13 +339,14 @@ export function CalendarDashboard({
                           ) : null}
                         </div>
                       </div>
-                    ))
+                      );
+                    })
                   )}
                 </div>
               </div>
 
               <details className="group border-b border-border" open>
-                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-4">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-4 xl:px-5 xl:py-3.5">
                   <span className="inline-flex items-center gap-2 font-medium">
                     <Plus className="size-4 text-emerald-300" />
                     Добавить занятость
@@ -311,7 +357,7 @@ export function CalendarDashboard({
                 </summary>
                 <form
                   action={run(createManualBusyEventAction)}
-                  className="grid gap-3 px-5 pb-5"
+                  className="grid gap-3 px-4 pb-4 xl:px-5"
                 >
                   <OwnerFields ownerType={ownerType} ownerId={ownerId} />
                   <input type="hidden" name="date" value={selectedDate} />
@@ -324,7 +370,7 @@ export function CalendarDashboard({
                     Личная заметка
                     <textarea
                       name="privateNote"
-                      className="min-h-20 rounded-md border border-input bg-background p-2.5 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring"
+                      className="min-h-16 rounded-md border border-input bg-background p-2.5 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring"
                       placeholder="Клиенты её не увидят"
                     />
                   </label>
@@ -336,7 +382,7 @@ export function CalendarDashboard({
               </details>
 
               <details className="group">
-                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-4">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-4 xl:px-5 xl:py-3.5">
                   <span className="inline-flex items-center gap-2 font-medium">
                     <Clock3 className="size-4 text-emerald-300" />
                     Рабочие часы
@@ -359,7 +405,7 @@ export function CalendarDashboard({
                 </summary>
                 <form
                   action={run(updateAvailabilityRuleAction)}
-                  className="grid gap-3 px-5 pb-5"
+                  className="grid gap-3 px-4 pb-4 xl:px-5"
                 >
                   <OwnerFields ownerType={ownerType} ownerId={ownerId} />
                   <input type="hidden" name="weekday" value={selectedDay.getDay()} />
@@ -559,12 +605,45 @@ function formatTime(value: string) {
   }).format(new Date(value));
 }
 
-function eventClass(source: EventDto["source"]) {
-  if (source === "PLATFORM_BOOKING") {
-    return "border-emerald-400/35 bg-emerald-400/10 text-emerald-100";
+function isPendingBooking(event: EventDto) {
+  return (
+    event.source === "PLATFORM_BOOKING" &&
+    ["PENDING", "PENDING_PLATFORM_FEE", "RESCHEDULE_REQUESTED"].includes(event.bookingStatus ?? "")
+  );
+}
+
+function eventDotClass(event: EventDto) {
+  if (isPendingBooking(event)) return "bg-amber-400";
+  if (event.source === "PLATFORM_BOOKING") return "bg-primary";
+  if (event.source === "MANUAL_BUSY") return "bg-blue-400";
+  if (event.source === "TELEGRAM") return "bg-cyan-400";
+  return "bg-sky-400";
+}
+
+function eventClass(event: EventDto) {
+  if (isPendingBooking(event)) {
+    return "calendar-event calendar-event-pending border-amber-400/40 bg-amber-400/10 text-amber-100";
   }
-  if (source === "MANUAL_BUSY") {
-    return "border-amber-400/35 bg-amber-400/10 text-amber-100";
+  if (event.source === "PLATFORM_BOOKING") {
+    return "calendar-event calendar-event-platform border-primary/35 bg-primary/10 text-emerald-100";
   }
-  return "border-sky-400/35 bg-sky-400/10 text-sky-100";
+  if (event.source === "MANUAL_BUSY") {
+    return "calendar-event calendar-event-manual border-blue-400/35 bg-blue-400/10 text-blue-100";
+  }
+  if (event.source === "TELEGRAM") {
+    return "calendar-event calendar-event-import border-cyan-400/35 bg-cyan-400/10 text-cyan-100";
+  }
+  return "calendar-event calendar-event-other border-sky-400/35 bg-sky-400/10 text-sky-100";
+}
+
+function sourceLabel(event: EventDto) {
+  if (isPendingBooking(event)) return "Ожидает";
+  const labels: Record<EventDto["source"], string> = {
+    PLATFORM_BOOKING: "Подтверждена",
+    MANUAL_BUSY: "Ручная",
+    SYSTEM_HOLD: "Hold",
+    TELEGRAM: "Импорт",
+    ACTIVE_HOLD: "Hold"
+  };
+  return labels[event.source];
 }

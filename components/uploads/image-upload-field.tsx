@@ -82,11 +82,11 @@ export function ImageUploadField({
   }
 
   return (
-    <div className="grid gap-3">
+    <div className="grid gap-2 sm:gap-3">
       <ImagePreview src={previewUrl || currentUrl} alt={previewAlt} />
       <label
         className={cn(
-          "flex min-h-28 cursor-pointer flex-col items-center justify-center gap-2 rounded-md border border-dashed border-border bg-secondary/30 px-4 py-5 text-center transition-colors hover:border-primary/60 hover:bg-secondary/60",
+          "flex min-h-16 cursor-pointer items-center justify-start gap-3 rounded-md border border-dashed border-border bg-secondary/30 px-3 py-3 text-left transition-colors hover:border-primary/60 hover:bg-secondary/60 sm:min-h-28 sm:flex-col sm:justify-center sm:gap-2 sm:px-4 sm:py-5 sm:text-center",
           isDragging && "border-primary bg-primary/10"
         )}
         onDragEnter={(event) => {
@@ -102,19 +102,21 @@ export function ImageUploadField({
         onDrop={handleDrop}
       >
         {previewUrl ? (
-          <ImagePlus className="size-5 text-primary" aria-hidden="true" />
+          <ImagePlus className="size-5 shrink-0 text-primary" aria-hidden="true" />
         ) : (
-          <UploadCloud className="size-5 text-primary" aria-hidden="true" />
+          <UploadCloud className="size-5 shrink-0 text-primary" aria-hidden="true" />
         )}
-        <span className="text-sm font-medium">{label}</span>
-        <span className="text-xs text-muted-foreground">
-          Перетащите изображение сюда или нажмите для выбора
-        </span>
-        <span className="text-xs text-muted-foreground">
-          JPEG, PNG или WebP, до {maxSizeMb} МБ
+        <span className="grid gap-0.5 sm:contents">
+          <span className="text-sm font-medium">{label}</span>
+          <span className="hidden text-xs text-muted-foreground sm:inline">
+            Перетащите изображение сюда или нажмите для выбора
+          </span>
+          <span className="text-xs text-muted-foreground">
+            JPEG, PNG или WebP, до {maxSizeMb} МБ
+          </span>
         </span>
         {maxSizeMb > 5 ? (
-          <span className="text-xs text-muted-foreground">
+          <span className="hidden text-xs text-muted-foreground sm:inline">
             Большие файлы автоматически оптимизируются перед загрузкой
           </span>
         ) : null}

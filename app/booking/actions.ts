@@ -22,12 +22,12 @@ export async function createBookingAction(
   }
   const bookingInput: CreateBookingInput = {
     ...input,
-    clientId: session.user.id
+    clientId: session.user.id,
+    clientEmail: ""
   };
   const required: Array<[keyof CreateBookingInput, string]> = [
     ["clientName", "Name is required"],
     ["clientPhone", "Phone is required"],
-    ["clientEmail", "Email is required"],
     ["date", "Date is required"],
     ["startTime", "Time slot is required"],
     ["durationHours", "Duration is required"]
@@ -41,7 +41,7 @@ export async function createBookingAction(
 
   if (!canUseDatabase()) {
     const bookingNumber = `MOCK-${Date.now().toString().slice(-6)}`;
-    saveMockRuntimeBooking(createMockRuntimeBooking(bookingInput, bookingNumber));
+    await saveMockRuntimeBooking(createMockRuntimeBooking(bookingInput, bookingNumber));
 
     return {
       success: true,

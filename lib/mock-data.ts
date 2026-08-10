@@ -175,6 +175,9 @@ export const studios: Studio[] = [
     city: "Алматы",
     district: "Самал",
     address: "пр. Достык, 91, Самал",
+    googleMapsUrl: "https://www.google.com/maps/search/?api=1&query=пр.%20Достык%2091%20Алматы",
+    googleMapsEmbedUrl: "https://www.google.com/maps?q=пр.%20Достык%2091%20Алматы&output=embed",
+    twoGisUrl: "https://2gis.kz/search/пр.%20Достык%2091%20Алматы",
     description:
       "Светлая студия с большими окнами, циклорамой и нейтральными фонами для портретов, контента и предметной съемки.",
     pricePerHour: 18000,
@@ -203,6 +206,9 @@ export const studios: Studio[] = [
     city: "Алматы",
     district: "Бостандык",
     address: "ул. Байзакова, 280, Бостандык",
+    googleMapsUrl: "https://www.google.com/maps/search/?api=1&query=ул.%20Байзакова%20280%20Алматы",
+    googleMapsEmbedUrl: "https://www.google.com/maps?q=ул.%20Байзакова%20280%20Алматы&output=embed",
+    twoGisUrl: "https://2gis.kz/search/ул.%20Байзакова%20280%20Алматы",
     description:
       "Интерьерная студия с несколькими зонами, импульсным светом и реквизитом для fashion и love story съемок.",
     pricePerHour: 22000,
@@ -231,6 +237,9 @@ export const studios: Studio[] = [
     city: "Астана",
     district: "Есиль",
     address: "пр. Кабанбай батыра, 46, Есиль",
+    googleMapsUrl: "https://www.google.com/maps/search/?api=1&query=пр.%20Кабанбай%20батыра%2046%20Астана",
+    googleMapsEmbedUrl: "https://www.google.com/maps?q=пр.%20Кабанбай%20батыра%2046%20Астана&output=embed",
+    twoGisUrl: "https://2gis.kz/search/пр.%20Кабанбай%20батыра%2046%20Астана",
     description:
       "Минималистичная студия с белыми стенами, мягкой мебелью и зоной кухни для семейных и lifestyle-съемок.",
     pricePerHour: 16000,
@@ -300,7 +309,8 @@ export const mockStudioHalls: StudioHall[] = [
     amenities: ["Дневной свет", "Циклорама", "Гримерка"],
     status: "Active",
     imageUrl:
-      "https://images.unsplash.com/photo-1604014237800-1c9102c219da?auto=format&fit=crop&w=900&q=80"
+      "https://images.unsplash.com/photo-1604014237800-1c9102c219da?auto=format&fit=crop&w=900&q=80",
+    galleryImages: []
   },
   {
     id: "hall-cyclorama",
@@ -310,7 +320,8 @@ export const mockStudioHalls: StudioHall[] = [
     amenities: ["Белая циклорама", "Импульсный свет", "Wi-Fi"],
     status: "Active",
     imageUrl:
-      "https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3?auto=format&fit=crop&w=900&q=80"
+      "https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3?auto=format&fit=crop&w=900&q=80",
+    galleryImages: []
   }
 ];
 
@@ -320,6 +331,9 @@ export const mockStudioProfile: StudioProfile = {
   name: "North Light",
   city: "Алматы",
   address: "пр. Достык, 91, Самал",
+  googleMapsUrl: "https://www.google.com/maps/search/?api=1&query=пр.%20Достык%2091%20Алматы",
+  googleMapsEmbedUrl: "https://www.google.com/maps?q=пр.%20Достык%2091%20Алматы&output=embed",
+  twoGisUrl: "https://2gis.kz/search/пр.%20Достык%2091%20Алматы",
   description:
     "Светлая студия с большими окнами, циклорамой и нейтральными фонами для портретов, контента и предметной съемки.",
   rules: ["Бронь от 1 часа", "Отмена не позднее чем за 24 часа", "Сменная обувь обязательна"],
@@ -450,8 +464,21 @@ export function getStudioById(id?: string) {
 
 export function getStyleTitles(styleIds: string[]) {
   return styleIds
-    .map((styleId) => styles.find((style) => style.id === styleId)?.title)
-    .filter(Boolean) as string[];
+    .map((styleId) => styles.find((style) => style.id === styleId)?.title ?? humanizeStyleId(styleId))
+    .filter(Boolean);
+}
+
+export function getPhotographerStyleTitles(photographer: { specializationIds: string[]; specializationTitles?: string[] }) {
+  return photographer.specializationTitles?.length
+    ? photographer.specializationTitles
+    : getStyleTitles(photographer.specializationIds);
+}
+
+function humanizeStyleId(styleId: string) {
+  return styleId
+    .replace(/[-_]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 export function getSlots(slotIds: string[]) {

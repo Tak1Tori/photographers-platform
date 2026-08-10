@@ -1,22 +1,21 @@
 import { Banknote, CalendarDays, Camera, CircleDollarSign, Clock3, Percent, Store } from "lucide-react";
+import { AccountActionsCard } from "@/components/dashboard/account-actions-card";
 import { AdminManagement } from "@/components/dashboard/admin-management";
 import { DashboardCard } from "@/components/dashboard/dashboard-card";
-import { PageHeader } from "@/components/shared/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  formatPrice,
-  mockAdminStats,
-} from "@/lib/mock-data";
-import {
+  getAdminBookings,
   getAdminNotificationLogs,
+  getAdminEditorProfiles,
+  getAdminEditorTags,
   getAdminPayments,
   getAdminPaymentWebhookLogs,
   getAdminPhotographerProfiles,
+  getAdminStyles,
   getAdminStudioHalls,
   getAdminStudioProfiles,
   getAdminUsers
 } from "@/lib/data/admin";
-import { getAllBookings } from "@/lib/data/bookings";
 import { canUseDatabase } from "@/lib/data/db";
 import { getAdminStats } from "@/lib/data/dashboard";
 import { requireSession } from "@/lib/guards";
@@ -24,37 +23,31 @@ import { requireSession } from "@/lib/guards";
 export const dynamic = "force-dynamic";
 
 export default async function AdminPage() {
-  await requireSession(["ADMIN"]);
-  const bookings = await getAllBookings();
-  const stats = await getAdminStats();
-  const [users, photographers, studios, halls, payments, webhookLogs, notificationLogs] = await Promise.all([
+  const session = await requireSession(["ADMIN"]);
+  const [bookings, stats, users, photographers, editors, styles, editorTags, studios, halls, payments, webhookLogs, notificationLogs] = await Promise.all([
+    getAdminBookings(),
+    getAdminStats(),
     getAdminUsers(),
     getAdminPhotographerProfiles(),
+    getAdminEditorProfiles(),
+    getAdminStyles(),
+    getAdminEditorTags(),
     getAdminStudioProfiles(),
     getAdminStudioHalls(),
     getAdminPayments(),
     getAdminPaymentWebhookLogs(),
     getAdminNotificationLogs()
   ]);
-  const photographerCommission = bookings.reduce(
-    (sum, booking) => sum + booking.photographerTotal * mockAdminStats.photographerCommissionRate,
-    0
-  );
-  const studioCommission = bookings.reduce(
-    (sum, booking) => sum + booking.studioTotal * mockAdminStats.studioCommissionRate,
-    0
-  );
-  const platformRevenue = stats.serviceFee + photographerCommission + studioCommission;
 
   return (
     <>
-      <PageHeader
-        eyebrow="Admin"
-        title="Административная панель"
-        description="Операционное управление бронированиями, партнерами и финансовыми метриками marketplace."
-      />
       <section className="section">
         <div className="container grid gap-8">
+          <AccountActionsCard
+            name={session.user.name}
+            roleLabel="Администратор"
+          />
+
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             <DashboardCard
               label="Всего бронирований"
@@ -79,7 +72,7 @@ export default async function AdminPage() {
             <DashboardCard label="Примерный GMV" value={formatPrice(stats.gmv)} icon={Banknote} />
             <DashboardCard
               label="Комиссия платформы"
-              value={formatPrice(platformRevenue)}
+              value={formatPrice(stats.platformRevenue)}
               icon={CircleDollarSign}
             />
           </div>
@@ -89,7 +82,6 @@ export default async function AdminPage() {
             users={users.map((user) => ({
               id: user.id,
               name: user.name,
-              email: user.email,
               phone: user.phone,
               role: user.role,
               createdAt: user.createdAt.toISOString().slice(0, 10)
@@ -98,17 +90,51 @@ export default async function AdminPage() {
               id: profile.id,
               name: profile.name,
               city: profile.city,
-              email: profile.user.email,
               status: mapProfileStatus(profile.status),
               styles: profile.styles.map((style) => style.name),
               bookingsCount: profile.bookings.length,
-              portfolioCount: profile.portfolioItems.length
+              portfolioCount: profile.portfolioItems.length,
+              rating: profile.reviews.length
+                ? profile.reviews.reduce((sum, review) => sum + review.rating, 0) / profile.reviews.length
+                : 0,
+              reviewsCount: profile.reviews.length,
+              reviews: profile.reviews.map((review) => ({
+                id: review.id,
+                clientName: review.clientName ?? "Клиент",
+                rating: review.rating,
+                comment: review.comment,
+                createdAt: review.createdAt.toISOString()
+              }))
+            }))}
+            editors={editors.map((profile) => ({
+              id: profile.id,
+              name: profile.name,
+              city: profile.city,
+              status: mapProfileStatus(profile.status),
+              tags: profile.editorTags.map((tag) => tag.name),
+              portfolioCount: profile.portfolioItems.length,
+              rating: profile.reviews.length
+                ? profile.reviews.reduce((sum, review) => sum + review.rating, 0) / profile.reviews.length
+                : 0,
+              reviewsCount: profile.reviews.length
+            }))}
+            styles={styles.map((style) => ({
+              id: style.id,
+              name: style.name,
+              slug: style.slug,
+              photographersCount: style._count.photographers,
+              bookingsCount: style._count.bookings
+            }))}
+            editorTags={editorTags.map((tag) => ({
+              id: tag.id,
+              name: tag.name,
+              slug: tag.slug,
+              editorsCount: tag._count.editors
             }))}
             studios={studios.map((studio) => ({
               id: studio.id,
               name: studio.name,
               city: studio.city,
-              email: studio.owner.email,
               status: mapProfileStatus(studio.status),
               hallsCount: studio.halls.length,
               bookingsCount: studio.bookings.length
@@ -148,7 +174,6 @@ export default async function AdminPage() {
             notificationLogs={notificationLogs.map((notification) => ({
               id: notification.id,
               userName: notification.user.name,
-              userEmail: notification.user.email,
               type: notification.type,
               title: notification.title,
               isRead: notification.isRead,
@@ -170,17 +195,12 @@ export default async function AdminPage() {
                 Platform revenue
               </CardTitle>
             </CardHeader>
-            <CardContent className="grid gap-3 text-sm md:grid-cols-2 lg:grid-cols-5">
+            <CardContent className="grid gap-3 text-sm md:grid-cols-3">
               <RevenueItem label="GMV" value={formatPrice(stats.gmv)} />
-              <RevenueItem
-                label="Photographer commission"
-                value={formatPrice(photographerCommission)}
-              />
-              <RevenueItem label="Studio commission" value={formatPrice(studioCommission)} />
               <RevenueItem label="Service fee" value={formatPrice(stats.serviceFee)} />
               <RevenueItem
                 label="Estimated platform revenue"
-                value={formatPrice(platformRevenue)}
+                value={formatPrice(stats.platformRevenue)}
                 strong
               />
             </CardContent>
@@ -189,6 +209,10 @@ export default async function AdminPage() {
       </section>
     </>
   );
+}
+
+function formatPrice(amount: number) {
+  return `${amount.toLocaleString("ru-RU")} ₸`;
 }
 
 function mapProfileStatus(status: string): "Draft" | "Published" | "Blocked" {

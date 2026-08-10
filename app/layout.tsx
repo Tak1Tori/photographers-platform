@@ -1,15 +1,16 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Manrope } from "next/font/google";
 import "./globals.css";
 import { CursorGlow } from "@/components/layout/cursor-glow";
+import { CookieConsentBanner } from "@/components/layout/cookie-consent-banner";
 import { Footer } from "@/components/layout/footer";
 import { Header } from "@/components/layout/header";
 
-const inter = Inter({ subsets: ["latin", "cyrillic"] });
+const manrope = Manrope({ subsets: ["latin", "cyrillic"] });
 
 export const metadata: Metadata = {
   title: "Framely | Бронирование фотосессий",
-  description: "Marketplace для подбора стиля, фотографа, студии и времени съемки."
+  description: "Marketplace для подбора фотографа и времени съемки."
 };
 
 export default function RootLayout({
@@ -18,14 +19,23 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ru">
-      <body className={inter.className}>
+    <html lang="ru" suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              'try{var theme=localStorage.getItem("framely-theme")==="light"?"light":"dark";document.documentElement.classList.toggle("light",theme==="light");document.documentElement.style.colorScheme=theme}catch(error){}'
+          }}
+        />
+      </head>
+      <body className={manrope.className}>
         <CursorGlow />
         <div className="relative z-10 flex min-h-screen flex-col">
           <Header />
           <main className="flex-1">{children}</main>
           <Footer />
         </div>
+        <CookieConsentBanner />
       </body>
     </html>
   );

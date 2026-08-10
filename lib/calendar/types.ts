@@ -1,4 +1,4 @@
-import type { CalendarEventSource, CalendarOwnerType } from "@prisma/client";
+import type { BookingStatus, CalendarEventSource, CalendarOwnerType } from "@prisma/client";
 
 export interface CalendarOwner {
   type: CalendarOwnerType;
@@ -46,6 +46,9 @@ export interface DashboardCalendarEvent extends TimeRange {
   source: CalendarEventSource | "ACTIVE_HOLD";
   title: string;
   privateNote?: string;
+  bookingNumber?: string;
+  bookingStatus?: BookingStatus;
+  rescheduleRequestedAt?: Date;
   canDelete: boolean;
 }
 

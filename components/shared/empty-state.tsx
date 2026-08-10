@@ -13,8 +13,8 @@ interface EmptyStateProps {
 export function EmptyState({
   title,
   description,
-  actionLabel = "Вернуться к выбору стиля",
-  actionHref = "/styles"
+  actionLabel = "Выбрать фотографа",
+  actionHref = "/photographers?mode=booking"
 }: EmptyStateProps) {
   return (
     <Card className="mx-auto max-w-2xl">

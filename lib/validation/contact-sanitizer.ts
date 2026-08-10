@@ -9,7 +9,7 @@ const contactPatterns = [
 ];
 
 export const CONTACT_INFO_ERROR =
-  "Контакты будут доступны после оплаты депозита. Уберите номер телефона, email, ссылку или username из описания.";
+  "Контакты будут доступны после оплаты сервисного сбора. Уберите номер телефона, ссылку или username из описания.";
 
 export function containsContactInfo(text: string): boolean {
   const normalized = text.trim();

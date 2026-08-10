@@ -1,19 +1,16 @@
 import { Suspense } from "react";
 import { SignInForm } from "@/components/auth/sign-in-form";
 import { PageHeader } from "@/components/shared/page-header";
+import { isTelegramLoginEnabled } from "@/lib/telegram-login";
 
 export default function SignInPage() {
   return (
     <>
-      <PageHeader
-        eyebrow="Auth"
-        title="Войти в аккаунт"
-        description="Используйте email и пароль, чтобы открыть свой кабинет."
-      />
+      <PageHeader title="Войти в аккаунт" />
       <section className="section">
         <div className="container">
           <Suspense fallback={<SignInFormPlaceholder />}>
-            <SignInForm />
+            <SignInForm telegramEnabled={isTelegramLoginEnabled()} />
           </Suspense>
         </div>
       </section>

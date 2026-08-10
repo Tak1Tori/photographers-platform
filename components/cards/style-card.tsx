@@ -36,7 +36,7 @@ export function StyleCard({
           <Button asChild size="sm">
             <Link href={selectionHref ?? `/photographers?style=${style.id}`}>
               {ctaLabel}
-              <ArrowRight className="size-4" aria-hidden="true" />
+              {/* <ArrowRight className="size-4" aria-hidden="true" /> */}
             </Link>
           </Button>
         </div>

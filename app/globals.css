@@ -22,19 +22,425 @@
     --radius: 0.5rem;
   }
 
+  :root.light {
+    --background: 37.5 47.0588% 93.3333%;
+    --foreground: 102 20% 19.6078%;
+    --card: 38 47% 97%;
+    --card-foreground: 102 20% 19.6078%;
+    --primary: 102 20% 19.6078%;
+    --primary-foreground: 37.5 47.0588% 93.3333%;
+    --secondary: 36 23% 83%;
+    --secondary-foreground: 102 20% 19.6078%;
+    --muted: 36 27% 88%;
+    --muted-foreground: 102 10% 34%;
+    --accent: 36 23% 83%;
+    --accent-foreground: 102 20% 19.6078%;
+    --border: 36 23% 77%;
+    --input: 36 23% 77%;
+    --ring: 102 20% 20%;
+  }
+
+  /* Keep affirmative states anchored to the light theme's forest green. */
+  :root.light [class~="text-emerald-200"],
+  :root.light [class~="text-emerald-300"],
+  :root.light [class~="text-emerald-800"],
+  :root.light [class~="text-lime-200"],
+  :root.light [class~="text-lime-300"],
+  :root.light [class~="text-lime-800"],
+  :root.light [class~="text-green-200"],
+  :root.light [class~="text-green-300"],
+  :root.light [class~="text-green-800"] {
+    color: #2e3c28;
+  }
+
+  :root.light [class~="text-amber-200"] {
+    color: #7a4b0a;
+  }
+
+  :root.light [class~="text-sky-200"] {
+    color: #155e75;
+  }
+
+  :root.light [class~="text-rose-200"] {
+    color: #9f1239;
+  }
+
+  :root.light [class~="text-teal-200"] {
+    color: #115e59;
+  }
+
+  :root.light [class~="fill-emerald-300"],
+  :root.light [class~="fill-lime-300"],
+  :root.light [class~="fill-green-300"] {
+    fill: #2e3c28;
+  }
+
+  :root.light [class~="border-emerald-500/30"],
+  :root.light [class~="border-lime-500/30"],
+  :root.light [class~="border-green-500/30"] {
+    border-color: rgb(46 60 40 / 0.42);
+  }
+
+  :root.light [class~="border-emerald-500/25"],
+  :root.light [class~="border-lime-500/25"],
+  :root.light [class~="border-green-500/25"] {
+    border-color: rgb(46 60 40 / 0.34);
+  }
+
+  :root.light [class~="border-emerald-300"],
+  :root.light [class~="border-lime-300"],
+  :root.light [class~="border-green-300"] {
+    border-color: rgb(46 60 40 / 0.52);
+  }
+
+  :root.light [class~="bg-emerald-500"],
+  :root.light [class~="bg-emerald-700"],
+  :root.light [class~="bg-lime-500"],
+  :root.light [class~="bg-green-500"] {
+    background-color: #2e3c28;
+  }
+
+  :root.light [class~="bg-emerald-500/15"],
+  :root.light [class~="bg-lime-500/15"],
+  :root.light [class~="bg-green-500/15"],
+  :root.light [class~="bg-emerald-100"],
+  :root.light [class~="bg-lime-100"],
+  :root.light [class~="bg-green-100"] {
+    background-color: rgb(46 60 40 / 0.12);
+  }
+
+  :root.light [class~="bg-emerald-500/10"],
+  :root.light [class~="bg-lime-500/10"],
+  :root.light [class~="bg-green-500/10"] {
+    background-color: rgb(46 60 40 / 0.1);
+  }
+
+  :root.light [class~="bg-emerald-500/5"],
+  :root.light [class~="bg-lime-500/5"],
+  :root.light [class~="bg-green-500/5"],
+  :root.light [class~="bg-emerald-500/[0.04]"] {
+    background-color: rgb(46 60 40 / 0.055);
+  }
+
+  :root.light .hover\:text-emerald-300:hover,
+  :root.light .hover\:text-lime-300:hover,
+  :root.light .hover\:text-green-300:hover {
+    color: #2e3c28;
+  }
+
+  :root.light .hover\:border-emerald-300:hover,
+  :root.light .hover\:border-lime-300:hover,
+  :root.light .hover\:border-green-300:hover {
+    border-color: #2e3c28;
+  }
+
   * {
     @apply border-border;
   }
 
   body {
     @apply bg-background text-foreground antialiased;
+    font-feature-settings: "ss01", "cv02", "cv03";
     background:
       radial-gradient(circle at top left, hsl(151 55% 13% / 0.55), transparent 34rem),
       linear-gradient(180deg, hsl(var(--background)), hsl(150 18% 3%));
   }
 
+  :root.light body {
+    background:
+      radial-gradient(ellipse 58rem 34rem at -10% -12%, hsl(102 20% 19.6078% / 0.1), transparent 68%),
+      radial-gradient(ellipse 44rem 30rem at 108% 24%, hsl(36 23% 83% / 0.72), transparent 70%),
+      hsl(var(--background));
+  }
+
+  :root.light .photographer-profile-hero {
+    --foreground: 37.5 47.0588% 93.3333%;
+    --muted-foreground: 36 23% 83%;
+    --secondary: 36 23% 83%;
+    --secondary-foreground: 102 20% 19.6078%;
+    --border: 36 23% 62%;
+    background: #2e3c28;
+    color: hsl(var(--foreground));
+  }
+
+  @media (min-width: 768px) {
+    :root.light .desktop-header-capsule {
+      border-color: rgb(246 240 230 / 0.36);
+      background: #2e3c28;
+      color: #f6f0e6;
+      box-shadow: 0 1.25rem 3rem rgb(27 38 23 / 0.2);
+    }
+
+    :root.light .desktop-header-capsule .brand-logo-light {
+      display: none;
+    }
+
+    :root.light .desktop-header-capsule .brand-logo-dark {
+      display: block;
+    }
+
+    :root.light .desktop-header-capsule [class~="text-muted-foreground"] {
+      color: rgb(246 240 230 / 0.72);
+    }
+
+    :root.light .desktop-header-capsule [class~="text-foreground"] {
+      color: #f6f0e6;
+    }
+
+    :root.light .desktop-header-capsule nav a:hover {
+      color: #f6f0e6;
+    }
+
+    :root.light .desktop-header-capsule nav a::after {
+      background-color: #f6f0e6;
+      box-shadow: 0 0 0.75rem rgb(246 240 230 / 0.7);
+    }
+
+    :root.light .desktop-header-capsule [class~="bg-secondary"] {
+      background-color: rgb(246 240 230 / 0.12);
+    }
+
+    :root.light .desktop-header-capsule [class~="bg-background"] {
+      border-color: rgb(246 240 230 / 0.42);
+      background-color: transparent;
+      color: #f6f0e6;
+    }
+
+    :root.light .desktop-header-capsule [class~="border-border"] {
+      border-color: rgb(246 240 230 / 0.32);
+    }
+  }
+
+  :root.light .photographer-profile-hero .photographer-booking-button {
+    border-color: hsl(var(--background));
+    background: hsl(var(--background));
+    color: #2e3c28;
+    box-shadow: 0 0.6rem 1.4rem rgb(12 20 10 / 0.16);
+  }
+
+  :root.light .photographer-profile-hero .photographer-booking-button:hover {
+    border-color: #ddd5c9;
+    background: #ddd5c9;
+    color: #2e3c28;
+  }
+
+  :root.light .calendar-event {
+    font-weight: 600;
+  }
+
+  :root.light .calendar-event-platform {
+    border-color: rgb(46 60 40 / 0.58);
+    background-color: rgb(46 60 40 / 0.16);
+    color: #2e3c28;
+  }
+
+  :root.light .calendar-event-pending {
+    border-color: rgb(146 88 12 / 0.54);
+    background-color: rgb(217 151 39 / 0.16);
+    color: #70420a;
+  }
+
+  :root.light .calendar-event-manual {
+    border-color: rgb(29 78 216 / 0.5);
+    background-color: rgb(59 130 246 / 0.14);
+    color: #1e3a8a;
+  }
+
+  :root.light .calendar-event-import {
+    border-color: rgb(13 116 143 / 0.5);
+    background-color: rgb(6 182 212 / 0.14);
+    color: #155e75;
+  }
+
+  :root.light .calendar-event-other {
+    border-color: rgb(3 105 161 / 0.5);
+    background-color: rgb(14 165 233 / 0.14);
+    color: #075985;
+  }
+
   ::selection {
     @apply bg-accent text-accent-foreground;
+  }
+
+  .brand-logo-light {
+    display: none;
+  }
+
+  .brand-logo-dark {
+    filter: grayscale(1) brightness(0) invert(1);
+    opacity: 0.9;
+  }
+
+  :root.light .brand-logo-light {
+    display: block;
+  }
+
+  :root.light .brand-logo-dark {
+    display: none;
+  }
+
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+}
+
+@layer components {
+  .theme-pull-toggle {
+    position: relative;
+    display: flex;
+    width: 2.5rem;
+    min-height: 0;
+    flex: 0 0 auto;
+    align-self: stretch;
+    align-items: stretch;
+    justify-content: center;
+    overflow: visible;
+    color: hsl(var(--muted-foreground));
+  }
+
+  .theme-pull-cord {
+    position: absolute;
+    top: calc(100% - 1px);
+    right: 0;
+    left: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    transform-origin: top center;
+  }
+
+  .theme-pull-string {
+    display: block;
+    width: 1px;
+    height: 1.75rem;
+    background: linear-gradient(180deg, hsl(var(--border)), hsl(var(--muted-foreground) / 0.8));
+    box-shadow: 0 0 0.5rem hsl(var(--primary) / 0.2);
+  }
+
+  .theme-pull-knob {
+    display: grid;
+    width: 2rem;
+    height: 2rem;
+    place-items: center;
+    border: 1px solid hsl(var(--border));
+    border-radius: 9999px;
+    background: hsl(var(--card));
+    box-shadow: 0 0.35rem 0.8rem hsl(150 35% 3% / 0.16);
+    transition: border-color 180ms ease, color 180ms ease, box-shadow 180ms ease;
+  }
+
+  .theme-pull-toggle:hover .theme-pull-knob {
+    border-color: hsl(var(--primary) / 0.66);
+    color: hsl(var(--primary));
+  }
+
+  .theme-pull-cord.is-pulling {
+    animation: theme-pull-cord 760ms cubic-bezier(0.22, 1.22, 0.4, 1);
+  }
+
+  .theme-pull-cord.is-pulling .theme-pull-knob {
+    box-shadow: 0 0.5rem 1rem hsl(var(--primary) / 0.24);
+  }
+
+  .theme-blackout {
+    position: fixed;
+    z-index: 9999;
+    inset: 0;
+    pointer-events: all;
+    background: #000;
+  }
+
+  .theme-blackout.is-covering {
+    animation: theme-blackout-in 420ms cubic-bezier(0.45, 0, 0.55, 1) forwards;
+  }
+
+  .theme-blackout.is-revealing {
+    animation: theme-blackout-out 720ms cubic-bezier(0.16, 0.84, 0.28, 1) forwards;
+  }
+
+  @media (max-width: 767px) {
+    .mobile-theme-toggle {
+      position: relative;
+      align-self: stretch;
+      width: 2.25rem;
+      flex: 0 0 auto;
+    }
+
+    .mobile-theme-toggle .theme-pull-toggle {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+    }
+
+    .mobile-theme-toggle .theme-pull-cord {
+      top: 0;
+    }
+
+    .theme-pull-toggle {
+      width: 2.25rem;
+    }
+
+    .theme-pull-string {
+      height: 1.6rem;
+    }
+
+    .theme-pull-knob {
+      width: 1.8rem;
+      height: 1.8rem;
+    }
+  }
+}
+
+@keyframes theme-pull-cord {
+  0% {
+    transform: translateY(0) rotate(0);
+  }
+
+  28% {
+    transform: translateY(0.6rem) rotate(-6deg);
+  }
+
+  50% {
+    transform: translateY(0.2rem) rotate(5deg);
+  }
+
+  72% {
+    transform: translateY(0.35rem) rotate(-2deg);
+  }
+
+  100% {
+    transform: translateY(0) rotate(0);
+  }
+}
+
+@keyframes theme-blackout-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes theme-blackout-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .theme-pull-cord.is-pulling {
+    animation: none;
+  }
+
+  .theme-blackout {
+    animation: none;
+    opacity: 0;
   }
 }
 
@@ -45,65 +451,379 @@
 
   .hero-light-on {
     isolation: isolate;
+    contain: paint;
+  }
+
+  .hero-dot-scene {
+    background: hsl(150 16% 5%);
+  }
+
+  :root.light .hero-dot-scene {
+    background: hsl(var(--background));
+  }
+
+  .hero-dot-field {
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    grid-template-rows: repeat(7, minmax(0, 1fr));
+    padding: 2.5rem 3.75vw;
+  }
+
+  .hero-dot {
+    --dot-scale: 1;
+    --dot-opacity: 1;
+    --dot-lightness: 91%;
+    width: 0.38rem;
+    height: 0.38rem;
+    align-self: center;
+    justify-self: center;
+    border-radius: 9999px;
+    background: hsl(0 0% var(--dot-lightness));
+    box-shadow: 0 0 1rem hsl(0 0% var(--dot-lightness) / 0.2);
+    opacity: calc(var(--dot-opacity) * 0.62);
+    transform: scale(var(--dot-scale));
+    transition: transform 180ms ease-out, opacity 180ms ease-out, background-color 120ms ease-out, box-shadow 120ms ease-out;
+    will-change: transform;
+  }
+
+  :root.light .hero-dot {
+    background: hsl(var(--primary));
+    box-shadow: 0 0 1.15rem hsl(102 20% 19.6078% / 0.13);
+    opacity: calc(var(--dot-opacity) * 0.76);
+  }
+
+  :root.light .hero-dot-field {
+    filter: blur(1px);
+    transform: scale(1.015);
+  }
+
+  .hero-light-wall {
+    background:
+      linear-gradient(180deg, hsl(150 15% 7% / 0.9), hsl(150 18% 3% / 0.96) 70%),
+      radial-gradient(ellipse at 50% 2%, hsl(151 56% 21% / 0.34), transparent 42rem);
   }
 
   .hero-light-wash {
     opacity: 0;
-    transform: scale(0.86);
-    transform-origin: 50% 12%;
-    animation: hero-light-wash 1450ms cubic-bezier(0.2, 0.75, 0.2, 1) 120ms both;
+    animation: hero-spotlight-on 1180ms cubic-bezier(0.2, 0.75, 0.2, 1) 180ms both;
   }
 
-  .hero-light-flash {
-    z-index: 10;
-    opacity: 0;
-    background:
-      radial-gradient(
-        ellipse at 50% 8%,
-        hsl(150 70% 88% / 0.24) 0%,
-        hsl(151 68% 42% / 0.16) 20%,
-        transparent 58%
-      );
-    mix-blend-mode: screen;
-    animation: hero-light-flash 1080ms ease-out 100ms both;
+  .hero-light-wash-left {
+    transform-origin: 40% 36%;
+    background: radial-gradient(
+      ellipse 34rem 23rem at 40% 38%,
+      hsl(151 94% 72% / 0.16) 0%,
+      hsl(151 76% 46% / 0.1) 38%,
+      hsl(151 62% 24% / 0.045) 66%,
+      transparent 86%
+    );
+    filter: blur(12px);
+  }
+
+  .hero-light-wash-right {
+    transform-origin: 58% 56%;
+    animation-delay: 280ms;
+    animation-duration: 1280ms;
+    background: radial-gradient(
+      ellipse 40rem 28rem at 59% 60%,
+      hsl(151 92% 70% / 0.15) 0%,
+      hsl(151 75% 45% / 0.1) 40%,
+      hsl(151 58% 22% / 0.05) 68%,
+      transparent 88%
+    );
+    filter: blur(14px);
+  }
+
+  .hero-stage-blackout {
+    z-index: 30;
+    background: hsl(150 25% 2% / 0.92);
+    animation: hero-stage-blackout 1450ms ease-out 80ms both;
   }
 
   .hero-light-base {
     opacity: 0;
-    animation: hero-light-base 1100ms ease-out 360ms both;
+    animation: hero-light-base 900ms ease-out 820ms both;
   }
 
   .hero-light-line {
     opacity: 0;
     transform: scaleX(0.08);
-    animation: hero-light-line 900ms cubic-bezier(0.2, 0.8, 0.2, 1) 360ms both;
+    animation: hero-light-line 900ms cubic-bezier(0.2, 0.8, 0.2, 1) 980ms both;
+  }
+
+  .hero-stage-lights {
+    opacity: 0;
+    animation: hero-stage-lights-on 1250ms cubic-bezier(0.2, 0.72, 0.2, 1) 120ms both;
+  }
+
+  .hero-stage-light {
+    position: absolute;
+    bottom: -1.75rem;
+    width: 16rem;
+    height: 27rem;
+    color: hsl(150 18% 2%);
+  }
+
+  .hero-stage-light::before {
+    content: "";
+    position: absolute;
+    top: -10rem;
+    width: 38rem;
+    height: 30rem;
+    background: radial-gradient(
+      ellipse at center,
+      hsl(151 95% 70% / 0.11) 0%,
+      hsl(151 78% 42% / 0.075) 42%,
+      hsl(151 70% 30% / 0.03) 72%,
+      transparent 90%
+    );
+    opacity: 0;
+    filter: blur(14px);
+    animation: hero-stage-beam-on 1050ms ease-out 240ms both;
+  }
+
+  .hero-stage-light-left {
+    left: max(1.25rem, calc((100vw - 82rem) / 2));
+    transform: scale(0.9);
+  }
+
+  .hero-stage-light-left::before {
+    left: 4.5rem;
+    transform: rotate(-12deg);
+  }
+
+  .hero-stage-light-right {
+    right: max(1.25rem, calc((100vw - 82rem) / 2));
+    transform: scale(1.08);
+  }
+
+  .hero-stage-light-right::before {
+    right: 4rem;
+    transform: rotate(12deg);
+    animation-delay: 340ms;
+    animation-duration: 1150ms;
+  }
+
+  .hero-stage-lamp {
+    position: absolute;
+    top: 1.3rem;
+    left: 5.1rem;
+    width: 5.6rem;
+    height: 4.15rem;
+    transform: rotate(-10deg);
+  }
+
+  .hero-stage-light-right .hero-stage-lamp {
+    left: 4.6rem;
+    transform: rotate(12deg) scaleX(-1);
+  }
+
+  .hero-stage-lamp-core {
+    position: absolute;
+    inset: 0.55rem 0.3rem;
+    border-radius: 48% 38% 42% 50%;
+    opacity: 0;
+    background:
+      linear-gradient(135deg, hsl(214 32% 16%), hsl(150 16% 3%) 54%),
+      hsl(150 18% 3%);
+    border: 1px solid hsl(150 12% 28% / 0.52);
+    box-shadow:
+      inset 0.35rem 0.1rem 0.95rem hsl(200 70% 70% / 0.12),
+      inset -0.7rem -0.1rem 0.75rem hsl(150 70% 1% / 0.92),
+      0 0 1.2rem hsl(151 90% 62% / 0.11);
+    animation: hero-lamp-core-on 1280ms ease-out 140ms both;
+  }
+
+  .hero-stage-lamp-core::before,
+  .hero-stage-lamp-core::after {
+    content: "";
+    position: absolute;
+    left: 0.8rem;
+    right: 1rem;
+    height: 0.14rem;
+    border-radius: 999px;
+    background: hsl(160 50% 92% / 0.64);
+    box-shadow: 0 0 0.45rem hsl(170 80% 80% / 0.35);
+  }
+
+  .hero-stage-lamp-core::before {
+    top: 0.85rem;
+  }
+
+  .hero-stage-lamp-core::after {
+    top: 1.45rem;
+    right: 1.35rem;
+  }
+
+  .hero-stage-lamp-door {
+    position: absolute;
+    right: -1rem;
+    width: 1.9rem;
+    height: 2rem;
+    background: hsl(150 18% 2%);
+    border-radius: 0.14rem;
+    box-shadow: inset 0 0 0 1px hsl(150 10% 18% / 0.7);
+  }
+
+  .hero-stage-lamp-door-top {
+    top: 0.1rem;
+    transform: rotate(-22deg);
+    transform-origin: left bottom;
+  }
+
+  .hero-stage-lamp-door-bottom {
+    bottom: 0.1rem;
+    transform: rotate(24deg);
+    transform-origin: left top;
+  }
+
+  .hero-stage-neck {
+    position: absolute;
+    top: 5.15rem;
+    left: 7.75rem;
+    width: 0.5rem;
+    height: 1.6rem;
+    border-radius: 999px;
+    background: hsl(150 12% 4%);
+  }
+
+  .hero-stage-stand {
+    position: absolute;
+    top: 6.35rem;
+    left: 7.98rem;
+    width: 0.32rem;
+    height: 17.6rem;
+    border-radius: 999px;
+    background: linear-gradient(90deg, hsl(150 18% 1%), hsl(150 12% 12%), hsl(150 18% 1%));
+  }
+
+  .hero-stage-tripod {
+    position: absolute;
+    bottom: 1.7rem;
+    left: 8.04rem;
+    width: 0.25rem;
+    height: 7.2rem;
+    border-radius: 999px;
+    background: hsl(150 18% 1%);
+    transform-origin: top center;
+  }
+
+  .hero-stage-tripod-left {
+    transform: rotate(48deg);
+  }
+
+  .hero-stage-tripod-right {
+    transform: rotate(-47deg);
+  }
+
+  .hero-stage-cable {
+    position: absolute;
+    bottom: 0.4rem;
+    left: 5.7rem;
+    width: 7.8rem;
+    height: 2.8rem;
+    border-bottom: 0.2rem solid hsl(150 18% 1%);
+    border-radius: 0 0 50% 50%;
+    transform: rotate(12deg);
+    opacity: 0.72;
+  }
+
+  .hero-mobile-lights {
+    opacity: 0;
+    animation: hero-stage-lights-on 1050ms cubic-bezier(0.2, 0.72, 0.2, 1) 80ms both;
+  }
+
+  .hero-mobile-light {
+    position: absolute;
+    top: -2.05rem;
+    width: 8.5rem;
+    height: 8.5rem;
+    color: hsl(150 18% 2%);
+  }
+
+  .hero-mobile-light::before {
+    content: "";
+    position: absolute;
+    top: 1.55rem;
+    width: 25rem;
+    height: 42rem;
+    background: radial-gradient(
+      ellipse at center,
+      hsl(151 95% 72% / 0.12) 0%,
+      hsl(151 72% 40% / 0.075) 42%,
+      hsl(151 56% 22% / 0.038) 70%,
+      transparent 90%
+    );
+    opacity: 0;
+    filter: blur(18px);
+    animation: hero-stage-beam-on 980ms ease-out 190ms both;
+  }
+
+  .hero-mobile-light-left {
+    left: -1.85rem;
+    transform: rotate(-8deg) scale(0.72);
+  }
+
+  .hero-mobile-light-left::before {
+    left: 3.2rem;
+    transform: rotate(10deg);
+    transform-origin: top left;
+  }
+
+  .hero-mobile-light-right {
+    right: -1.85rem;
+    transform: rotate(8deg) scale(0.72);
+  }
+
+  .hero-mobile-light-right::before {
+    right: 3.2rem;
+    transform: rotate(-10deg);
+    transform-origin: top right;
+    animation-delay: 260ms;
+  }
+
+  .hero-mobile-light .hero-stage-lamp {
+    top: 0;
+    left: 1.45rem;
+    transform: rotate(34deg) scale(0.88);
+  }
+
+  .hero-mobile-light-right .hero-stage-lamp {
+    left: 1.15rem;
+    transform: rotate(-34deg) scaleX(-1) scale(0.88);
+  }
+
+  .hero-mobile-light .hero-stage-lamp-core {
+    box-shadow:
+      inset 0.35rem 0.1rem 0.95rem hsl(200 70% 70% / 0.11),
+      inset -0.7rem -0.1rem 0.75rem hsl(150 70% 1% / 0.92),
+      0 0 1rem hsl(151 90% 62% / 0.12);
   }
 
   .hero-light-item {
     opacity: 0;
     transform: translateY(18px);
-    filter: blur(8px);
-    animation: hero-light-content 760ms cubic-bezier(0.2, 0.75, 0.2, 1) both;
+    animation: hero-light-content 820ms cubic-bezier(0.2, 0.75, 0.2, 1) both;
   }
 
   .hero-light-item-1 {
-    animation-delay: 480ms;
+    animation-delay: 140ms;
   }
 
   .hero-light-item-2 {
-    animation-delay: 570ms;
+    animation-delay: 220ms;
   }
 
   .hero-light-item-3 {
-    animation-delay: 660ms;
+    animation-delay: 300ms;
   }
 
   .hero-light-item-4 {
-    animation-delay: 750ms;
+    animation-delay: 1510ms;
   }
 
   .hero-light-item-5 {
-    animation-delay: 840ms;
+    animation-delay: 1620ms;
   }
 
   .cursor-glow {
@@ -133,6 +853,10 @@
 
   .cursor-glow[data-visible="true"] {
     opacity: 1;
+  }
+
+  :root.light .cursor-glow {
+    display: none;
   }
 
   .cursor-filter-definitions {
@@ -202,63 +926,179 @@
     }
   }
 
+  @media (max-width: 639px) {
+    .hero-dot-field {
+      padding: 1.5rem 0.75rem;
+    }
+
+    .hero-dot {
+      width: 0.3rem;
+      height: 0.3rem;
+    }
+
+    .hero-dot[data-mobile-visible="false"] {
+      display: none;
+    }
+
+    .hero-dot[data-mobile-visible="true"] {
+      animation: hero-dot-idle-pulse 3.8s ease-in-out infinite;
+      transform: scale(1);
+    }
+
+    .hero-dot-pulse-1 {
+      animation-delay: -1.1s !important;
+      animation-duration: 4.6s !important;
+    }
+
+    .hero-dot-pulse-2 {
+      animation-delay: -2.4s !important;
+      animation-duration: 3.3s !important;
+    }
+
+    .hero-dot-pulse-3 {
+      animation-delay: -0.5s !important;
+      animation-duration: 5.2s !important;
+    }
+  }
+
   @media (prefers-reduced-motion: reduce) {
+    .hero-dot {
+      transition: none;
+      animation: none;
+    }
+
     .hero-light-wash,
-    .hero-light-flash,
+    .hero-stage-blackout,
     .hero-light-base,
     .hero-light-line,
+    .hero-stage-lights,
+    .hero-stage-light::before,
+    .hero-stage-lamp-core,
     .hero-light-item {
       animation: none;
       opacity: 1;
-      transform: none;
       filter: none;
     }
+
+    .hero-stage-blackout {
+      display: none;
+    }
+
+    .hero-light-wash,
+    .hero-light-base,
+    .hero-light-line,
+    .hero-light-item {
+      transform: none;
+    }
+
   }
 }
 
-@keyframes hero-light-flash {
+@keyframes hero-dot-idle-pulse {
   0%,
-  8% {
-    opacity: 0;
+  100% {
+    opacity: 0.58;
+    transform: scale(1);
   }
-  10% {
-    opacity: 0.7;
+
+  48% {
+    opacity: 0.95;
+    transform: scale(2.15);
   }
-  14% {
-    opacity: 0.06;
+}
+
+@keyframes hero-stage-blackout {
+  0%,
+  16% {
+    opacity: 1;
   }
-  20% {
-    opacity: 0.42;
+  24% {
+    opacity: 0.62;
   }
-  28% {
-    opacity: 0.12;
+  31% {
+    opacity: 0.9;
   }
-  38% {
-    opacity: 0.3;
+  48% {
+    opacity: 0.2;
   }
   100% {
     opacity: 0;
   }
 }
 
-@keyframes hero-light-wash {
+@keyframes hero-spotlight-on {
   0%,
-  16% {
+  18% {
     opacity: 0;
-    transform: scale(0.86);
+    transform: scale(0.9);
   }
-  20% {
-    opacity: 0.3;
+  24% {
+    opacity: 0.48;
   }
-  27% {
+  30% {
     opacity: 0.08;
   }
-  36% {
-    opacity: 0.65;
+  44% {
+    opacity: 0.78;
   }
   100% {
     opacity: 1;
     transform: scale(1);
+  }
+}
+
+@keyframes hero-stage-lights-on {
+  0%,
+  14% {
+    opacity: 0;
+    transform: translateY(1.2rem);
+  }
+  22% {
+    opacity: 0.58;
+  }
+  29% {
+    opacity: 0.18;
+  }
+  47% {
+    opacity: 0.9;
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes hero-stage-beam-on {
+  0%,
+  15% {
+    opacity: 0;
+  }
+  23% {
+    opacity: 0.42;
+  }
+  30% {
+    opacity: 0.07;
+  }
+  48%,
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes hero-lamp-core-on {
+  0%,
+  12% {
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  29% {
+    opacity: 0.42;
+  }
+  48%,
+  100% {
+    opacity: 1;
   }
 }
 
@@ -286,11 +1126,9 @@
   from {
     opacity: 0;
     transform: translateY(18px);
-    filter: blur(8px);
   }
   to {
     opacity: 1;
     transform: translateY(0);
-    filter: blur(0);
   }
 }

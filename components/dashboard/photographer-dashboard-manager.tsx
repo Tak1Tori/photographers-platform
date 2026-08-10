@@ -1,23 +1,34 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { Fragment, useState, useTransition } from "react";
-import { CalendarDays, Images, Plus, Save, Trash2, UserRound, X } from "lucide-react";
 import {
-  createPhotographerAvailabilitySlotAction,
+  AlertTriangle,
+  CalendarDays,
+  Check,
+  ExternalLink,
+  Images,
+  Link as LinkIcon,
+  Plus,
+  Save,
+  Trash2,
+  UserRound,
+  X
+} from "lucide-react";
+import {
   createCustomPhotographerStyleAction,
-  deleteAvailabilitySlotAction,
   deletePortfolioItemAction,
   requestPhotographerFinalPaymentAction,
+  resolvePhotographerRescheduleAction,
   savePhotographerPortfolioAction,
-  updateAvailabilitySlotAction,
   updatePhotographerBookingStatusAction,
   updatePhotographerProfileAction
 } from "@/app/dashboard/photographer/actions";
+import { CalendarDashboard, type CalendarDashboardProps } from "@/components/calendar/calendar-dashboard";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusBadge } from "@/components/dashboard/status-badge";
+import { SuccessToast } from "@/components/shared/success-toast";
 import {
   DashboardSectionTabs,
   type DashboardSectionTab
@@ -25,10 +36,15 @@ import {
 import { AlbumContentField } from "@/components/uploads/album-content-field";
 import { ImageUploadField } from "@/components/uploads/image-upload-field";
 import { EQUIPMENT_OPTIONS, LOCATION_TYPES, SHOOT_TYPES, getOptionLabel } from "@/lib/booking-options";
+import {
+  canClientBookingMoveToInProgress,
+  isClientBookingBeforeStart
+} from "@/lib/bookings/client-status";
 import { formatPrice } from "@/lib/mock-data";
+import { calculateProviderPayouts } from "@/lib/provider-payouts";
+import { cn } from "@/lib/utils";
 import type {
   Booking,
-  DashboardAvailabilitySlot,
   PhotographerProfile,
   PhotoStyle,
   PortfolioItem
@@ -38,9 +54,10 @@ interface PhotographerDashboardManagerProps {
   profile: PhotographerProfile;
   styles: PhotoStyle[];
   portfolioItems: PortfolioItem[];
-  slots: DashboardAvailabilitySlot[];
+  calendar: CalendarDashboardProps;
   bookings: Booking[];
   databaseReady: boolean;
+  initialSection?: PhotographerSection;
 }
 
 type ActionState = {
@@ -56,16 +73,19 @@ export function PhotographerDashboardManager({
   profile,
   styles,
   portfolioItems,
-  slots,
+  calendar,
   bookings,
-  databaseReady
+  databaseReady,
+  initialSection = "profile"
 }: PhotographerDashboardManagerProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [state, setState] = useState<ActionState>(null);
   const [showCustomStyle, setShowCustomStyle] = useState(false);
   const [customStyleName, setCustomStyleName] = useState("");
-  const [activeSection, setActiveSection] = useState<PhotographerSection>("profile");
+  const [activeSection, setActiveSection] = useState<PhotographerSection>(initialSection);
+  const [isPublicLinkCopied, setIsPublicLinkCopied] = useState(false);
+  const rescheduleRequestsCount = bookings.filter((booking) => booking.rescheduleRequestedAt).length;
   const sections: DashboardSectionTab<PhotographerSection>[] = [
     {
       id: "profile",
@@ -83,16 +103,17 @@ export function PhotographerDashboardManager({
     {
       id: "schedule",
       label: "Расписание",
-      description: "Свободные даты",
+      description: "Календарь месяца",
       icon: CalendarDays,
-      count: slots.length
+      count: calendar.events.length
     },
     {
       id: "bookings",
       label: "Брони",
-      description: "Заявки и оплата",
+      description: rescheduleRequestsCount > 0 ? "Есть запросы на перенос" : "Заявки и оплата",
       icon: CalendarDays,
-      count: bookings.length
+      count: bookings.length,
+      attention: rescheduleRequestsCount > 0
     }
   ];
 
@@ -165,6 +186,27 @@ export function PhotographerDashboardManager({
     });
   }
 
+  async function copyPublicProfileLink() {
+    const publicProfileUrl = `${window.location.origin}/photographers/${profile.id}`;
+
+    try {
+      await navigator.clipboard.writeText(publicProfileUrl);
+    } catch {
+      const input = document.createElement("textarea");
+      input.value = publicProfileUrl;
+      input.setAttribute("readonly", "");
+      input.style.position = "fixed";
+      input.style.opacity = "0";
+      document.body.appendChild(input);
+      input.select();
+      document.execCommand("copy");
+      document.body.removeChild(input);
+    }
+
+    setIsPublicLinkCopied(true);
+    window.setTimeout(() => setIsPublicLinkCopied(false), 2400);
+  }
+
   return (
     <div className="grid gap-8">
       {!databaseReady ? (
@@ -181,14 +223,48 @@ export function PhotographerDashboardManager({
       />
 
       {activeSection === "profile" ? (
-      <Card>
+      <Card id="profile-editor" className="scroll-mt-24">
         <CardHeader>
           <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
             <CardTitle>Профиль фотографа</CardTitle>
-            <StatusBadge status={profile.status} />
+            <div className="flex flex-wrap items-center gap-2">
+              <StatusBadge status={profile.status} />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={profile.status !== "Published"}
+                onClick={copyPublicProfileLink}
+              >
+                {isPublicLinkCopied ? (
+                  <Check className="size-4" aria-hidden="true" />
+                ) : (
+                  <LinkIcon className="size-4" aria-hidden="true" />
+                )}
+                {isPublicLinkCopied ? "Ссылка скопирована" : "Поделиться профилем"}
+              </Button>
+              {profile.status === "Published" ? (
+                <Button type="button" variant="outline" size="sm" asChild>
+                  <a
+                    href={`/photographers/${profile.id}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label="Открыть публичный профиль"
+                    title="Открыть публичный профиль"
+                  >
+                    <ExternalLink className="size-4" aria-hidden="true" />
+                  </a>
+                </Button>
+              ) : null}
+            </div>
           </div>
         </CardHeader>
         <CardContent>
+          {profile.status !== "Published" ? (
+            <p className="mb-5 text-sm text-muted-foreground">
+              Опубликуйте профиль, чтобы клиент мог открыть ссылку без входа в аккаунт.
+            </p>
+          ) : null}
           <form action={run("profile", updatePhotographerProfileAction)} className="grid gap-6">
             <Message state={state} area="profile" />
             <div className="grid gap-4 rounded-lg border border-border p-4 md:grid-cols-[220px_1fr] md:items-start">
@@ -296,25 +372,18 @@ export function PhotographerDashboardManager({
             <div>
               <h4 className="text-lg font-semibold tracking-normal">Новый альбом</h4>
               <p className="mt-1 text-sm text-muted-foreground">
-                Добавьте обложку, название и материалы новой съемки.
+                Добавьте название и материалы новой съемки. Первую фотографию можно
+                кадрировать прямо на обложке.
               </p>
             </div>
             <Message state={state} area="portfolio" />
-            <div className="grid gap-4 md:grid-cols-[minmax(220px,360px)_1fr]">
-              <ImageUploadField
-                name="newPortfolioImage"
-                label="Добавить новую работу"
-                previewAlt="Предпросмотр новой работы"
-                maxSizeMb={25}
-              />
-              <div className="grid content-start gap-3">
-                <Field label="Название" name="newPortfolioTitle" />
-                <Field label="Описание" name="newPortfolioDescription" />
-                <AlbumContentField name="newAlbumImages" />
-                <p className="text-sm text-muted-foreground">
-                  Новая работа появится в портфолио после общего сохранения.
-                </p>
-              </div>
+            <div className="grid content-start gap-3">
+              <Field label="Название" name="newPortfolioTitle" />
+              <AlbumContentField name="newAlbumImages" />
+              <p className="text-sm text-muted-foreground">
+                Первая фотография станет обложкой альбома. Кадрирование доступно на
+                самой обложке.
+              </p>
             </div>
             <Button
               disabled={isPending || !databaseReady}
@@ -330,7 +399,7 @@ export function PhotographerDashboardManager({
               <div>
                 <h4 className="text-lg font-semibold tracking-normal">Существующие альбомы</h4>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Обновляйте обложки, описание и содержимое каждого альбома.
+                  Обновляйте обложки, названия и содержимое каждого альбома.
                 </p>
               </div>
               <span className="text-sm text-muted-foreground">
@@ -345,26 +414,20 @@ export function PhotographerDashboardManager({
                 {portfolioItems.map((item) => (
                   <div key={item.id} className="grid gap-3 rounded-lg border border-border p-4">
                     <input type="hidden" name="portfolioItemIds" value={item.id} />
-                    <ImageUploadField
-                      name={`portfolioImage:${item.id}`}
-                      label="Заменить изображение"
-                      currentUrl={item.imageUrl}
-                      previewAlt={item.title || "Portfolio item"}
-                      maxSizeMb={25}
-                    />
                     <Field
                       label="Название"
                       name={`portfolioTitle:${item.id}`}
                       defaultValue={item.title}
                     />
-                    <Field
-                      label="Описание"
-                      name={`portfolioDescription:${item.id}`}
-                      defaultValue={item.description}
-                    />
                     <AlbumContentField
                       name={`albumImages:${item.id}`}
                       existingImages={item.albumImages}
+                      initialCoverCrop={{
+                        x: item.coverCropX,
+                        y: item.coverCropY,
+                        width: item.coverCropWidth,
+                        height: item.coverCropHeight
+                      }}
                     />
                     <Button
                       disabled={isPending || !databaseReady}
@@ -400,80 +463,10 @@ export function PhotographerDashboardManager({
       ) : null}
 
       {activeSection === "schedule" ? (
-      <Card>
-        <CardHeader>
-          <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-            <div>
-              <CardTitle>Календарь доступности</CardTitle>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Smart Calendar управляет рабочими часами, занятостью и бронями.
-              </p>
-            </div>
-            <Button asChild>
-              <Link href="/dashboard/photographer/calendar">
-                <CalendarDays className="size-4" />
-                Открыть Smart Calendar
-              </Link>
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent className="grid gap-5">
-          <p className="text-sm font-medium text-muted-foreground">
-            Legacy slots: сохранены для совместимости и постепенно заменяются правилами календаря.
-          </p>
-          <form action={run("slots", createPhotographerAvailabilitySlotAction)} className="grid gap-3 rounded-lg border border-border p-4">
-            <Message state={state} area="slots" />
-            <div className="grid gap-3 md:grid-cols-4">
-              <Field label="Дата" name="date" type="date" />
-              <Field label="Начало" name="startTime" type="time" />
-              <Field label="Конец" name="endTime" type="time" />
-              <label className="flex items-end gap-2 pb-2 text-sm font-medium">
-                <input name="isAvailable" type="checkbox" defaultChecked />
-                Доступен
-              </label>
-            </div>
-            <Button disabled={isPending || !databaseReady} size="sm" className="w-fit">
-              <Plus className="size-4" aria-hidden="true" />
-              Add slot
-            </Button>
-          </form>
-          {slots.length === 0 ? (
-            <EmptyText text="Слотов пока нет." />
-          ) : (
-            <div className="grid gap-3">
-              {slots.map((slot) => (
-                <form key={slot.id} action={run(`slot-${slot.id}`, updateAvailabilitySlotAction)} className="grid gap-3 rounded-lg border border-border p-4 md:grid-cols-[1fr_1fr_1fr_auto] md:items-end">
-                  <input type="hidden" name="id" value={slot.id} />
-                  <Message state={state} area={`slot-${slot.id}`} />
-                  <Field label="Дата" name="date" type="date" defaultValue={slot.date} />
-                  <Field label="Начало" name="startTime" type="time" defaultValue={slot.startTime} />
-                  <Field label="Конец" name="endTime" type="time" defaultValue={slot.endTime} />
-                  <div className="flex flex-wrap gap-2">
-                    <label className="flex items-center gap-2 text-sm">
-                      <input name="isAvailable" type="checkbox" defaultChecked={slot.isAvailable} />
-                      On
-                    </label>
-                    <Button disabled={isPending || !databaseReady} size="sm" variant="outline">Save</Button>
-                    <Button
-                      disabled={isPending || !databaseReady}
-                      size="sm"
-                      variant="outline"
-                      type="button"
-                      onClick={() => {
-                        const data = new FormData();
-                        data.set("id", slot.id);
-                        run("slots", deleteAvailabilitySlotAction)(data);
-                      }}
-                    >
-                      Delete
-                    </Button>
-                  </div>
-                </form>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      <CalendarDashboard
+        {...calendar}
+        showBackLink={false}
+      />
       ) : null}
 
       {activeSection === "bookings" ? (
@@ -502,87 +495,325 @@ function BookingStatusTable({
   }
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-border bg-card">
-      <table className="w-full min-w-[760px] text-left text-sm">
-        <thead className="border-b border-border bg-secondary/60 text-muted-foreground">
-          <tr>
-            <th className="px-4 py-3 font-medium">Booking</th>
-            <th className="px-4 py-3 font-medium">Клиент</th>
-            <th className="px-4 py-3 font-medium">Дата</th>
-            <th className="px-4 py-3 font-medium">Тип</th>
-            <th className="px-4 py-3 font-medium">Суммы</th>
-            <th className="px-4 py-3 font-medium">Статус брони</th>
-            <th className="px-4 py-3 font-medium">Оплата</th>
-            <th className="px-4 py-3 font-medium">Действия</th>
-          </tr>
-        </thead>
-        <tbody>
-          {bookings.map((booking) => (
-            <Fragment key={booking.id}>
-            <tr className="border-b border-border last:border-0">
-              <td className="px-4 py-3 font-medium">{booking.id}</td>
-              <td className="px-4 py-3">
-                <div className="grid gap-1">
-                  <span>{booking.clientName}</span>
-                  {["DEPOSIT_PAID", "FINAL_PAYMENT_PENDING", "FULLY_PAID"].includes(
-                    booking.paymentStatus
-                  ) && ["Confirmed", "In progress", "Completed"].includes(booking.status) ? (
-                    <span className="text-xs text-muted-foreground">
-                      {booking.clientPhone || "-"} · {booking.clientEmail || "-"}
-                    </span>
-                  ) : (
-                    <span className="text-xs text-muted-foreground">Контакты после депозита</span>
-                  )}
-                </div>
-              </td>
-              <td className="px-4 py-3">{booking.date} · {booking.time}</td>
-              <td className="px-4 py-3"><StatusBadge status={booking.bookingType ?? "FULL_SHOOT"} /></td>
-              <td className="px-4 py-3">
-                <div className="grid gap-1">
-                  <span>Всего: {formatPrice(booking.totalAmount)}</span>
-                  <span className="text-muted-foreground">Депозит: {formatPrice(booking.depositAmount)}</span>
-                  <span className="text-muted-foreground">Оплачено: {formatPrice(booking.paidAmount)}</span>
-                  <span className="text-muted-foreground">Остаток: {formatPrice(booking.remainingAmount)}</span>
-                </div>
-              </td>
-              <td className="px-4 py-3"><StatusBadge status={booking.status} /></td>
-              <td className="px-4 py-3"><StatusBadge status={booking.paymentStatus} /></td>
-              <td className="px-4 py-3">
-                <StatusActions
-                  booking={booking}
-                  disabled={isPending || !databaseReady}
-                  onSubmit={run("booking", updatePhotographerBookingStatusAction)}
-                  onRequestFinal={run("booking", requestPhotographerFinalPaymentAction)}
-                />
-              </td>
+    <>
+      <div className="grid gap-3 md:hidden">
+        {bookings.map((booking) => (
+          <MobileBookingCard
+            key={booking.id}
+            booking={booking}
+            disabled={isPending || !databaseReady}
+            onSubmit={run("booking", updatePhotographerBookingStatusAction)}
+            onRequestFinal={run("booking", requestPhotographerFinalPaymentAction)}
+            onResolveReschedule={run("booking", resolvePhotographerRescheduleAction)}
+          />
+        ))}
+      </div>
+      <div className="hidden overflow-x-auto rounded-lg border border-border bg-card md:block">
+        <table className="w-full min-w-[760px] text-left text-sm">
+          <thead className="border-b border-border bg-secondary/60 text-muted-foreground">
+            <tr>
+              <th className="px-4 py-3 font-medium">Бронь</th>
+              <th className="px-4 py-3 font-medium">Клиент</th>
+              <th className="px-4 py-3 font-medium">Дата</th>
+              <th className="px-4 py-3 font-medium">Тип</th>
+              <th className="px-4 py-3 font-medium">Суммы</th>
+              <th className="px-4 py-3 font-medium">Статус брони</th>
+              <th className="px-4 py-3 font-medium">Оплата</th>
+              <th className="px-4 py-3 font-medium">Действия</th>
             </tr>
-            {booking.bookingType === "PHOTOGRAPHER_ONLY" ? (
-              <tr key={`${booking.id}-brief`} className="border-b border-border bg-secondary/30">
-                <td className="px-4 py-3" colSpan={8}>
-                  <details className="group">
-                    <summary className="cursor-pointer text-sm font-medium">View brief</summary>
-                    <div className="mt-3 grid gap-3 text-sm md:grid-cols-3">
-                      <BriefItem label="Тип" value={getOptionLabel(SHOOT_TYPES, booking.shootType)} />
-                      <BriefItem label="Локация" value={getOptionLabel(LOCATION_TYPES, booking.locationType)} />
-                      <BriefItem label="Город/район" value={[booking.city, booking.district].filter(Boolean).join(", ") || "-"} />
-                      <BriefItem label="Людей" value={booking.peopleCount ? String(booking.peopleCount) : "-"} />
-                      <BriefItem
-                        label="Оборудование"
-                        value={booking.equipmentNeeded?.map((item) => getOptionLabel(EQUIPMENT_OPTIONS, item)).join(", ") ?? "-"}
-                      />
-                      <BriefItem label="Описание" value={booking.shootDescription ?? "-"} />
-                      <BriefItem label="Адрес" value={booking.addressDetails ?? "-"} />
-                      <BriefItem label="Особые требования" value={booking.specialRequirements ?? "-"} />
-                    </div>
-                  </details>
+          </thead>
+          <tbody>
+            {bookings.map((booking, index) => (
+              <Fragment key={booking.id}>
+              {index > 0 ? (
+                <tr aria-hidden="true">
+                  <td className="h-3 bg-background p-0" colSpan={8} />
+                </tr>
+              ) : null}
+              <tr
+                className={cn(
+                  "border-b border-border bg-card",
+                  index % 2 === 1 && "bg-secondary/20",
+                  booking.rescheduleRequestedAt && "bg-amber-400/[0.04] ring-1 ring-inset ring-amber-400/20"
+                )}
+              >
+                <td className="px-4 py-3 font-medium">
+                  <div className="grid gap-2">
+                    <span>{booking.id}</span>
+                    {booking.rescheduleRequestedAt ? <RescheduleBadge /> : null}
+                  </div>
+                </td>
+                <td className="px-4 py-3">
+                  <div className="grid gap-1">
+                    <span>{booking.clientName}</span>
+                    {canShowClientContacts(booking) ? (
+                      <span className="text-xs text-muted-foreground">
+                        {booking.clientPhone || "-"}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">Контакты после сервисного сбора</span>
+                    )}
+                  </div>
+                </td>
+                <td className="px-4 py-3">{booking.date} · {booking.time}</td>
+                <td className="px-4 py-3"><StatusBadge status={booking.bookingType ?? "FULL_SHOOT"} /></td>
+                <td className="px-4 py-3">
+                  <BookingAmounts booking={booking} />
+                </td>
+                <td className="px-4 py-3"><StatusBadge status={booking.status} /></td>
+                <td className="px-4 py-3"><StatusBadge status={booking.paymentStatus} /></td>
+                <td className="px-4 py-3">
+                  <StatusActions
+                    booking={booking}
+                    disabled={isPending || !databaseReady}
+                    onSubmit={run("booking", updatePhotographerBookingStatusAction)}
+                    onRequestFinal={run("booking", requestPhotographerFinalPaymentAction)}
+                  />
                 </td>
               </tr>
+              {booking.rescheduleRequestedAt ? (
+                <tr className="border-b border-border bg-amber-400/[0.03]">
+                  <td className="px-4 py-3" colSpan={8}>
+                    <RescheduleDecisionPanel
+                      booking={booking}
+                      disabled={isPending || !databaseReady}
+                      onResolve={run("booking", resolvePhotographerRescheduleAction)}
+                    />
+                  </td>
+                </tr>
+              ) : null}
+              {booking.bookingType === "PHOTOGRAPHER_ONLY" ? (
+                <tr key={`${booking.id}-brief`} className="border-b border-border bg-secondary/35">
+                  <td className="px-4 py-3" colSpan={8}>
+                    <BookingBrief booking={booking} />
+                  </td>
+                </tr>
+              ) : null}
+              </Fragment>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
+  );
+}
+
+function MobileBookingCard({
+  booking,
+  disabled,
+  onSubmit,
+  onRequestFinal,
+  onResolveReschedule
+}: {
+  booking: Booking;
+  disabled: boolean;
+  onSubmit: (formData: FormData) => void;
+  onRequestFinal: (formData: FormData) => void;
+  onResolveReschedule: (formData: FormData) => void;
+}) {
+  return (
+    <article
+      className={cn(
+        "relative overflow-hidden rounded-lg border border-border bg-card p-4 shadow-[0_16px_44px_rgba(0,0,0,0.2)]",
+        booking.rescheduleRequestedAt && "border-amber-400/45 bg-amber-400/[0.05]"
+      )}
+    >
+      <div
+        className={cn(
+          "grid gap-0 transition",
+          booking.rescheduleRequestedAt && "pointer-events-none select-none blur-[2px] opacity-45"
+        )}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+              Запись {booking.id}
+            </p>
+            {booking.rescheduleRequestedAt ? (
+              <div className="mt-2">
+                <RescheduleBadge />
+              </div>
             ) : null}
-            </Fragment>
-          ))}
-        </tbody>
-      </table>
+            <h3 className="mt-2 text-xl font-semibold tracking-normal">
+              {booking.shootType ?? booking.styleId ?? "Фотосессия"}
+            </h3>
+          </div>
+          <StatusBadge status={booking.bookingType ?? "FULL_SHOOT"} />
+        </div>
+
+        <div className="mt-4 flex flex-wrap gap-2">
+          <StatusBadge status={booking.status} />
+          <StatusBadge status={booking.paymentStatus} />
+        </div>
+
+        <div className="mt-4 border-t border-border pt-4 text-sm text-muted-foreground">
+          <p className="text-foreground">{booking.date} · {booking.time} · {booking.durationHours} ч</p>
+          <p className="mt-2">{booking.clientName}</p>
+          {canShowClientContacts(booking) ? (
+            <p className="mt-1 text-xs">
+              {booking.clientPhone || "-"}
+            </p>
+          ) : (
+            <p className="mt-1 text-xs">Контакты после сервисного сбора</p>
+          )}
+        </div>
+
+        <div className="mt-4 rounded-md border border-border bg-background/70 p-3">
+          <BookingAmounts booking={booking} />
+        </div>
+
+        <div className="mt-4">
+          <StatusActions
+            booking={booking}
+            disabled={disabled}
+            onSubmit={onSubmit}
+            onRequestFinal={onRequestFinal}
+          />
+        </div>
+
+        {booking.bookingType === "PHOTOGRAPHER_ONLY" ? (
+          <div className="mt-4 border-t border-border pt-3">
+            <BookingBrief booking={booking} />
+          </div>
+        ) : null}
+      </div>
+
+      {booking.rescheduleRequestedAt ? (
+        <div className="absolute inset-0 z-10 flex items-center p-4">
+          <RescheduleDecisionPanel
+            booking={booking}
+            disabled={disabled}
+            onResolve={onResolveReschedule}
+            compact
+          />
+        </div>
+      ) : null}
+    </article>
+  );
+}
+
+function RescheduleDecisionPanel({
+  booking,
+  disabled,
+  onResolve,
+  compact = false
+}: {
+  booking: Booking;
+  disabled: boolean;
+  onResolve: (formData: FormData) => void;
+  compact?: boolean;
+}) {
+  const comment = getRescheduleComment(booking.rescheduleComment);
+
+  function resolve(decision: "accept" | "decline") {
+    const data = new FormData();
+    data.set("bookingId", booking.dbId ?? booking.id);
+    data.set("decision", decision);
+    onResolve(data);
+  }
+
+  return (
+    <div
+      className={cn(
+        "w-full rounded-lg border border-amber-300/40 bg-background/90 p-4 shadow-[0_18px_60px_rgba(0,0,0,0.45)] backdrop-blur-md",
+        compact ? "grid gap-3" : "flex flex-col gap-3 md:flex-row md:items-center md:justify-between"
+      )}
+    >
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-center gap-2">
+          <RescheduleBadge />
+          <span className="text-sm font-semibold text-foreground">
+            {booking.date} · {booking.time} · {booking.durationHours} ч
+          </span>
+        </div>
+        <p className="mt-2 text-sm text-muted-foreground">
+          {comment || "Клиент запросил перенос без комментария."}
+        </p>
+      </div>
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <Button disabled={disabled} onClick={() => resolve("accept")}>
+          Перенести
+        </Button>
+        <Button
+          disabled={disabled}
+          variant="outline"
+          onClick={() => resolve("decline")}
+        >
+          Отказаться
+        </Button>
+      </div>
     </div>
+  );
+}
+
+function RescheduleBadge() {
+  return (
+    <span className="inline-flex w-fit items-center gap-1 rounded-full border border-amber-400/40 bg-amber-400/10 px-2 py-0.5 text-xs font-medium text-amber-200">
+      <AlertTriangle className="size-3" aria-hidden="true" />
+      Запрошен перенос
+    </span>
+  );
+}
+
+function getRescheduleComment(value?: string) {
+  if (!value) return "";
+  return value.replace(/^Запрошен перенос на .+?(?:\. Комментарий:\s*)?/i, "").trim();
+}
+
+function BookingAmounts({ booking }: { booking: Booking }) {
+  const hasStudioPart = booking.studioTotal > 0;
+  const payouts = calculateProviderPayouts(booking);
+  const hasSeveralProviders = payouts.photographerGross > 0 && payouts.studioGross > 0;
+
+  return (
+    <div className="grid gap-1 text-sm">
+      {hasStudioPart ? (
+        <span>Общая услуга: {formatPrice(booking.totalServicePrice ?? booking.totalAmount)}</span>
+      ) : null}
+      <span>Фотографу: {formatPrice(payouts.photographerGross)}</span>
+      <span className="text-muted-foreground">
+        {hasSeveralProviders ? "Сбор платформы всего" : "Сбор платформы"}:{" "}
+        {formatPrice(payouts.platformFee)}
+      </span>
+      {hasSeveralProviders ? (
+        <span className="text-muted-foreground">
+          Доля сбора фотографа: {formatPrice(payouts.photographerFeeShare)}
+        </span>
+      ) : null}
+      <span className="text-muted-foreground">Оплачено платформе: {formatPrice(booking.paidAmount)}</span>
+      <span className="font-medium text-emerald-200">
+        К выплате фотографу: {formatPrice(payouts.photographerPayout)}
+      </span>
+    </div>
+  );
+}
+
+function BookingBrief({ booking }: { booking: Booking }) {
+  return (
+    <details className="group">
+      <summary className="cursor-pointer text-sm font-medium">Бриф съемки</summary>
+      <div className="mt-3 grid gap-3 text-sm md:grid-cols-3">
+        <BriefItem label="Тип" value={getOptionLabel(SHOOT_TYPES, booking.shootType)} />
+        <BriefItem label="Локация" value={getOptionLabel(LOCATION_TYPES, booking.locationType)} />
+        <BriefItem label="Город/район" value={[booking.city, booking.district].filter(Boolean).join(", ") || "-"} />
+        <BriefItem label="Людей" value={booking.peopleCount ? String(booking.peopleCount) : "-"} />
+        <BriefItem
+          label="Оборудование"
+          value={booking.equipmentNeeded?.map((item) => getOptionLabel(EQUIPMENT_OPTIONS, item)).join(", ") ?? "-"}
+        />
+        <BriefItem label="Описание" value={booking.shootDescription ?? "-"} />
+        <BriefItem label="Адрес" value={booking.addressDetails ?? "-"} />
+        <BriefItem label="Особые требования" value={booking.specialRequirements ?? "-"} />
+      </div>
+    </details>
+  );
+}
+
+function canShowClientContacts(booking: Booking) {
+  return (
+    (booking.platformFeeStatus === "PAID" ||
+      ["DEPOSIT_PAID", "FINAL_PAYMENT_PENDING", "FULLY_PAID"].includes(booking.paymentStatus)) &&
+    ["Confirmed", "In progress", "Completed"].includes(booking.status)
   );
 }
 
@@ -613,14 +844,17 @@ function StatusActions({
         ? ["IN_PROGRESS", "CANCELLED"]
         : [];
   const canRequestFinal =
-    ["Confirmed", "In progress"].includes(booking.status) &&
-    booking.paymentStatus === "DEPOSIT_PAID" &&
-    booking.remainingAmount > 0;
+    booking.status === "In progress" &&
+    (booking.platformFeeStatus === "PAID" || booking.paymentStatus === "DEPOSIT_PAID");
+  const isBeforeStart = isClientBookingBeforeStart(booking);
+  const canMoveToInProgress = canClientBookingMoveToInProgress(booking);
 
   return (
     <div className="grid gap-2">
-      {booking.status === "Pending" && booking.paymentStatus !== "DEPOSIT_PAID" ? (
-        <p className="text-xs text-muted-foreground">Нельзя подтвердить бронь до оплаты депозита.</p>
+      {booking.status === "Pending" &&
+      booking.platformFeeStatus !== "PAID" &&
+      booking.paymentStatus !== "DEPOSIT_PAID" ? (
+        <p className="text-xs text-muted-foreground">Нельзя подтвердить бронь до оплаты сервисного сбора.</p>
       ) : null}
       <div className="flex flex-wrap gap-2">
       {statuses.map((status) => (
@@ -628,7 +862,13 @@ function StatusActions({
           key={status}
           size="sm"
           variant={status === "CONFIRMED" || status === "IN_PROGRESS" ? "default" : "outline"}
-          disabled={disabled || (status === "CONFIRMED" && booking.paymentStatus !== "DEPOSIT_PAID")}
+          disabled={
+            disabled ||
+            (status === "IN_PROGRESS" && !canMoveToInProgress) ||
+            (status === "CONFIRMED" &&
+              booking.platformFeeStatus !== "PAID" &&
+              booking.paymentStatus !== "DEPOSIT_PAID")
+          }
           onClick={() => {
             const data = new FormData();
             data.set("bookingId", booking.dbId ?? booking.id);
@@ -636,7 +876,7 @@ function StatusActions({
             onSubmit(data);
           }}
         >
-          {status}
+          {bookingActionLabels[status] ?? status}
         </Button>
       ))}
       {canRequestFinal ? (
@@ -649,19 +889,31 @@ function StatusActions({
             onRequestFinal(data);
           }}
         >
-          Работа завершена · запросить оплату
+          Работа завершена
         </Button>
       ) : null}
       </div>
+      {booking.status === "Confirmed" && isBeforeStart ? (
+        <span className="text-xs text-muted-foreground">
+          Статус «В работе» станет доступен в дату и время начала брони.
+        </span>
+      ) : null}
       {booking.paymentStatus === "FINAL_PAYMENT_PENDING" ? (
-        <span className="text-xs text-amber-300">Остаток ожидает оплаты клиентом.</span>
+        <span className="text-xs text-amber-300">Остаток оплачивается напрямую исполнителю.</span>
       ) : null}
       {booking.paymentStatus === "FULLY_PAID" ? (
-        <span className="text-xs text-emerald-300">Полностью оплачено.</span>
+        <span className="text-xs text-emerald-300">Сервисный сбор оплачен.</span>
       ) : null}
     </div>
   );
 }
+
+const bookingActionLabels: Record<string, string> = {
+  CONFIRMED: "Подтвердить",
+  DECLINED: "Отклонить",
+  IN_PROGRESS: "В работе",
+  CANCELLED: "Отменить"
+};
 
 function Field({
   label,
@@ -684,7 +936,7 @@ function Field({
 
 function Message({ state, area }: { state: ActionState; area: string }) {
   if (!state || state.area !== area) return null;
-  return <Notice tone={state.success ? "success" : "error"} message={state.message} />;
+  return state.success ? <SuccessToast message={state.message} /> : <Notice tone="error" message={state.message} />;
 }
 
 function Notice({ message, tone = "info" }: { message: string; tone?: "info" | "success" | "error" }) {

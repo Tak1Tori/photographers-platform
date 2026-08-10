@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { autoCompletePastBookings } from "@/lib/bookings/status-service";
 import { expireOldHolds } from "@/lib/calendar/hold-service";
 
 export async function GET(request: Request) {
@@ -8,6 +9,14 @@ export async function GET(request: Request) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
-  const result = await expireOldHolds();
-  return NextResponse.json({ ok: true, expired: result.count });
+  const [holds, bookings] = await Promise.all([
+    expireOldHolds(),
+    autoCompletePastBookings()
+  ]);
+
+  return NextResponse.json({
+    ok: true,
+    expired: holds.count,
+    completed: bookings.count
+  });
 }

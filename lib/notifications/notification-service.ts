@@ -3,6 +3,7 @@ import { canUseDatabase } from "@/lib/data/db";
 import { prisma } from "@/lib/prisma";
 import { createInAppDeliveryLog, simulateMockEmail } from "@/lib/notifications/mock-delivery";
 import type { CreateNotificationInput, NotificationDTO } from "@/lib/notifications/types";
+import { sendNotificationToTelegram } from "@/lib/telegram/telegram-notification-service";
 
 const bookingNotificationInclude = {
   client: true,
@@ -29,7 +30,8 @@ export async function createNotification(input: CreateNotificationInput) {
 
   await Promise.all([
     createInAppDeliveryLog(notification),
-    simulateMockEmail(notification)
+    simulateMockEmail(notification),
+    sendNotificationToTelegram(notification.id)
   ]);
 
   return notification;
@@ -128,19 +130,19 @@ export async function notifyDepositPaid(bookingId: string) {
     await createNotifications([
       ...allBookingSideNotifications(booking, {
         type: NotificationType.DEPOSIT_PAID,
-        title: "Депозит оплачен",
+        title: "Сервисный сбор оплачен",
         message:
           booking.bookingType === "PHOTOGRAPHER_ONLY"
-            ? `Клиент оплатил депозит за съемку ${booking.bookingNumber}.`
+            ? `Клиент оплатил сервисный сбор за съемку ${booking.bookingNumber}.`
             : booking.bookingType === "STUDIO_ONLY"
-              ? `Клиент оплатил депозит за аренду студии ${booking.bookingNumber}.`
-            : `По брони ${booking.bookingNumber} оплачен депозит.`,
+              ? `Клиент оплатил сервисный сбор за аренду студии ${booking.bookingNumber}.`
+            : `По брони ${booking.bookingNumber} оплачен сервисный сбор.`,
         linkUrl: bookingLink(booking.bookingNumber)
       }),
       ...(await adminNotifications({
         type: NotificationType.DEPOSIT_PAID,
-        title: "Депозит оплачен",
-        message: `По брони ${booking.bookingNumber} оплачен депозит.`,
+        title: "Сервисный сбор оплачен",
+        message: `По брони ${booking.bookingNumber} оплачен сервисный сбор.`,
         linkUrl: "/admin"
       }))
     ]);
@@ -157,21 +159,21 @@ export async function notifyFinalPaymentRequested(bookingId: string) {
         ? [{
             userId: booking.clientId,
             type: NotificationType.FINAL_PAYMENT_REQUESTED,
-            title: "Оплатите остаток по брони",
-            message: `По брони ${booking.bookingNumber} запрошена финальная оплата.`,
+            title: "Исполнитель завершил работу",
+            message: `По брони ${booking.bookingNumber} остаток оплачивается напрямую исполнителю.`,
             linkUrl: bookingLink(booking.bookingNumber)
           }]
         : []),
       ...participantNotifications(booking, {
         type: NotificationType.FINAL_PAYMENT_REQUESTED,
-        title: "Финальная оплата запрошена",
-        message: `По брони ${booking.bookingNumber} клиенту отправлен запрос на оплату остатка.`,
+        title: "Работа завершена",
+        message: `По брони ${booking.bookingNumber} остаток оплачивается напрямую исполнителю.`,
         linkUrl: bookingLink(booking.bookingNumber)
       }),
       ...(await adminNotifications({
         type: NotificationType.FINAL_PAYMENT_REQUESTED,
-        title: "Финальная оплата запрошена",
-        message: `По брони ${booking.bookingNumber} запрошена финальная оплата.`,
+        title: "Работа завершена",
+        message: `По брони ${booking.bookingNumber} остаток оплачивается напрямую исполнителю.`,
         linkUrl: "/admin"
       }))
     ]);
@@ -277,13 +279,17 @@ export async function notifyReviewCreated(reviewId: string) {
 
     if (!review) return;
 
+    const reviewTarget = review.booking
+      ? `по брони ${review.booking.bookingNumber}`
+      : "вручную в админке";
+
     await createNotifications([
       ...(review.photographer?.userId
         ? [{
             userId: review.photographer.userId,
             type: NotificationType.REVIEW_CREATED,
             title: "Новый отзыв",
-            message: `Клиент оставил отзыв по брони ${review.booking.bookingNumber}.`,
+            message: `Клиент оставил отзыв ${reviewTarget}.`,
             linkUrl: "/dashboard/photographer"
           }]
         : []),
@@ -292,14 +298,14 @@ export async function notifyReviewCreated(reviewId: string) {
             userId: review.studio.ownerId,
             type: NotificationType.REVIEW_CREATED,
             title: "Новый отзыв",
-            message: `Клиент оставил отзыв по брони ${review.booking.bookingNumber}.`,
+            message: `Клиент оставил отзыв ${reviewTarget}.`,
             linkUrl: "/dashboard/studio"
           }]
         : []),
       ...(await adminNotifications({
         type: NotificationType.REVIEW_CREATED,
         title: "Новый отзыв",
-        message: `Создан отзыв по брони ${review.booking.bookingNumber}.`,
+        message: `Создан отзыв ${reviewTarget}.`,
         linkUrl: "/admin"
       }))
     ]);
@@ -316,14 +322,14 @@ export async function notifyPaymentRefunded(bookingId: string) {
         ? [{
             userId: booking.clientId,
             type: NotificationType.PAYMENT_REFUNDED,
-            title: "Возврат депозита",
+            title: "Возврат сервисного сбора",
             message: `По брони ${booking.bookingNumber} оформлен mock refund.`,
             linkUrl: bookingLink(booking.bookingNumber)
           }]
         : []),
       ...(await adminNotifications({
         type: NotificationType.PAYMENT_REFUNDED,
-        title: "Возврат депозита",
+        title: "Возврат сервисного сбора",
         message: `По брони ${booking.bookingNumber} оформлен mock refund.`,
         linkUrl: "/admin"
       }))

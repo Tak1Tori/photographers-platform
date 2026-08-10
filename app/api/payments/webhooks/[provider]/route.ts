@@ -6,10 +6,11 @@ export const dynamic = "force-dynamic";
 
 export async function POST(
   request: Request,
-  { params }: { params: { provider: string } }
+  { params }: { params: Promise<{ provider: string }> }
 ) {
   try {
-    const provider = parsePaymentProvider(params.provider);
+    const { provider: providerName } = await params;
+    const provider = parsePaymentProvider(providerName);
     const result = await handlePaymentWebhook(provider, request);
     return NextResponse.json(result.body, { status: result.status });
   } catch (error) {

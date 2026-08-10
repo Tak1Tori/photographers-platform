@@ -57,7 +57,8 @@ export async function createPhotographerOnlyBookingAction(
 
   const input: CreatePhotographerOnlyBookingInput = {
     ...parsed.input,
-    clientId: session.user.id
+    clientId: session.user.id,
+    clientEmail: ""
   };
 
   try {
@@ -115,11 +116,38 @@ export async function createStudioOnlyBookingAction(
 
   const input: CreateStudioOnlyBookingInput = {
     ...parsed.input,
-    clientId: session.user.id
+    clientId: session.user.id,
+    clientEmail: ""
   };
 
   try {
-    const { booking, paymentSession } = await createStudioOnlyBooking(input);
+    const result = await createStudioOnlyBooking(input);
+
+    if ("requiresStudioConfirmation" in result && result.requiresStudioConfirmation) {
+      revalidatePath("/dashboard/client");
+      revalidatePath("/dashboard/studio");
+      revalidatePath("/dashboard/studio/requests");
+      revalidatePath("/admin");
+      revalidatePath("/admin/studio-confirmations");
+
+      return {
+        success: true,
+        requiresStudioConfirmation: true,
+        confirmationRequestId: result.confirmationRequestId,
+        waitingUrl: result.waitingUrl,
+        platformFeeAmount: result.platformFeeAmount,
+        whatsappOpenUrl: result.whatsappOpenUrl
+      };
+    }
+
+    if (!("booking" in result) || !result.booking || !("paymentSession" in result)) {
+      return {
+        success: false,
+        error: "Не удалось создать бронь."
+      };
+    }
+
+    const { booking, paymentSession } = result;
     await notifyBookingCreated(booking.id);
 
     revalidatePath("/dashboard/client");
@@ -145,38 +173,64 @@ function parsePhotographerOnlyForm(formData: FormData) {
   const fieldErrors: FieldErrors = {};
   const get = (key: string) => String(formData.get(key) ?? "").trim();
   const photographerId = get("photographerId");
-  const shootType = get("shootType");
+  const shootTypeValue = get("shootType");
+  const customShootType = sanitizeUserText(get("customShootType"));
+  const shootType = shootTypeValue === "OTHER" ? customShootType : shootTypeValue;
   const shootDescription = sanitizeUserText(get("shootDescription"));
-  const locationType = get("locationType");
+  const locationTypeValue = get("locationType");
+  const customLocationType = sanitizeUserText(get("customLocationType"));
+  const locationType = locationTypeValue === "OTHER" ? customLocationType : locationTypeValue;
   const city = sanitizeUserText(get("city")) || "Алматы";
   const district = sanitizeUserText(get("district"));
   const addressDetails = sanitizeUserText(get("addressDetails"));
   const date = get("date");
   const startTime = get("startTime");
-  const durationHours = Number(get("durationHours"));
+  const durationValue = get("durationHours");
+  const durationHours = Number(durationValue === "CUSTOM" ? get("customDurationHours") : durationValue);
   const peopleCountRaw = get("peopleCount");
   const peopleCount = peopleCountRaw ? Number(peopleCountRaw) : undefined;
-  const equipmentNeeded = formData
+  const selectedEquipment = formData
     .getAll("equipmentNeeded")
     .map(String)
     .filter((value) => EQUIPMENT_OPTIONS.some((option) => option.value === value));
+  const customEquipmentNeeded = sanitizeUserText(get("customEquipmentNeeded"));
+  const equipmentNeeded = selectedEquipment.includes("OTHER")
+    ? [
+        ...selectedEquipment.filter((value) => value !== "OTHER"),
+        ...(customEquipmentNeeded ? [`Другое: ${customEquipmentNeeded}`] : [])
+      ]
+    : selectedEquipment;
   const specialRequirements = sanitizeUserText(get("specialRequirements"));
   const clientName = sanitizeUserText(get("clientName"));
   const clientPhone = get("clientPhone");
-  const clientEmail = get("clientEmail").toLowerCase();
+  const allowedLocationTypes = LOCATION_TYPES.filter((option) => option.value !== "NEED_STUDIO_HELP");
 
   if (!photographerId) fieldErrors.photographerId = "Сначала выберите фотографа.";
-  if (!SHOOT_TYPES.some((option) => option.value === shootType)) {
+  if (!SHOOT_TYPES.some((option) => option.value === shootTypeValue)) {
     fieldErrors.shootType = "Выберите тип съемки.";
   }
+  if (shootTypeValue === "OTHER" && !customShootType) {
+    fieldErrors.customShootType = "Уточните тип съемки.";
+  }
   if (!shootDescription) fieldErrors.shootDescription = "Опишите задачу для фотографа.";
-  if (!LOCATION_TYPES.some((option) => option.value === locationType)) {
+  if (!allowedLocationTypes.some((option) => option.value === locationTypeValue)) {
     fieldErrors.locationType = "Выберите тип локации.";
   }
+  if (locationTypeValue === "OTHER" && !customLocationType) {
+    fieldErrors.customLocationType = "Уточните локацию.";
+  }
   if (!city) fieldErrors.city = "Укажите город.";
+  if (!addressDetails) fieldErrors.addressDetails = "Укажите точный адрес и комментарии.";
+  if (selectedEquipment.includes("OTHER") && !customEquipmentNeeded) {
+    fieldErrors.customEquipmentNeeded = "Уточните оборудование.";
+  }
   if (!date) fieldErrors.date = "Выберите дату.";
   if (!startTime) fieldErrors.startTime = "Выберите время.";
-  if (!Number.isInteger(durationHours) || durationHours < 1 || durationHours > 8) {
+  if (durationValue === "CUSTOM") {
+    if (!Number.isInteger(durationHours) || durationHours < 5 || durationHours > 24) {
+      fieldErrors.customDurationHours = "Укажите длительность от 5 до 24 часов.";
+    }
+  } else if (!Number.isInteger(durationHours) || durationHours < 1 || durationHours > 4) {
     fieldErrors.durationHours = "Выберите длительность.";
   }
   if (peopleCount !== undefined && (!Number.isInteger(peopleCount) || peopleCount < 1 || peopleCount > 100)) {
@@ -184,12 +238,12 @@ function parsePhotographerOnlyForm(formData: FormData) {
   }
   if (!clientName) fieldErrors.clientName = "Укажите имя.";
   if (!clientPhone) fieldErrors.clientPhone = "Укажите телефон.";
-  if (!clientEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clientEmail)) {
-    fieldErrors.clientEmail = "Укажите корректный email.";
-  }
 
   for (const [field, value] of [
+    ["customShootType", customShootType],
     ["shootDescription", shootDescription],
+    ["customLocationType", customLocationType],
+    ["customEquipmentNeeded", customEquipmentNeeded],
     ["addressDetails", addressDetails],
     ["specialRequirements", specialRequirements]
   ] as const) {
@@ -217,8 +271,7 @@ function parsePhotographerOnlyForm(formData: FormData) {
               equipmentNeeded.length > 0 ? equipmentNeeded : ["NO_SPECIAL_EQUIPMENT"],
             specialRequirements,
             clientName,
-            clientPhone,
-            clientEmail
+            clientPhone
           }
         : undefined
   };
@@ -245,7 +298,6 @@ function parseStudioOnlyForm(formData: FormData) {
   const specialRequirements = sanitizeUserText(get("specialRequirements"));
   const clientName = sanitizeUserText(get("clientName"));
   const clientPhone = get("clientPhone");
-  const clientEmail = get("clientEmail").toLowerCase();
   const capacity = Number(get("selectedHallCapacity"));
   const allowedEquipment = new Set<string>(STUDIO_EQUIPMENT_OPTIONS.map((option) => option.value));
   const normalizedAmenities = selectedAmenities.filter((value) =>
@@ -276,9 +328,6 @@ function parseStudioOnlyForm(formData: FormData) {
   }
   if (!clientName) fieldErrors.clientName = "Укажите имя.";
   if (!clientPhone) fieldErrors.clientPhone = "Укажите телефон.";
-  if (!clientEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clientEmail)) {
-    fieldErrors.clientEmail = "Укажите корректный email.";
-  }
 
   for (const [field, value] of [
     ["shootDescription", shootDescription],
@@ -305,8 +354,7 @@ function parseStudioOnlyForm(formData: FormData) {
             selectedAmenities: normalizedAmenities,
             specialRequirements,
             clientName,
-            clientPhone,
-            clientEmail
+            clientPhone
           }
         : undefined
   };

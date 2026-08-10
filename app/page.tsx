@@ -1,33 +1,68 @@
-import { BookingScenarios } from "@/components/home/booking-scenarios";
+import { BenefitsSlider } from "@/components/home/benefits-slider";
 import { HeroSection } from "@/components/home/hero-section";
 import { MarketplaceSlider } from "@/components/home/marketplace-slider";
+import { getEditors } from "@/lib/data/editors";
 import { getPhotographers } from "@/lib/data/photographers";
-import { getStudios } from "@/lib/data/studios";
+import { getStyles } from "@/lib/data/styles";
+
+const HOME_GROUP_LIMIT = 3;
+
+function compareGroups<T extends { photographers: unknown[]; title: string }>(a: T, b: T) {
+  return b.photographers.length - a.photographers.length || a.title.localeCompare(b.title, "ru");
+}
 
 export default async function HomePage() {
-  const [photographers, studios] = await Promise.all([
+  const [photographers, styles, editors] = await Promise.all([
     getPhotographers(),
-    getStudios()
+    getStyles(),
+    getEditors()
   ]);
+
+  const photographerGroups = styles
+    .map((style) => {
+      return {
+        id: style.id,
+        title: style.title,
+        photographers: photographers.filter((photographer) =>
+          photographer.specializationIds.some((tag) => tag === style.id)
+        )
+      };
+    })
+    .filter((group) => group.photographers.length > 0)
+    .sort(compareGroups);
+
+  const limitedGroups = photographerGroups.slice(0, HOME_GROUP_LIMIT);
+
+  const groups =
+    limitedGroups.length > 0
+      ? limitedGroups
+      : photographers.length > 0
+        ? [{ id: "", title: "Фотографы", photographers }]
+        : [];
 
   return (
     <>
       <HeroSection />
-      <BookingScenarios />
-      <div className="border-b border-border">
-        <MarketplaceSlider
-          title="Фотографы"
-          type="photographers"
-          items={photographers}
-          viewAllHref="/photographers?mode=booking"
-        />
-        <MarketplaceSlider
-          title="Студии"
-          type="studios"
-          items={studios}
-          viewAllHref="/studios?mode=booking"
-        />
-      </div>
+      <BenefitsSlider />
+      {groups.map((group) => (
+        <div key={group.id || "all-photographers"} className="border-b border-border">
+          <MarketplaceSlider
+            title={group.title}
+            type="photographers"
+            items={group.photographers}
+            viewAllHref={
+              group.id
+                ? `/photographers?mode=booking&style=${group.id}`
+                : "/photographers?mode=booking"
+            }
+          />
+        </div>
+      ))}
+      {editors.length > 0 ? (
+        <div className="border-b border-border">
+          <MarketplaceSlider title="Монтажеры" type="editors" items={editors} viewAllHref="/editors" />
+        </div>
+      ) : null}
     </>
   );
 }

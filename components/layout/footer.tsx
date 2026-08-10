@@ -1,41 +1,60 @@
 import Link from "next/link";
+import { Instagram, Send } from "lucide-react";
+import { BrandLogo } from "@/components/layout/brand-logo";
+
+const marketplaceLinks = [
+  { href: "/photographers?mode=booking", label: "Фотографы" },
+  { href: "/editors", label: "Монтажеры" }
+];
+
+const legalLinks = [
+  { href: "/contacts", label: "Контакты" },
+  { href: "/privacy-policy", label: "Политика конфиденциальности" },
+  { href: "/terms", label: "Пользовательское соглашение" },
+  { href: "/offer", label: "Публичная оферта" },
+  { href: "/payment-and-refund", label: "Правила оплаты и возврата" },
+  { href: "/cookies", label: "Политика Cookies" }
+];
 
 export function Footer() {
   return (
     <footer className="border-t border-border bg-card">
-      <div className="container grid gap-8 py-10 md:grid-cols-[1.5fr_1fr_1fr]">
-        <div>
-          <Link href="/" className="text-base font-semibold">
-            Framely
+      <div className="container grid gap-9 py-9 sm:grid-cols-2 lg:grid-cols-[1.35fr_0.8fr_1.25fr_auto] lg:items-start lg:gap-12 lg:py-10">
+        <div className="max-w-[17rem]">
+          <Link href="/" className="inline-flex items-center" aria-label="Framely">
+            <BrandLogo className="h-12 w-auto" sizes="108px" />
           </Link>
-          <p className="mt-3 max-w-sm text-sm leading-6 text-muted-foreground">
-            MVP marketplace-платформы для бронирования фотосессий под ключ:
-            стиль, фотограф, студия и время в одном потоке.
+          <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+            Онлайн-платформа для бронирования фотографов и монтажеров.
           </p>
         </div>
-        <div className="grid gap-2 text-sm">
-          <p className="font-medium">Marketplace</p>
-          <Link href="/styles" className="text-muted-foreground hover:text-foreground">
-            Стили съемки
-          </Link>
-          <Link href="/photographers" className="text-muted-foreground hover:text-foreground">
-            Фотографы
-          </Link>
-          <Link href="/studios" className="text-muted-foreground hover:text-foreground">
-            Студии
-          </Link>
+
+        <nav className="grid content-start gap-3 text-sm" aria-label="Маркетплейс">
+          {marketplaceLinks.map((link) => (
+            <Link key={link.href} href={link.href} className="text-muted-foreground transition-colors hover:text-foreground">
+              {link.label}
+            </Link>
+          ))}
+        </nav>
+
+        <div className="grid content-start gap-3 text-sm text-muted-foreground" aria-label="Документы">
+          {legalLinks.map((link) => (
+            <Link key={link.label} href={link.href} className="transition-colors hover:text-foreground">
+              {link.label}
+            </Link>
+          ))}
         </div>
-        <div className="grid gap-2 text-sm">
-          <p className="font-medium">Кабинеты</p>
-          <Link href="/dashboard/photographer" className="text-muted-foreground hover:text-foreground">
-            Фотограф
-          </Link>
-          <Link href="/dashboard/studio" className="text-muted-foreground hover:text-foreground">
-            Студия
-          </Link>
-          <Link href="/admin" className="text-muted-foreground hover:text-foreground">
-            Админ
-          </Link>
+
+        <div className="grid content-start gap-3 lg:justify-items-end">
+          <p className="text-sm text-muted-foreground">Следите за нами:</p>
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <span className="flex size-9 items-center justify-center rounded-full border border-border" title="Instagram">
+              <Instagram className="size-4" aria-hidden="true" />
+            </span>
+            <span className="flex size-9 items-center justify-center rounded-full border border-border" title="Telegram">
+              <Send className="size-4" aria-hidden="true" />
+            </span>
+          </div>
         </div>
       </div>
     </footer>

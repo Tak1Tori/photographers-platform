@@ -50,7 +50,8 @@ export async function deleteManualBusyEventAction(
     const event = await prisma.calendarEvent.findUnique({ where: { id: eventId } });
     if (
       !event ||
-      event.source !== CalendarEventSource.MANUAL_BUSY ||
+      (event.source !== CalendarEventSource.MANUAL_BUSY &&
+        event.source !== CalendarEventSource.TELEGRAM) ||
       (owner.type === "PHOTOGRAPHER"
         ? event.photographerProfileId !== owner.photographerProfileId
         : event.studioHallId !== owner.studioHallId)

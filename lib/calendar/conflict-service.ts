@@ -24,7 +24,7 @@ export async function checkTimeRangeConflict(
   startTime: Date,
   endTime: Date,
   db: DbClient = prisma,
-  options: { ignoreBookingId?: string } = {}
+  options: { ignoreBookingId?: string; ignoreHoldId?: string } = {}
 ) {
   return (await getConflictReason(owner, startTime, endTime, db, options)) !== null;
 }
@@ -34,7 +34,7 @@ export async function assertNoCalendarConflict(
   startTime: Date,
   endTime: Date,
   db: DbClient = prisma,
-  options: { ignoreBookingId?: string } = {}
+  options: { ignoreBookingId?: string; ignoreHoldId?: string } = {}
 ) {
   const reason = await getConflictReason(owner, startTime, endTime, db, options);
   if (reason) throw new Error(reason);
@@ -45,7 +45,7 @@ export async function getConflictReason(
   startTime: Date,
   endTime: Date,
   db: DbClient = prisma,
-  options: { ignoreBookingId?: string } = {}
+  options: { ignoreBookingId?: string; ignoreHoldId?: string } = {}
 ) {
   validateOwner(owner);
   if (!(startTime instanceof Date) || !(endTime instanceof Date) || endTime <= startTime) {
@@ -76,6 +76,13 @@ export async function getConflictReason(
         ...ownerWhere(owner),
         status: CalendarEventStatus.BUSY,
         bookingId: options.ignoreBookingId ? { not: options.ignoreBookingId } : undefined,
+        NOT: {
+          booking: {
+            is: {
+              status: BookingStatus.COMPLETED
+            }
+          }
+        },
         startTime: { lt: bufferedEnd },
         endTime: { gt: bufferedStart }
       }
@@ -83,6 +90,7 @@ export async function getConflictReason(
     db.availabilityHold.findMany({
       where: {
         ...ownerWhere(owner),
+        id: options.ignoreHoldId ? { not: options.ignoreHoldId } : undefined,
         status: AvailabilityHoldStatus.ACTIVE,
         expiresAt: { gt: new Date() },
         bookingId: options.ignoreBookingId ? { not: options.ignoreBookingId } : undefined,
@@ -96,7 +104,13 @@ export async function getConflictReason(
         ...(owner.type === "PHOTOGRAPHER"
           ? { photographerId: owner.photographerProfileId }
           : { studioHallId: owner.studioHallId }),
-        status: { notIn: [BookingStatus.CANCELLED, BookingStatus.DECLINED] },
+        status: {
+          notIn: [
+            BookingStatus.CANCELLED,
+            BookingStatus.DECLINED,
+            BookingStatus.COMPLETED
+          ]
+        },
         OR: [
           {
             paymentStatus: {

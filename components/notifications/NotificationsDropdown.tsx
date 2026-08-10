@@ -26,7 +26,7 @@ export function NotificationsDropdown({
   }
 
   return (
-    <div className="absolute right-0 top-12 z-50 w-[min(92vw,380px)] rounded-lg border border-border bg-card p-3 shadow-lg">
+    <div className="fixed left-4 right-4 top-24 z-[70] w-auto rounded-lg border border-border bg-card p-3 shadow-lg sm:absolute sm:left-auto sm:right-0 sm:top-12 sm:z-50 sm:w-[min(92vw,380px)]">
       <div className="flex items-center justify-between gap-3 border-b border-border pb-3">
         <div>
           <p className="font-semibold tracking-normal">Уведомления</p>
@@ -34,7 +34,7 @@ export function NotificationsDropdown({
         </div>
         <Button type="button" variant="ghost" size="sm" onClick={onClose}>Закрыть</Button>
       </div>
-      <div className="max-h-[430px] overflow-y-auto py-3">
+      <div className="max-h-[min(430px,calc(100svh-14rem))] overflow-y-auto py-3">
         {notifications.length === 0 ? (
           <div className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
             Уведомлений пока нет.

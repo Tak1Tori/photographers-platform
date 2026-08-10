@@ -6,44 +6,36 @@ import {
   Camera,
   Check,
   CircleDashed,
-  Sparkles,
+  DoorOpen,
   UserRound
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import type { Photographer, PhotoStyle, Studio } from "@/lib/types";
+import { formatPrice } from "@/lib/mock-data";
+import type { Photographer, Studio, StudioHall } from "@/lib/types";
 
 interface FullShootBuilderProps {
-  style?: PhotoStyle;
   photographer?: Photographer;
   studio?: Studio;
+  studioHall?: StudioHall;
 }
 
 export function FullShootBuilder({
-  style,
   photographer,
-  studio
+  studio,
+  studioHall
 }: FullShootBuilderProps) {
+  const activeHalls = studio?.halls.filter((hall) => (hall.status ?? "Active") === "Active") ?? [];
   const selection = {
-    style: style?.id,
     photographer: photographer?.id,
-    studio: studio?.id
+    studio: studio?.id,
+    studioHall: studioHall?.id
   };
-  const isComplete = Boolean(style && photographer && studio);
+  const isComplete = Boolean(photographer && studio && studioHall);
 
   const steps = [
     {
       number: "01",
-      title: "Стили",
-      description: "Определите настроение и визуальный язык съемки.",
-      selectedTitle: style?.title,
-      selectedMeta: style ? `от ${style.startingPrice.toLocaleString("ru-RU")} ₸` : undefined,
-      imageUrl: style?.imageUrl,
-      href: buildCatalogHref("/styles", selection),
-      icon: Sparkles
-    },
-    {
-      number: "02",
       title: "Фотографы",
       description: "Выберите автора, чей взгляд подходит вашей задаче.",
       selectedTitle: photographer?.name,
@@ -55,12 +47,12 @@ export function FullShootBuilder({
       icon: UserRound
     },
     {
-      number: "03",
+      number: "02",
       title: "Студии",
       description: "Найдите пространство, свет и оборудование для съемки.",
       selectedTitle: studio?.name,
       selectedMeta: studio
-        ? `${studio.hallName} · ${studio.pricePerHour.toLocaleString("ru-RU")} ₸/ч`
+        ? `${activeHalls.length} ${formatHallCount(activeHalls.length)} · от ${formatPrice(getLowestHallPrice(activeHalls, studio.pricePerHour))}/ч`
         : undefined,
       imageUrl: studio?.imageUrl,
       href: buildCatalogHref("/studios", selection),
@@ -70,7 +62,16 @@ export function FullShootBuilder({
 
   return (
     <div className="grid gap-8">
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid gap-2">
+        <h1 className="text-3xl font-semibold tracking-normal md:text-5xl">
+          Конструктор
+        </h1>
+        <p className="max-w-2xl text-sm leading-6 text-muted-foreground md:text-base">
+          Соберите съемку из двух ключевых элементов: выберите фотографа и подходящую студию.
+        </p>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2">
         {steps.map((step) => {
           const Icon = step.icon;
           const isSelected = Boolean(step.selectedTitle);
@@ -92,7 +93,7 @@ export function FullShootBuilder({
                     src={step.imageUrl}
                     alt={step.selectedTitle ?? step.title}
                     fill
-                    sizes="(max-width: 1024px) 100vw, 33vw"
+                    sizes="(max-width: 1024px) 100vw, 50vw"
                     className="object-cover transition duration-500 group-hover:scale-[1.03]"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-background via-background/45 to-transparent" />
@@ -156,6 +157,75 @@ export function FullShootBuilder({
         })}
       </div>
 
+      {studio ? (
+        <div className="grid gap-4 rounded-lg border border-border bg-card/70 p-5 md:p-6">
+          <div className="flex flex-col justify-between gap-3 md:flex-row md:items-end">
+            <div>
+              <div className="inline-flex items-center gap-2 text-sm font-medium text-primary">
+                <DoorOpen className="size-4" aria-hidden="true" />
+                Шаг 03
+              </div>
+              <h2 className="mt-2 text-2xl font-semibold tracking-normal">Выберите зал</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Для конструктора нужен конкретный зал: по нему считаем цену и проверяем календарь.
+              </p>
+            </div>
+            {studioHall ? (
+              <span className="rounded-md border border-primary/40 bg-primary/10 px-3 py-2 text-sm text-emerald-200">
+                Выбран: {studioHall.name}
+              </span>
+            ) : null}
+          </div>
+
+          {activeHalls.length > 0 ? (
+            <div className="grid gap-3 md:grid-cols-2">
+              {activeHalls.map((hall) => {
+                const isSelected = hall.id === studioHall?.id;
+
+                return (
+                  <Link
+                    key={hall.id ?? hall.name}
+                    href={buildConstructorHref({ ...selection, studioHall: hall.id })}
+                    className={cn(
+                      "group grid gap-3 overflow-hidden rounded-lg border p-4 transition",
+                      isSelected
+                        ? "border-primary bg-primary/10"
+                        : "border-border hover:-translate-y-0.5 hover:border-primary/50"
+                    )}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-lg font-semibold">{hall.name}</p>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          до {hall.capacity} чел · {formatPrice(hall.pricePerHour)} / час
+                        </p>
+                      </div>
+                      <span
+                        className={cn(
+                          "flex size-8 items-center justify-center rounded-md border",
+                          isSelected
+                            ? "border-primary bg-primary text-emerald-950"
+                            : "border-border text-muted-foreground"
+                        )}
+                      >
+                        {isSelected ? <Check className="size-4" /> : <CircleDashed className="size-4" />}
+                      </span>
+                    </div>
+                    <p className="line-clamp-2 text-sm text-muted-foreground">
+                      {(hall.amenities ?? []).join(", ") || "Базовая площадка для съемки"}
+                    </p>
+                  </Link>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="rounded-lg border border-dashed border-border p-5 text-sm text-muted-foreground">
+              У этой студии пока нет активных залов. Выберите другую студию.
+            </div>
+          )}
+        </div>
+      ) : null}
+
       <div className="flex flex-col items-start justify-between gap-5 border-t border-border pt-6 sm:flex-row sm:items-center">
         <div className="flex items-start gap-3">
           <span className="flex size-10 shrink-0 items-center justify-center rounded-md bg-secondary">
@@ -163,22 +233,20 @@ export function FullShootBuilder({
           </span>
           <div>
             <p className="font-medium">
-              {isComplete ? "Комплект собран" : "Соберите все три элемента"}
+              {isComplete ? "Конструктор собран" : "Выберите фотографа, студию и зал"}
             </p>
             <p className="mt-1 text-sm text-muted-foreground">
               {isComplete
                 ? "Переходите к выбору даты, времени и оплате брони."
-                : "После выбора стиля, фотографа и студии откроется финальный шаг."}
+                : "После выбора всех элементов откроется пошаговое бронирование."}
             </p>
           </div>
         </div>
         {isComplete ? (
           <Button asChild size="lg">
-            <Link
-              href={`/booking?style=${style!.id}&photographer=${photographer!.id}&studio=${studio!.id}`}
-            >
+            <Link href={buildBookingHref(selection)}>
               Продолжить бронирование
-              <ArrowRight className="size-4" aria-hidden="true" />
+              {/* <ArrowRight className="size-4" aria-hidden="true" /> */}
             </Link>
           </Button>
         ) : (
@@ -193,13 +261,49 @@ export function FullShootBuilder({
 
 function buildCatalogHref(
   pathname: string,
-  selection: { style?: string; photographer?: string; studio?: string }
+  selection: { photographer?: string; studio?: string; studioHall?: string }
 ) {
   const params = new URLSearchParams({ flow: "full-shoot" });
 
-  if (selection.style) params.set("style", selection.style);
   if (selection.photographer) params.set("photographer", selection.photographer);
   if (selection.studio) params.set("studio", selection.studio);
+  if (selection.studioHall) params.set("studioHallId", selection.studioHall);
 
   return `${pathname}?${params.toString()}`;
+}
+
+function buildBookingHref(selection: {
+  photographer?: string;
+  studio?: string;
+  studioHall?: string;
+}) {
+  const params = new URLSearchParams();
+  if (selection.photographer) params.set("photographer", selection.photographer);
+  if (selection.studio) params.set("studio", selection.studio);
+  if (selection.studioHall) params.set("studioHallId", selection.studioHall);
+  return `/booking?${params.toString()}`;
+}
+
+function buildConstructorHref(selection: {
+  photographer?: string;
+  studio?: string;
+  studioHall?: string;
+}) {
+  const params = new URLSearchParams({ type: "FULL_SHOOT" });
+  if (selection.photographer) params.set("photographer", selection.photographer);
+  if (selection.studio) params.set("studio", selection.studio);
+  if (selection.studioHall) params.set("studioHallId", selection.studioHall);
+  return `/booking/new?${params.toString()}`;
+}
+
+function getLowestHallPrice(halls: StudioHall[], fallback: number) {
+  if (halls.length === 0) return fallback;
+  return Math.min(...halls.map((hall) => hall.pricePerHour));
+}
+
+function formatHallCount(count: number) {
+  if (count % 100 >= 11 && count % 100 <= 14) return "залов";
+  if (count % 10 === 1) return "зал";
+  if (count % 10 >= 2 && count % 10 <= 4) return "зала";
+  return "залов";
 }

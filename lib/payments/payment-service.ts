@@ -4,8 +4,11 @@ import {
   PaymentProvider,
   PaymentStatus,
   PaymentType,
+  PlatformFeeStatus,
   PayoutStatus,
-  Prisma
+  ProviderPaymentStatus,
+  Prisma,
+  StudioConfirmationRequestStatus
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import {
@@ -33,6 +36,10 @@ import {
   cancelPlatformBookingEvent,
   createPlatformBookingEvent
 } from "@/lib/calendar/calendar-service";
+import {
+  buildStudioWhatsappMessageAfterPayment,
+  buildWhatsappOpenUrl
+} from "@/lib/studio-confirmations/whatsapp-message-builder";
 
 const paymentBookingInclude = {
   style: true,
@@ -41,7 +48,7 @@ const paymentBookingInclude = {
   studioHall: true
 };
 
-export async function createDepositPaymentForBooking(
+export async function createPlatformFeePaymentForBooking(
   bookingId: string,
   provider = getConfiguredPaymentProvider()
 ) {
@@ -51,21 +58,25 @@ export async function createDepositPaymentForBooking(
   });
 
   if (!booking) throw new Error("Booking not found");
-  if (booking.clientId === null) {
+  if (booking.clientId === null && booking.source !== "TELEGRAM_LEAD") {
     throw new Error("A signed-in client is required for hosted payment");
   }
-  if (booking.depositAmount <= 0 || booking.depositAmount > booking.totalPrice) {
-    throw new Error("Invalid booking deposit amount");
+  const platformFeeAmount = booking.platformFeeAmount || booking.depositAmount || booking.serviceFee;
+
+  if (platformFeeAmount <= 0 || platformFeeAmount > booking.totalPrice) {
+    throw new Error("Invalid booking platform fee amount");
   }
 
   const paidDeposit = booking.payments.find(
-    (payment) => payment.type === PaymentType.DEPOSIT && payment.status === PaymentStatus.PAID
+    (payment) =>
+      (payment.type === PaymentType.PLATFORM_FEE || payment.type === PaymentType.DEPOSIT) &&
+      payment.status === PaymentStatus.PAID
   );
-  if (paidDeposit) throw new Error("Deposit is already paid");
+  if (paidDeposit) throw new Error("Platform fee is already paid");
 
   const reusable = booking.payments.find(
     (payment) =>
-      payment.type === PaymentType.DEPOSIT &&
+      payment.type === PaymentType.PLATFORM_FEE &&
       payment.status === PaymentStatus.PENDING &&
       payment.provider === provider
   );
@@ -79,21 +90,25 @@ export async function createDepositPaymentForBooking(
       const created = await tx.payment.create({
         data: {
           bookingId: booking.id,
-          amount: booking.depositAmount,
+          amount: platformFeeAmount,
           currency: "KZT",
           status: PaymentStatus.PENDING,
           provider,
-          type: PaymentType.DEPOSIT
+          type: PaymentType.PLATFORM_FEE
         }
       });
       await tx.booking.update({
         where: { id: booking.id },
-        data: { paymentStatus: BookingPaymentStatus.DEPOSIT_PENDING }
+        data: {
+          paymentStatus: BookingPaymentStatus.DEPOSIT_PENDING,
+          platformFeeStatus: PlatformFeeStatus.UNPAID,
+          status: BookingStatus.PENDING_PLATFORM_FEE
+        }
       });
       await createAuditLog(tx, {
         bookingId: booking.id,
         paymentId: created.id,
-        action: "DEPOSIT_PAYMENT_CREATED",
+        action: "PLATFORM_FEE_PAYMENT_CREATED",
         metadata: { provider, amount: created.amount }
       });
       return created;
@@ -123,6 +138,8 @@ export async function createDepositPaymentForBooking(
     throw error;
   }
 }
+
+export const createDepositPaymentForBooking = createPlatformFeePaymentForBooking;
 
 export async function createFinalPaymentForBooking(
   bookingId: string,
@@ -253,16 +270,35 @@ export async function markPaymentAsPaid(
         }
       });
 
-      if (payment.type === PaymentType.DEPOSIT) {
-        if (payment.amount !== payment.booking.depositAmount) {
-          throw new Error("Deposit payment amount does not match booking");
+      if (payment.type === PaymentType.PLATFORM_FEE || payment.type === PaymentType.DEPOSIT) {
+        const confirmationRequest = await tx.studioConfirmationRequest.findUnique({
+          where: { bookingId: payment.bookingId },
+          include: {
+            studioProfile: { include: { owner: true } },
+            studioHall: true,
+            booking: true,
+            client: true
+          }
+        });
+        const platformFeeAmount =
+          payment.booking.platformFeeAmount || payment.booking.depositAmount || payment.booking.serviceFee;
+        const providerAmount =
+          payment.booking.providerAmount ||
+          Math.max(payment.booking.totalPrice - platformFeeAmount, 0);
+
+        if (payment.amount !== platformFeeAmount) {
+          throw new Error("Platform fee payment amount does not match booking");
         }
         await tx.booking.update({
           where: { id: payment.bookingId },
           data: {
             paymentStatus: BookingPaymentStatus.DEPOSIT_PAID,
+            platformFeeStatus: PlatformFeeStatus.PAID,
+            platformFeePaidAt: new Date(),
+            providerPaymentStatus: ProviderPaymentStatus.EXTERNAL_PENDING,
+            status: confirmationRequest ? BookingStatus.CONFIRMED : BookingStatus.PENDING,
             paidAmount: payment.amount,
-            remainingAmount: payment.booking.totalPrice - payment.amount,
+            remainingAmount: providerAmount,
             providerFee: totalProviderFee,
             netPlatformRevenue: calculateNetPlatformRevenue({
               platformCommission,
@@ -282,6 +318,18 @@ export async function markPaymentAsPaid(
           );
         }
         await createPlatformBookingEvent(payment.bookingId, tx);
+        if (confirmationRequest) {
+          const message = buildStudioWhatsappMessageAfterPayment(confirmationRequest);
+          const url = buildWhatsappOpenUrl(confirmationRequest.studioProfile.whatsappBookingPhone, message);
+          await tx.studioConfirmationRequest.update({
+            where: { id: confirmationRequest.id },
+            data: {
+              status: StudioConfirmationRequestStatus.CONVERTED_TO_BOOKING,
+              whatsappMessageTextAfterPayment: message,
+              whatsappOpenUrlAfterPayment: url
+            }
+          });
+        }
       } else if (payment.type === PaymentType.FINAL_PAYMENT) {
         if (payment.amount !== payment.booking.remainingAmount) {
           throw new Error("Final payment amount does not match booking remainder");
@@ -305,6 +353,7 @@ export async function markPaymentAsPaid(
             })
           }
         });
+        await cancelPlatformBookingEvent(payment.bookingId, tx);
       } else {
         throw new Error("Refund records cannot be marked as paid");
       }
@@ -357,9 +406,9 @@ export async function markPaymentAsFailed(
             : BookingPaymentStatus.FAILED
       }
     });
-    if (payment.type === PaymentType.DEPOSIT) {
-      await cancelBookingHolds(payment.bookingId, tx);
-    }
+      if (payment.type === PaymentType.DEPOSIT || payment.type === PaymentType.PLATFORM_FEE) {
+        await cancelBookingHolds(payment.bookingId, tx);
+      }
     await createAuditLog(tx, {
       bookingId: payment.bookingId,
       paymentId: payment.id,
@@ -404,7 +453,7 @@ export async function cancelPayment(
             : BookingPaymentStatus.UNPAID
       }
     });
-    if (payment.type === PaymentType.DEPOSIT) {
+    if (payment.type === PaymentType.DEPOSIT || payment.type === PaymentType.PLATFORM_FEE) {
       await cancelBookingHolds(payment.bookingId, tx);
     }
     await createAuditLog(tx, {
@@ -449,6 +498,12 @@ export async function getBookingPaymentSummary(bookingId: string) {
     platformCommission: booking.platformCommission,
     providerFee: booking.providerFee,
     netPlatformRevenue: booking.netPlatformRevenue,
+    settlementMode: booking.settlementMode,
+    totalServicePrice: booking.totalServicePrice,
+    platformFeeAmount: booking.platformFeeAmount,
+    providerAmount: booking.providerAmount,
+    platformFeeStatus: booking.platformFeeStatus,
+    providerPaymentStatus: booking.providerPaymentStatus,
     payments: booking.payments
   };
 }
@@ -545,9 +600,9 @@ async function initializeCheckout(paymentId: string) {
     currency: payment.currency,
     type: payment.type,
     description:
-      payment.type === PaymentType.DEPOSIT
-        ? `Депозит по брони ${payment.booking.bookingNumber}`
-        : `Остаток по брони ${payment.booking.bookingNumber}`,
+      payment.type === PaymentType.PLATFORM_FEE || payment.type === PaymentType.DEPOSIT
+        ? `Сервисный сбор по брони ${payment.booking.bookingNumber}`
+        : `Платеж по брони ${payment.booking.bookingNumber}`,
     successUrl: `${appUrl}/booking/success?bookingNumber=${encodeURIComponent(
       payment.booking.bookingNumber
     )}`,

@@ -8,7 +8,7 @@ const fallback =
 export function ImagePreview({
   src,
   alt,
-  aspect = "aspect-[4/3]"
+  aspect = "aspect-video sm:aspect-[4/3]"
 }: {
   src?: string;
   alt: string;

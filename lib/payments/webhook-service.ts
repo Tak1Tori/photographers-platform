@@ -84,7 +84,7 @@ export async function handlePaymentWebhook(
     if (event.status === PaymentStatus.PAID) {
       const updated = await processPaidEvent(payment.id, event);
       if (updated?.bookingId) {
-        if (payment.type === PaymentType.DEPOSIT) {
+        if (payment.type === PaymentType.PLATFORM_FEE || payment.type === PaymentType.DEPOSIT) {
           await notifyDepositPaid(updated.bookingId);
         } else if (payment.type === PaymentType.FINAL_PAYMENT) {
           await notifyFullyPaid(updated.bookingId);

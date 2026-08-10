@@ -6,7 +6,7 @@ export interface PhotoStyle {
   startingPrice: number;
 }
 
-export type UserRole = "CLIENT" | "PHOTOGRAPHER" | "STUDIO_OWNER" | "ADMIN";
+export type UserRole = "CLIENT" | "PHOTOGRAPHER" | "EDITOR" | "STUDIO_OWNER" | "ADMIN";
 
 export type BookingStatus = "Pending" | "Confirmed" | "In progress" | "Completed" | "Cancelled";
 export type ExtendedBookingStatus = BookingStatus | "Declined";
@@ -19,6 +19,10 @@ export type BookingPaymentStatus =
   | "REFUNDED"
   | "FAILED";
 export type BookingType = "FULL_SHOOT" | "PHOTOGRAPHER_ONLY" | "STUDIO_ONLY";
+export type StudioConfirmationMode =
+  | "PLATFORM_CALENDAR_AUTO"
+  | "WHATSAPP_CONFIRMATION"
+  | "MANUAL_DASHBOARD_CONFIRMATION";
 export type ShootType =
   | "PERSONAL"
   | "EVENT"
@@ -77,7 +81,19 @@ export type PaymentProvider =
   | "FREEDOM_PAY"
   | "KASPI"
   | "PAYBOX";
-export type PaymentType = "DEPOSIT" | "FINAL_PAYMENT" | "REFUND";
+export type PaymentType = "PLATFORM_FEE" | "DEPOSIT" | "FINAL_PAYMENT" | "REFUND";
+export type SettlementMode = "PLATFORM_FEE_ONLY" | "AGENT_FULL_COLLECTION";
+export type PlatformFeeStatus =
+  | "UNPAID"
+  | "PAID"
+  | "REFUND_REQUESTED"
+  | "REFUNDED"
+  | "NON_REFUNDABLE";
+export type ProviderPaymentStatus =
+  | "NOT_TRACKED"
+  | "EXTERNAL_PENDING"
+  | "EXTERNAL_PAID"
+  | "EXTERNAL_CANCELLED";
 export type ClientBookingFilter =
   | "All"
   | "Pending"
@@ -120,10 +136,32 @@ export interface DashboardAvailabilitySlot {
   studioHallName?: string;
 }
 
+export type MediaProvider = "CLOUDINARY" | "SUPABASE" | "LOCAL";
+
+export interface MediaMetadata {
+  provider?: MediaProvider;
+  bytes?: number;
+  originalBytes?: number;
+  width?: number;
+  height?: number;
+  format?: string;
+}
+
 export interface PortfolioItem {
   id: string;
   imageUrl: string;
   imagePublicId?: string;
+  mediaType?: "IMAGE" | "VIDEO";
+  provider?: MediaProvider;
+  bytes?: number;
+  originalBytes?: number;
+  width?: number;
+  height?: number;
+  format?: string;
+  coverCropX?: number | null;
+  coverCropY?: number | null;
+  coverCropWidth?: number | null;
+  coverCropHeight?: number | null;
   title: string;
   description: string;
   albumImages: PortfolioAlbumImage[];
@@ -134,6 +172,12 @@ export interface PortfolioAlbumImage {
   imageUrl: string;
   imagePublicId?: string;
   mediaType: "IMAGE" | "VIDEO";
+  provider?: MediaProvider;
+  bytes?: number;
+  originalBytes?: number;
+  width?: number;
+  height?: number;
+  format?: string;
   sortOrder: number;
 }
 
@@ -143,11 +187,20 @@ export interface Photographer {
   city: string;
   bio: string;
   specializationIds: string[];
+  specializationTitles?: string[];
   pricePerHour: number;
   rating: number;
   imageUrl: string;
   portfolio: string[];
   availableSlotIds: string[];
+}
+
+export interface PhotographerReview {
+  id: string;
+  rating: number;
+  comment?: string;
+  createdAt: string;
+  clientName: string;
 }
 
 export interface StudioHall {
@@ -160,6 +213,27 @@ export interface StudioHall {
   status?: "Active" | "Inactive";
   imageUrl?: string;
   imagePublicId?: string;
+  imageProvider?: MediaProvider;
+  imageBytes?: number;
+  imageOriginalBytes?: number;
+  imageWidth?: number;
+  imageHeight?: number;
+  imageFormat?: string;
+  imageMediaType?: "IMAGE" | "VIDEO";
+  galleryImages?: StudioHallGalleryImage[];
+}
+
+export interface StudioHallGalleryImage {
+  id: string;
+  imageUrl: string;
+  imagePublicId?: string;
+  provider?: MediaProvider;
+  bytes?: number;
+  originalBytes?: number;
+  width?: number;
+  height?: number;
+  format?: string;
+  sortOrder: number;
 }
 
 export interface Studio {
@@ -169,6 +243,10 @@ export interface Studio {
   city: string;
   district: string;
   address: string;
+  googleMapsUrl?: string;
+  googleMapsEmbedUrl?: string;
+  twoGisUrl?: string;
+  twoGisEmbedUrl?: string;
   description: string;
   pricePerHour: number;
   capacity: number;
@@ -181,6 +259,11 @@ export interface Studio {
   suitableStyleIds: string[];
   availableSlotIds: string[];
   primaryHallId?: string;
+  confirmationMode?: StudioConfirmationMode;
+  whatsappBookingPhone?: string;
+  whatsappContactName?: string;
+  whatsappResponseTimeoutMinutes?: number;
+  whatsappConfirmationEnabled?: boolean;
 }
 
 export interface MockBooking {
@@ -229,6 +312,13 @@ export interface Booking {
   studioTotal: number;
   serviceFee: number;
   totalAmount: number;
+  settlementMode?: SettlementMode;
+  totalServicePrice?: number;
+  platformFeeAmount?: number;
+  providerAmount?: number;
+  platformFeeStatus?: PlatformFeeStatus;
+  providerPaymentStatus?: ProviderPaymentStatus;
+  platformFeePaidAt?: string;
   depositAmount: number;
   paidAmount: number;
   remainingAmount: number;
@@ -252,6 +342,7 @@ export interface ClientBookingListItem extends Booking {
   studioName: string;
   studioAddress: string;
   createdAt: string;
+  hasReview?: boolean;
 }
 
 export interface ClientBookingDetails extends ClientBookingListItem {
@@ -290,7 +381,7 @@ export interface CreateBookingInput {
   clientEmail: string;
   clientPhone: string;
   clientComment?: string;
-  styleId: string;
+  styleId?: string;
   photographerId: string;
   studioId: string;
   studioHallId?: string;
@@ -346,6 +437,11 @@ export interface CreateBookingResult {
   bookingNumber?: string;
   checkoutUrl?: string;
   paymentId?: string;
+  requiresStudioConfirmation?: boolean;
+  confirmationRequestId?: string;
+  waitingUrl?: string;
+  platformFeeAmount?: number;
+  whatsappOpenUrl?: string;
   error?: string;
 }
 
@@ -377,7 +473,6 @@ export interface PaymentWebhookLogDTO {
 export interface AdminNotificationDTO {
   id: string;
   userName: string;
-  userEmail: string;
   type: string;
   title: string;
   isRead: boolean;
@@ -395,6 +490,12 @@ export interface BookingPaymentSummary {
   bookingId: string;
   bookingNumber: string;
   paymentStatus: BookingPaymentStatus;
+  settlementMode?: SettlementMode;
+  totalServicePrice?: number;
+  platformFeeAmount?: number;
+  providerAmount?: number;
+  platformFeeStatus?: PlatformFeeStatus;
+  providerPaymentStatus?: ProviderPaymentStatus;
   depositAmount: number;
   paidAmount: number;
   remainingAmount: number;
@@ -416,6 +517,13 @@ export interface PhotographerProfile {
   city: string;
   avatarUrl?: string;
   avatarPublicId?: string;
+  avatarProvider?: MediaProvider;
+  avatarBytes?: number;
+  avatarOriginalBytes?: number;
+  avatarWidth?: number;
+  avatarHeight?: number;
+  avatarFormat?: string;
+  avatarMediaType?: "IMAGE" | "VIDEO";
   specializationIds: string[];
   pricePerHour: number;
   bio: string;
@@ -430,12 +538,28 @@ export interface StudioProfile {
   name: string;
   city: string;
   address: string;
+  googleMapsUrl?: string;
+  googleMapsEmbedUrl?: string;
+  twoGisUrl?: string;
+  twoGisEmbedUrl?: string;
   imageUrl?: string;
   imagePublicId?: string;
+  imageProvider?: MediaProvider;
+  imageBytes?: number;
+  imageOriginalBytes?: number;
+  imageWidth?: number;
+  imageHeight?: number;
+  imageFormat?: string;
+  imageMediaType?: "IMAGE" | "VIDEO";
   description: string;
   rules: string[];
   status: ProfileStatus;
   halls: StudioHall[];
+  confirmationMode?: StudioConfirmationMode;
+  whatsappBookingPhone?: string;
+  whatsappContactName?: string;
+  whatsappResponseTimeoutMinutes?: number;
+  whatsappConfirmationEnabled?: boolean;
 }
 
 export interface DashboardStats {

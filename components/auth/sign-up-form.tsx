@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { signIn } from "next-auth/react";
 import { UserPlus } from "lucide-react";
 import { registerUserAction } from "@/app/auth/actions";
@@ -11,23 +12,23 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 const roles = [
   { label: "Я клиент", value: "CLIENT" },
   { label: "Я фотограф", value: "PHOTOGRAPHER" },
-  { label: "Я владелец студии", value: "STUDIO_OWNER" }
+  { label: "Я монтажер", value: "EDITOR" }
 ] as const;
 
 export function SignUpForm() {
   const router = useRouter();
   const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<(typeof roles)[number]["value"]>("CLIENT");
+  const [acceptedLegal, setAcceptedLegal] = useState(false);
   const [error, setError] = useState("");
   const [isPending, startTransition] = useTransition();
 
   function submit() {
     setError("");
     startTransition(async () => {
-      const result = await registerUserAction({ name, email, phone, password, role });
+      const result = await registerUserAction({ name, phone, password, role, acceptedLegal });
 
       if (!result.success) {
         setError(result.error ?? "Не удалось зарегистрироваться");
@@ -35,7 +36,7 @@ export function SignUpForm() {
       }
 
       const signInResult = await signIn("credentials", {
-        email,
+        phone,
         password,
         redirect: false,
         callbackUrl: result.redirectTo
@@ -57,7 +58,7 @@ export function SignUpForm() {
             {error}
           </p>
         ) : null}
-        <div className="grid gap-2 sm:grid-cols-3">
+        <div className="grid gap-2 sm:grid-cols-2">
           {roles.map((item) => (
             <button
               key={item.value}
@@ -73,12 +74,20 @@ export function SignUpForm() {
             </button>
           ))}
         </div>
-        <div className="grid gap-4 md:grid-cols-2">
-          <Field label="Имя" value={name} onChange={setName} />
-          <Field label="Телефон" value={phone} onChange={setPhone} />
-        </div>
-        <Field label="Email" value={email} onChange={setEmail} />
+        <Field label="Имя" value={name} onChange={setName} />
+        <Field label="Телефон" value={phone} type="tel" onChange={setPhone} />
         <Field label="Пароль" type="password" value={password} onChange={setPassword} />
+        <label className="flex items-start gap-3 text-sm leading-5 text-muted-foreground">
+          <input
+            type="checkbox"
+            checked={acceptedLegal}
+            onChange={(event) => setAcceptedLegal(event.target.checked)}
+            className="mt-1 size-4 shrink-0 accent-primary"
+          />
+          <span>
+            Я принимаю <Link href="/terms" className="text-foreground underline underline-offset-2">Пользовательское соглашение</Link> и <Link href="/privacy-policy" className="text-foreground underline underline-offset-2">Политику конфиденциальности</Link>.
+          </span>
+        </label>
         <Button onClick={submit} disabled={isPending}>
           <UserPlus className="size-4" aria-hidden="true" />
           {isPending ? "Создаем аккаунт..." : "Зарегистрироваться"}

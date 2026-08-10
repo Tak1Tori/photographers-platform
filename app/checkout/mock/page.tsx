@@ -1,6 +1,6 @@
 import { CreditCard, ShieldCheck } from "lucide-react";
+import Link from "next/link";
 import { cancelMockPaymentAction, confirmMockPaymentAction } from "@/app/checkout/mock/actions";
-import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getBookingById } from "@/lib/data/bookings";
@@ -24,53 +24,48 @@ export default async function MockCheckoutPage({ searchParams }: MockCheckoutPag
   const mockBooking = !canUseDatabase() && paymentId ? await getBookingById(paymentId) : undefined;
   const canAccessPayment =
     !payment ||
+    payment.booking.source === "TELEGRAM_LEAD" ||
     session?.user.role === "ADMIN" ||
     (session?.user.id && payment.booking.clientId === session.user.id);
 
   if (!paymentId || (!payment && !mockBooking) || !canAccessPayment) {
     return (
-      <>
-        <PageHeader eyebrow="Checkout" title="Платеж не найден" description="Проверьте ссылку на оплату или создайте бронь заново." />
-        <section className="section"><div className="container"><EmptyBox text="Payment не найден." /></div></section>
-      </>
+      <section className="py-6 md:py-10"><div className="container"><EmptyBox text="Payment не найден." /></div></section>
     );
   }
 
   if (searchParams.cancelled) {
     return (
-      <>
-        <PageHeader eyebrow="Checkout" title="Оплата отменена" description="Депозит не был списан. Можно вернуться к бронированию и попробовать снова." />
-        <section className="section"><div className="container"><EmptyBox text="Оплата отменена." /></div></section>
-      </>
+      <section className="py-6 md:py-10"><div className="container"><EmptyBox text="Оплата отменена." /></div></section>
     );
   }
 
   if (searchParams.error) {
     return (
-      <>
-        <PageHeader eyebrow="Checkout" title="Платеж не обработан" description="Webhook не подтвердил оплату. Статус брони не изменен." />
-        <section className="section"><div className="container"><EmptyBox text="Проверьте платеж и попробуйте снова." /></div></section>
-      </>
+      <section className="py-6 md:py-10"><div className="container"><EmptyBox text="Проверьте платеж и попробуйте снова." /></div></section>
     );
   }
 
   const booking = payment?.booking;
+  const isPlatformFeePayment =
+    payment?.type === "PLATFORM_FEE" || payment?.type === "DEPOSIT" || !payment?.type;
   const details = booking
     ? {
         bookingNumber: booking.bookingNumber,
         bookingType: booking.bookingType,
         style: booking.style?.name ?? booking.shootType ?? "Бронирование фотографа",
         photographer: booking.photographer?.name ?? "Без фотографа",
-        studio: booking.studio?.name ?? "Без студии",
-        hall: booking.studioHall?.name ?? "Без зала",
         shootType: booking.shootType,
         rentalPurpose: booking.rentalPurpose,
         date: booking.date.toISOString().slice(0, 10),
         time: booking.startTime,
         durationHours: booking.durationHours,
-        total: booking.totalPrice,
-        deposit: booking.depositAmount,
-        remaining: Math.max(booking.totalPrice - booking.depositAmount, 0)
+        total: booking.totalServicePrice || booking.totalPrice,
+        platformFee: booking.platformFeeAmount || booking.depositAmount || payment?.amount || booking.serviceFee,
+        providerAmount:
+          booking.providerAmount ||
+          booking.remainingAmount ||
+          Math.max((booking.totalServicePrice || booking.totalPrice) - (booking.platformFeeAmount || booking.depositAmount || booking.serviceFee), 0)
       }
     : mockBooking
       ? {
@@ -78,59 +73,35 @@ export default async function MockCheckoutPage({ searchParams }: MockCheckoutPag
           bookingType: mockBooking.bookingType,
           style: mockBooking.styleId,
           photographer: mockBooking.photographerId,
-          studio: mockBooking.studioId,
-          hall: mockBooking.hallName,
           shootType: mockBooking.shootType,
           rentalPurpose: mockBooking.rentalPurpose,
           date: mockBooking.date,
           time: mockBooking.time,
           durationHours: mockBooking.durationHours,
-          total: mockBooking.totalAmount,
-          deposit: mockBooking.depositAmount,
-          remaining: Math.max(mockBooking.totalAmount - mockBooking.depositAmount, 0)
+          total: mockBooking.totalServicePrice ?? mockBooking.totalAmount,
+          platformFee: mockBooking.platformFeeAmount ?? mockBooking.depositAmount,
+          providerAmount:
+            mockBooking.providerAmount ??
+            Math.max((mockBooking.totalServicePrice ?? mockBooking.totalAmount) - (mockBooking.platformFeeAmount ?? mockBooking.depositAmount), 0)
         }
       : undefined;
 
   return (
-    <>
-      <PageHeader
-        eyebrow="Mock checkout"
-        title={
-          payment?.type === "FINAL_PAYMENT"
-            ? "Оплата остатка"
-            : details?.bookingType === "PHOTOGRAPHER_ONLY"
-            ? "Оплата депозита за бронирование фотографа"
-            : details?.bookingType === "STUDIO_ONLY"
-              ? "Оплата депозита за аренду студии"
-              : "Оплата депозита"
-        }
-        description="Тестовый hosted checkout. Статус оплаты меняется только после подписанного mock webhook."
-      />
-      <section className="section">
+      <section className="py-6 md:py-10">
         <div className="container grid gap-6 lg:grid-cols-[1fr_420px]">
           <Card>
             <CardHeader>
               <CardTitle>Детали брони</CardTitle>
             </CardHeader>
-            <CardContent className="grid gap-3 text-sm md:grid-cols-2">
+            <CardContent className="grid grid-cols-2 gap-3 text-sm">
               <Summary label="Номер брони" value={details?.bookingNumber ?? "-"} />
-              {details?.bookingType === "STUDIO_ONLY" ? (
-                <>
-                  <Summary label="Студия" value={details?.studio ?? "-"} />
-                  <Summary label="Зал" value={details?.hall ?? "-"} />
-                  <Summary label="Цель аренды" value={details?.rentalPurpose ?? "-"} />
-                </>
-              ) : (
-                <>
-                  <Summary label={details?.bookingType === "PHOTOGRAPHER_ONLY" ? "Тип съемки" : "Стиль"} value={details?.style ?? "-"} />
-                  <Summary label="Фотограф" value={details?.photographer ?? "-"} />
-                </>
-              )}
+              <Summary label={details?.bookingType === "PHOTOGRAPHER_ONLY" ? "Тип съемки" : "Формат"} value={details?.style ?? "-"} />
+              <Summary label="Фотограф" value={details?.photographer ?? "-"} />
               <Summary label="Дата и время" value={`${details?.date ?? "-"} · ${details?.time ?? "-"}`} />
               <Summary label="Длительность" value={`${details?.durationHours ?? "-"} ч`} />
-              <Summary label="Общая стоимость" value={formatPrice(details?.total ?? 0)} />
-              <Summary label="Депозит" value={formatPrice(details?.deposit ?? 0)} />
-              <Summary label="Остаток" value={formatPrice(details?.remaining ?? 0)} />
+              <Summary label="Стоимость услуги" value={formatPrice(details?.total ?? 0)} />
+              <Summary label="Сервисный сбор платформы" value={formatPrice(details?.platformFee ?? 0)} />
+              <Summary label="Остаток исполнителю" value={formatPrice(details?.providerAmount ?? 0)} />
             </CardContent>
           </Card>
 
@@ -152,12 +123,20 @@ export default async function MockCheckoutPage({ searchParams }: MockCheckoutPag
               </div>
               <p className="inline-flex items-center gap-2 text-sm text-muted-foreground">
                 <ShieldCheck className="size-4" aria-hidden="true" />
-                Списание не происходит, статус меняется в БД.
+                Списание не происходит. Сервисный сбор подтверждает бронь, остаток оплачивается напрямую исполнителю.
               </p>
               <form action={confirmMockPaymentAction}>
                 <input type="hidden" name="paymentId" value={paymentId} />
+                <label className="mb-4 flex cursor-pointer items-start gap-3 text-xs leading-5 text-muted-foreground">
+                  <input name="acceptedLegal" type="checkbox" required className="mt-0.5 size-4 shrink-0 accent-primary" />
+                  <span>
+                    Я принимаю <Link href="/offer" className="text-foreground underline underline-offset-2">Публичную оферту</Link> и <Link href="/payment-and-refund" className="text-foreground underline underline-offset-2">Правила оплаты и возврата</Link>.
+                  </span>
+                </label>
                 <Button className="w-full" size="lg">
-                  {payment?.type === "FINAL_PAYMENT" ? "Оплатить остаток" : "Оплатить депозит"}
+                  {isPlatformFeePayment
+                    ? `Подтвердить бронь за ${formatPrice(details?.platformFee ?? payment?.amount ?? 0)}`
+                    : "Продолжить"}
                 </Button>
               </form>
               <form action={cancelMockPaymentAction}>
@@ -168,15 +147,14 @@ export default async function MockCheckoutPage({ searchParams }: MockCheckoutPag
           </Card>
         </div>
       </section>
-    </>
   );
 }
 
 function Summary({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-border p-4">
+    <div className="min-w-0 rounded-lg border border-border p-3 sm:p-4">
       <p className="text-muted-foreground">{label}</p>
-      <p className="mt-1 font-semibold">{value}</p>
+      <p className="mt-1 break-words font-semibold">{value}</p>
     </div>
   );
 }

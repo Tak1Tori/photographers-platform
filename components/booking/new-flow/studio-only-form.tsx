@@ -3,8 +3,8 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState, useTransition } from "react";
-import { AlertCircle, ArrowLeft, Building2, CreditCard, MapPin, Users } from "lucide-react";
+import { useCallback, useMemo, useState, useTransition } from "react";
+import { AlertCircle, ArrowLeft, Building2, CalendarDays, Check, CreditCard, MapPin, Users } from "lucide-react";
 import { createStudioOnlyBookingAction } from "@/app/booking/new/actions";
 import {
   RENTAL_PURPOSES,
@@ -18,17 +18,22 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SmartSlotPicker } from "@/components/booking/smart-slot-picker";
+import { StudioMap } from "@/components/studios/studio-map";
 import { formatPrice } from "@/lib/mock-data";
+import { cn } from "@/lib/utils";
 import type { Studio, StudioHall } from "@/lib/types";
 
 type FieldErrors = Record<string, string>;
+type CreatedBookingState = {
+  bookingNumber: string;
+  checkoutUrl: string;
+};
 
 interface StudioOnlyFormProps {
   studio?: Studio;
   hall?: StudioHall;
   clientDefaults?: {
     name?: string | null;
-    email?: string | null;
     phone?: string | null;
   };
 }
@@ -47,9 +52,13 @@ export function StudioOnlyForm({ studio, hall, clientDefaults }: StudioOnlyFormP
   const [peopleCount, setPeopleCount] = useState(1);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
+  const [createdBooking, setCreatedBooking] = useState<CreatedBookingState | null>(null);
+  const [mobileStep, setMobileStep] = useState(0);
+  const [mobileSlot, setMobileSlot] = useState({ date: "", startTime: "" });
   const pricing = useMemo(
     () =>
       calculateBookingPricing({
+        bookingType: "STUDIO_ONLY",
         photographerPrice: 0,
         studioPrice: selectedHall?.pricePerHour ?? 0,
         durationHours
@@ -61,6 +70,18 @@ export function StudioOnlyForm({ studio, hall, clientDefaults }: StudioOnlyFormP
       ? `Вместимость выбранного зала: ${selectedHall.capacity} человек.`
       : undefined;
   const hasContactErrors = Object.values(fieldErrors).some((error) => error === CONTACT_INFO_ERROR);
+  const canGoNext = mobileStep !== 1 || Boolean(mobileSlot.date && mobileSlot.startTime);
+  const requiresStudioConfirmation =
+    studio?.confirmationMode === "WHATSAPP_CONFIRMATION" && Boolean(studio.whatsappConfirmationEnabled);
+  const handleMobileSlotChange = useCallback((date: string, startTime: string) => {
+    setMobileSlot((current) => {
+      if (current.date === date && current.startTime === startTime) {
+        return current;
+      }
+
+      return { date, startTime };
+    });
+  }, []);
 
   function validateTextField(name: string, value: string) {
     const result = validateNoContactInfo(value);
@@ -75,10 +96,19 @@ export function StudioOnlyForm({ studio, hall, clientDefaults }: StudioOnlyFormP
   function submit(formData: FormData) {
     setFormError(null);
     setFieldErrors({});
+    setCreatedBooking(null);
     startTransition(async () => {
       const result = await createStudioOnlyBookingAction(formData);
+      if (result.success && result.requiresStudioConfirmation && result.waitingUrl) {
+        router.push(result.waitingUrl);
+        return;
+      }
       if (result.success && result.checkoutUrl) {
-        router.push(result.checkoutUrl);
+        setCreatedBooking({
+          bookingNumber: result.bookingNumber ?? "Новая бронь",
+          checkoutUrl: result.checkoutUrl
+        });
+        setMobileStep(2);
         return;
       }
 
@@ -109,76 +139,118 @@ export function StudioOnlyForm({ studio, hall, clientDefaults }: StudioOnlyFormP
   }
 
   return (
-    <form action={submit} className="grid gap-6 lg:grid-cols-[1fr_380px]">
+    <form action={submit} className="grid gap-6">
       <input type="hidden" name="studioId" value={studio.id} />
       <input type="hidden" name="studioHallId" value={selectedHall?.id ?? ""} />
       <input type="hidden" name="selectedHallCapacity" value={selectedHall?.capacity ?? 0} />
 
-      <div className="grid gap-6">
-        <StudioCard studio={studio} selectedHall={selectedHall} />
+      <div className="sticky top-16 z-20 -mx-4 border-y border-border bg-background/95 px-4 py-4 backdrop-blur sm:-mx-6 sm:px-6 md:static md:mx-0 md:rounded-xl md:border md:bg-card/70 md:px-8">
+        <StudioBookingStepper currentStep={mobileStep} />
+      </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Детали аренды</CardTitle>
-          </CardHeader>
-          <CardContent className="grid gap-5">
-            {formError ? <Notice message={formError} /> : null}
-            <div className="grid gap-3">
-              <p className="text-sm font-medium">Выбор зала</p>
-              <div className="grid gap-3 md:grid-cols-2">
-                {activeHalls.map((item) => (
-                  <label
-                    key={item.id ?? item.name}
-                    className={`grid cursor-pointer gap-2 rounded-lg border p-4 text-sm ${
-                      selectedHall?.id === item.id ? "border-foreground bg-secondary" : "border-border"
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      className="sr-only"
-                      checked={selectedHall?.id === item.id}
-                      onChange={() => {
-                        setSelectedHallId(item.id ?? "");
-                        setPeopleCount((current) => Math.min(current, item.capacity));
-                      }}
-                    />
-                    <span className="font-semibold">{item.name}</span>
-                    <span className="text-muted-foreground">{item.capacity} чел · {formatPrice(item.pricePerHour)} / час</span>
-                    <span className="text-muted-foreground">{(item.amenities ?? []).join(", ") || "Базовые удобства"}</span>
-                  </label>
-                ))}
-              </div>
-              <ErrorText error={fieldErrors.studioHallId} />
-            </div>
+      <div className="grid min-h-[calc(100svh-230px)] gap-4 pb-28 pt-2 md:min-h-0 md:pb-0">
+        {formError ? <Notice message={formError} /> : null}
 
-            <Select label="Цель аренды" name="rentalPurpose" options={RENTAL_PURPOSES} error={fieldErrors.rentalPurpose} />
+        <section className={cn("grid gap-4 lg:grid-cols-[320px_minmax(0,1fr)]", mobileStep !== 0 && "hidden")}>
+          <StudioCard studio={studio} selectedHall={selectedHall} />
 
-            <Textarea
-              label="Описание съемки/аренды"
-              name="shootDescription"
-              placeholder="Опишите, для чего нужна студия: съемка, видео, контент, предметка, кастинг и т.д."
-              error={fieldErrors.shootDescription}
-              onValidate={validateTextField}
-              required
-            />
-
-            <div className="grid gap-4">
-              <label className="grid max-w-xs gap-2 text-sm font-medium">
-                Длительность
-                <select
-                  name="durationHours"
-                  value={durationHours}
-                  onChange={(event) => setDurationHours(Number(event.target.value))}
-                  className={inputClass}
-                >
-                  {[1, 2, 3, 4, 5].map((hours) => (
-                    <option key={hours} value={hours}>
-                      {hours === 5 ? "5+ часов" : `${hours} ${hours === 1 ? "час" : "часа"}`}
-                    </option>
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-xl">Детали аренды</CardTitle>
+            </CardHeader>
+            <CardContent className="grid gap-5">
+              <div className="grid gap-3">
+                <p className="text-sm font-medium">Выбор зала</p>
+                <div className="grid gap-3 md:grid-cols-2">
+                  {activeHalls.map((item) => (
+                    <label
+                      key={item.id ?? item.name}
+                      className={cn(
+                        "grid cursor-pointer gap-2 rounded-lg border p-4 text-sm transition-colors",
+                        selectedHall?.id === item.id
+                          ? "border-primary bg-primary/10"
+                          : "border-border hover:border-primary/50"
+                      )}
+                    >
+                      <input
+                        type="radio"
+                        className="sr-only"
+                        checked={selectedHall?.id === item.id}
+                        onChange={() => {
+                          setSelectedHallId(item.id ?? "");
+                          setPeopleCount((current) => Math.min(current, item.capacity));
+                          setMobileSlot({ date: "", startTime: "" });
+                        }}
+                      />
+                      <span className="font-semibold">{item.name}</span>
+                      <span className="text-muted-foreground">
+                        {item.capacity} чел · {formatPrice(item.pricePerHour)} / час
+                      </span>
+                      <span className="text-muted-foreground">
+                        {(item.amenities ?? []).join(", ") || "Базовые удобства"}
+                      </span>
+                    </label>
                   ))}
-                </select>
-                <ErrorText error={fieldErrors.durationHours} />
-              </label>
+                </div>
+                <ErrorText error={fieldErrors.studioHallId} />
+              </div>
+
+              <Select label="Цель аренды" name="rentalPurpose" options={RENTAL_PURPOSES} error={fieldErrors.rentalPurpose} />
+
+              <Textarea
+                label="Описание съемки/аренды"
+                name="shootDescription"
+                placeholder="Опишите, для чего нужна студия: съемка, видео, контент, предметка, кастинг и т.д."
+                error={fieldErrors.shootDescription}
+                onValidate={validateTextField}
+                required
+              />
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <label className="grid gap-2 text-sm font-medium">
+                  Длительность
+                  <select
+                    name="durationHours"
+                    value={durationHours}
+                    onChange={(event) => {
+                      setDurationHours(Number(event.target.value));
+                      setMobileSlot({ date: "", startTime: "" });
+                    }}
+                    className={inputClass}
+                  >
+                    {[1, 2, 3, 4, 5].map((hours) => (
+                      <option key={hours} value={hours}>
+                        {hours === 5 ? "5+ часов" : `${hours} ${hours === 1 ? "час" : "часа"}`}
+                      </option>
+                    ))}
+                  </select>
+                  <ErrorText error={fieldErrors.durationHours} />
+                </label>
+
+                <label className="grid gap-2 text-sm font-medium">
+                  Количество людей
+                  <input
+                    name="peopleCount"
+                    type="number"
+                    min={1}
+                    max={selectedHall?.capacity ?? 100}
+                    value={peopleCount}
+                    onChange={(event) => setPeopleCount(Number(event.target.value))}
+                    className={inputClass}
+                  />
+                  <ErrorText error={capacityError ?? fieldErrors.peopleCount} />
+                </label>
+              </div>
+            </CardContent>
+          </Card>
+        </section>
+
+        <section className={cn("grid gap-4", mobileStep !== 1 && "hidden")}>
+          <Card className="overflow-hidden">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-xl">Дата и время</CardTitle>
+            </CardHeader>
+            <CardContent>
               {selectedHall?.id ? (
                 <SmartSlotPicker
                   bookingType="STUDIO_ONLY"
@@ -186,103 +258,123 @@ export function StudioOnlyForm({ studio, hall, clientDefaults }: StudioOnlyFormP
                   durationHours={durationHours}
                   dateError={fieldErrors.date}
                   timeError={fieldErrors.startTime}
+                  onSelectionChange={handleMobileSlotChange}
+                  presentation="split"
                 />
-              ) : null}
-            </div>
+              ) : (
+                <Notice message="Сначала выберите зал." />
+              )}
+            </CardContent>
+          </Card>
+        </section>
 
-            <div className="grid gap-4 md:grid-cols-2">
-              <label className="grid gap-2 text-sm font-medium">
-                Количество людей
-                <input
-                  name="peopleCount"
-                  type="number"
-                  min={1}
-                  max={selectedHall?.capacity ?? 100}
-                  value={peopleCount}
-                  onChange={(event) => setPeopleCount(Number(event.target.value))}
-                  className={inputClass}
-                />
-                <ErrorText error={capacityError ?? fieldErrors.peopleCount} />
-              </label>
-              <label className="flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm font-medium">
+        <section className={cn("grid gap-4", mobileStep !== 2 && "hidden")}>
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-xl">Подтверждение</CardTitle>
+            </CardHeader>
+            <CardContent className="grid gap-4">
+              {createdBooking ? (
+                <div className="grid gap-3 rounded-lg border border-primary/40 bg-primary/10 p-4">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-300">
+                      Бронь создана
+                    </p>
+                    <h3 className="mt-2 text-xl font-semibold tracking-normal">
+                      {createdBooking.bookingNumber}
+                    </h3>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Сервисный сбор можно оплатить сейчас или позже из личного кабинета.
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    onClick={() => router.push(createdBooking.checkoutUrl)}
+                    className="w-full bg-white text-emerald-950 hover:bg-white/90"
+                  >
+                    <CreditCard className="size-4" aria-hidden="true" />
+                    Подтвердить бронь
+                  </Button>
+                </div>
+              ) : null}
+
+              <div className="grid gap-3 rounded-lg border border-border bg-secondary/20 p-4 text-sm">
+                <MoneyLine label="Студия" value={studio.name} />
+                <MoneyLine label="Зал" value={selectedHall?.name ?? "-"} />
+                <MoneyLine label="Длительность" value={`${durationHours} ч`} />
+                <MoneyLine label="Ставка зала" value={`${formatPrice(selectedHall?.pricePerHour ?? 0)} / час`} />
+                <MoneyLine label="Аренда" value={formatPrice(pricing.studioTotal)} />
+                <MoneyLine label="Сервисный сбор" value={formatPrice(pricing.platformFeeAmount)} />
+                <div className="border-t border-border pt-3">
+                  <MoneyLine label="Стоимость услуги" value={formatPrice(pricing.totalServicePrice)} strong />
+                </div>
+                <MoneyLine label="Остаток студии" value={formatPrice(pricing.providerAmount)} />
+              </div>
+
+              <div className="grid gap-3">
+                <Field label="Имя" name="clientName" defaultValue={clientDefaults?.name ?? ""} error={fieldErrors.clientName} />
+                <Field label="Телефон" name="clientPhone" defaultValue={clientDefaults?.phone ?? ""} error={fieldErrors.clientPhone} />
+              </div>
+
+              <label className="flex items-center gap-2 rounded-md border border-border px-3 py-3 text-sm font-medium">
                 <input type="checkbox" name="needsEquipment" />
                 Нужно оборудование
               </label>
-            </div>
 
-            <div className="grid gap-2">
-              <p className="text-sm font-medium">Оборудование и удобства</p>
-              <div className="grid gap-2 rounded-md border border-border p-3 sm:grid-cols-2">
-                {[...(selectedHall?.amenities ?? []), ...STUDIO_EQUIPMENT_OPTIONS.map((item) => item.label)]
-                  .filter((item, index, array) => array.indexOf(item) === index)
-                  .map((label) => (
-                    <label key={label} className="flex items-center gap-2 text-sm">
-                      <input type="checkbox" name="selectedAmenities" value={label} />
-                      {label}
-                    </label>
-                  ))}
+              <div className="grid gap-2">
+                <p className="text-sm font-medium">Оборудование и удобства</p>
+                <div className="grid gap-2 rounded-md border border-border p-3 sm:grid-cols-2">
+                  {[...(selectedHall?.amenities ?? []), ...STUDIO_EQUIPMENT_OPTIONS.map((item) => item.label)]
+                    .filter((item, index, array) => array.indexOf(item) === index)
+                    .map((label) => (
+                      <label key={label} className="flex items-center gap-2 text-sm">
+                        <input type="checkbox" name="selectedAmenities" value={label} />
+                        {label}
+                      </label>
+                    ))}
+                </div>
               </div>
-            </div>
 
-            <Textarea
-              label="Особые требования"
-              name="specialRequirements"
-              placeholder="Пожелания по залу, свету, реквизиту или таймингу"
-              error={fieldErrors.specialRequirements}
-              onValidate={validateTextField}
-            />
+              <Textarea
+                label="Особые требования"
+                name="specialRequirements"
+                placeholder="Пожелания по залу, свету, реквизиту или таймингу"
+                error={fieldErrors.specialRequirements}
+                onValidate={validateTextField}
+              />
 
-            <div className="grid gap-4 rounded-lg border border-border p-4 md:grid-cols-3">
-              <Field label="Имя" name="clientName" defaultValue={clientDefaults?.name ?? ""} error={fieldErrors.clientName} />
-              <Field label="Телефон" name="clientPhone" defaultValue={clientDefaults?.phone ?? ""} error={fieldErrors.clientPhone} />
-              <Field label="Email" name="clientEmail" type="email" defaultValue={clientDefaults?.email ?? ""} error={fieldErrors.clientEmail} />
-            </div>
-
-            <p className="inline-flex items-start gap-2 rounded-md bg-secondary px-4 py-3 text-sm text-muted-foreground">
-              <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-              Контакты студии раскрываются только после оплаты депозита. Не вставляйте телефон,
-              email, ссылки или username в свободные поля.
-            </p>
-          </CardContent>
-        </Card>
+              <p className="inline-flex items-start gap-2 rounded-md bg-secondary px-4 py-3 text-sm text-muted-foreground">
+                <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+                Контакты студии раскрываются только после оплаты сервисного сбора. Не вставляйте телефон,
+                email, ссылки или username в свободные поля.
+              </p>
+              {hasContactErrors ? <ErrorText error={CONTACT_INFO_ERROR} /> : null}
+              {capacityError ? <ErrorText error={capacityError} /> : null}
+            </CardContent>
+          </Card>
+        </section>
       </div>
 
-      <aside className="grid h-fit gap-4 lg:sticky lg:top-24">
-        <Card>
-          <CardHeader>
-            <CardTitle>Стоимость</CardTitle>
-          </CardHeader>
-          <CardContent className="grid gap-4 text-sm">
-            <MoneyLine label="Зал" value={selectedHall?.name ?? "-"} />
-            <MoneyLine label="Ставка зала" value={`${formatPrice(selectedHall?.pricePerHour ?? 0)} / час`} />
-            <MoneyLine label="Длительность" value={`${durationHours} ч`} />
-            <MoneyLine label="Студия" value={formatPrice(pricing.studioTotal)} />
-            <MoneyLine label="Сервисный сбор" value={formatPrice(pricing.serviceFee)} />
-            <div className="border-t border-border pt-4">
-              <MoneyLine label="Общая сумма" value={formatPrice(pricing.totalPrice)} strong />
-            </div>
-            <MoneyLine label="Депозит" value={formatPrice(pricing.depositAmount)} />
-            <MoneyLine label="Остаток" value={formatPrice(pricing.remainingAmount)} />
-            <Button
-              size="lg"
-              disabled={isPending || hasContactErrors || Boolean(capacityError) || !selectedHall}
-              className="w-full"
-            >
-              <CreditCard className="size-4" aria-hidden="true" />
-              {isPending ? "Создаем бронь..." : "Оплатить депозит"}
-            </Button>
-            {hasContactErrors ? <ErrorText error={CONTACT_INFO_ERROR} /> : null}
-            {capacityError ? <ErrorText error={capacityError} /> : null}
-          </CardContent>
-        </Card>
-
-        <Button asChild variant="outline">
-          <Link href="/studios?mode=booking">
-            <ArrowLeft className="size-4" aria-hidden="true" />
-            Вернуться к выбору
-          </Link>
-        </Button>
-      </aside>
+      <StudioWizardFooter
+        currentStep={mobileStep}
+        canGoNext={canGoNext}
+        isPending={isPending}
+        hasContactErrors={hasContactErrors}
+        hasBlockingError={Boolean(capacityError) || !selectedHall}
+        requiresStudioConfirmation={requiresStudioConfirmation}
+        createdBooking={createdBooking}
+        onPayDeposit={() => {
+          if (createdBooking) router.push(createdBooking.checkoutUrl);
+        }}
+        onBack={() => setMobileStep((step) => Math.max(step - 1, 0))}
+        onNext={() => {
+          if (mobileStep === 1) {
+            router.push("/booking/payment-unavailable");
+            return;
+          }
+          setMobileStep((step) => Math.min(step + 1, 2));
+        }}
+      />
     </form>
   );
 }
@@ -291,8 +383,8 @@ function StudioCard({ studio, selectedHall }: { studio: Studio; selectedHall?: S
   const imageUrl = selectedHall?.imageUrl || studio.imageUrl;
 
   return (
-    <Card>
-      <CardContent className="grid gap-5 p-6 md:grid-cols-[220px_1fr]">
+    <Card className="min-w-0 overflow-hidden">
+      <CardContent className="grid min-w-0 gap-5 p-6">
         <div className="relative aspect-[4/3] overflow-hidden rounded-md bg-secondary">
           {imageUrl ? (
             <Image src={imageUrl} alt={studio.name} fill className="object-cover" />
@@ -302,13 +394,15 @@ function StudioCard({ studio, selectedHall }: { studio: Studio; selectedHall?: S
             </span>
           )}
         </div>
-        <div className="grid gap-3">
-          <div>
-            <h2 className="text-2xl font-semibold tracking-normal">{studio.name}</h2>
-            <div className="mt-2 flex flex-wrap gap-3 text-sm text-muted-foreground">
-              <span className="inline-flex items-center gap-1">
+        <div className="grid min-w-0 gap-3">
+          <div className="min-w-0">
+            <h2 className="break-words text-2xl font-semibold tracking-normal">{studio.name}</h2>
+            <div className="mt-2 grid gap-2 text-sm text-muted-foreground">
+              <span className="inline-flex min-w-0 items-start gap-1">
                 <MapPin className="size-4" aria-hidden="true" />
-                {studio.city} · {studio.address}
+                <span className="min-w-0 break-words">
+                  {studio.city} · {studio.address}
+                </span>
               </span>
               <span className="inline-flex items-center gap-1">
                 <Users className="size-4" aria-hidden="true" />
@@ -316,14 +410,24 @@ function StudioCard({ studio, selectedHall }: { studio: Studio; selectedHall?: S
               </span>
             </div>
           </div>
-          <p className="text-sm text-muted-foreground">{studio.description}</p>
+          <p className="line-clamp-4 break-words text-sm text-muted-foreground">{studio.description}</p>
           {selectedHall ? (
-            <p className="text-sm">
+            <p className="break-words text-sm">
               <span className="font-medium">Выбранный зал: </span>
               {selectedHall.name} · {formatPrice(selectedHall.pricePerHour)} / час
             </p>
           ) : null}
-          <p className="text-sm text-muted-foreground">{studio.rules.join(" ")}</p>
+          <p className="line-clamp-3 break-words text-sm text-muted-foreground">{studio.rules.join(" ")}</p>
+          {studio.address ? (
+            <StudioMap
+              title={studio.name}
+              address={studio.address}
+              city={studio.city}
+              twoGisUrl={studio.twoGisUrl}
+              twoGisEmbedUrl={studio.twoGisEmbedUrl}
+              compact
+            />
+          ) : null}
         </div>
       </CardContent>
     </Card>
@@ -431,6 +535,133 @@ function Notice({ message }: { message: string }) {
 function ErrorText({ error }: { error?: string }) {
   if (!error) return null;
   return <span className="text-xs font-medium text-rose-700">{error}</span>;
+}
+
+const studioSteps = [
+  { label: "Студия", icon: Building2 },
+  { label: "Дата", icon: CalendarDays },
+  { label: "Данные", icon: Check }
+];
+
+function StudioBookingStepper({ currentStep }: { currentStep: number }) {
+  const progressWidth =
+    currentStep === 0
+      ? "0%"
+      : currentStep === studioSteps.length - 1
+        ? "calc(100% - 33.333%)"
+        : "calc((100% - 33.333%) / 2)";
+
+  return (
+    <div className="relative grid grid-cols-3 items-start gap-2">
+      <span
+        className="pointer-events-none absolute left-[16.666%] right-[16.666%] top-4 h-px bg-border"
+        aria-hidden="true"
+      />
+      <span
+        className="pointer-events-none absolute left-[16.666%] top-4 h-px bg-primary/70 transition-[width] duration-300"
+        style={{ width: progressWidth }}
+        aria-hidden="true"
+      />
+      {studioSteps.map((step, index) => {
+        const Icon = step.icon;
+        const isActive = index === currentStep;
+        const isDone = index < currentStep;
+
+        return (
+          <div key={step.label} className="relative grid justify-items-center gap-2 text-center">
+            <span
+              className={cn(
+                "relative z-10 flex size-8 items-center justify-center rounded-full border bg-background transition-colors",
+                isActive && "border-primary text-emerald-300 shadow-[0_0_20px_hsl(var(--primary)/0.16)]",
+                isDone && "border-primary bg-primary text-emerald-950"
+              )}
+            >
+              <Icon className="size-4" aria-hidden="true" />
+            </span>
+            <span
+              className={cn(
+                "text-xs font-medium text-muted-foreground",
+                isActive && "text-foreground",
+                isDone && "text-emerald-300"
+              )}
+            >
+              {step.label}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function StudioWizardFooter({
+  currentStep,
+  canGoNext,
+  isPending,
+  hasContactErrors,
+  hasBlockingError,
+  requiresStudioConfirmation,
+  createdBooking,
+  onPayDeposit,
+  onBack,
+  onNext
+}: {
+  currentStep: number;
+  canGoNext: boolean;
+  isPending: boolean;
+  hasContactErrors: boolean;
+  hasBlockingError: boolean;
+  requiresStudioConfirmation: boolean;
+  createdBooking: CreatedBookingState | null;
+  onPayDeposit: () => void;
+  onBack: () => void;
+  onNext: () => void;
+}) {
+  const isLastStep = currentStep === studioSteps.length - 1;
+
+  return (
+    <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-background/95 px-4 py-3 backdrop-blur md:static md:border-0 md:bg-transparent md:px-0 md:py-0 md:backdrop-blur-0">
+      <div
+        className={cn(
+          "mx-auto grid max-w-screen-sm gap-3 md:max-w-none md:justify-center",
+          currentStep === 0
+            ? "grid-cols-1 md:grid-cols-[minmax(220px,300px)]"
+            : "grid-cols-[56px_1fr] md:grid-cols-[56px_minmax(220px,300px)]"
+        )}
+      >
+        {currentStep > 0 ? (
+          <Button type="button" variant="outline" className="h-12 w-14 shrink-0" onClick={onBack} aria-label="Назад">
+            <ArrowLeft className="size-5" aria-hidden="true" />
+          </Button>
+        ) : null}
+
+        {isLastStep ? (
+          <Button
+            type={createdBooking ? "button" : "submit"}
+            size="lg"
+            disabled={isPending || hasContactErrors || hasBlockingError}
+            onClick={createdBooking ? onPayDeposit : undefined}
+            className="h-12 flex-1"
+          >
+            <CreditCard className="size-4" aria-hidden="true" />
+            {createdBooking
+              ? "Подтвердить бронь"
+              : isPending
+                ? requiresStudioConfirmation
+                  ? "Отправляем..."
+                  : "Создаем..."
+                : requiresStudioConfirmation
+                  ? "Отправить заявку студии"
+                  : "Создать бронь"}
+          </Button>
+        ) : (
+          <Button type="button" size="lg" disabled={!canGoNext} className="h-12 flex-1" onClick={onNext}>
+            Далее
+          </Button>
+        )}
+      </div>
+    </div>
+  );
 }
 
 const inputClass =

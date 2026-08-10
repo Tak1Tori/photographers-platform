@@ -1,4 +1,4 @@
-import type { BookingType } from "@prisma/client";
+import type { BookingType, SettlementMode } from "@prisma/client";
 
 const BASIS_POINTS = 10_000;
 
@@ -81,26 +81,37 @@ export function calculateBookingPricing(input: BookingPricingInput) {
   const bookingType = input.bookingType ?? "FULL_SHOOT";
   const photographerTotal = input.photographerPrice * input.durationHours;
   const studioTotal = input.studioPrice * input.durationHours;
-  const platformCommission = calculatePlatformCommission({
+  const totalServicePrice = photographerTotal + studioTotal;
+  const platformFeeAmount = calculatePlatformCommission({
     bookingType,
     photographerPrice: photographerTotal,
     studioPrice: studioTotal
   });
-  const totalPrice = photographerTotal + studioTotal + platformCommission;
-  const depositAmount = calculateDepositAmount({ bookingType, totalPrice });
+  const providerAmount = Math.max(totalServicePrice - platformFeeAmount, 0);
+  const settlementMode = getPaymentSettlementMode();
 
   return {
     photographerTotal,
     studioTotal,
-    serviceFee: platformCommission,
-    platformCommission,
-    totalPrice,
-    depositAmount,
+    serviceFee: platformFeeAmount,
+    platformCommission: platformFeeAmount,
+    totalPrice: totalServicePrice,
+    totalServicePrice,
+    platformFeeAmount,
+    providerAmount,
+    settlementMode,
+    depositAmount: platformFeeAmount,
     paidAmount: 0,
-    remainingAmount: totalPrice,
+    remainingAmount: providerAmount,
     providerFee: 0,
-    netPlatformRevenue: platformCommission
+    netPlatformRevenue: platformFeeAmount
   };
+}
+
+export function getPaymentSettlementMode(): SettlementMode {
+  return process.env.PAYMENT_SETTLEMENT_MODE === "AGENT_FULL_COLLECTION"
+    ? "AGENT_FULL_COLLECTION"
+    : "PLATFORM_FEE_ONLY";
 }
 
 function percentageOf(amount: number, basisPoints: number) {

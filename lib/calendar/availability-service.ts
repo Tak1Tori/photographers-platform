@@ -90,6 +90,13 @@ export async function getAvailableSlots(
       where: {
         ...ownerWhere(input.owner),
         status: CalendarEventStatus.BUSY,
+        NOT: {
+          booking: {
+            is: {
+              status: BookingStatus.COMPLETED
+            }
+          }
+        },
         startTime: { lt: range.endTime },
         endTime: { gt: range.startTime }
       }
@@ -109,7 +116,13 @@ export async function getAvailableSlots(
           ? { photographerId: input.owner.photographerProfileId }
           : { studioHallId: input.owner.studioHallId }),
         date: new Date(`${input.date}T00:00:00.000Z`),
-        status: { notIn: [BookingStatus.CANCELLED, BookingStatus.DECLINED] },
+        status: {
+          notIn: [
+            BookingStatus.CANCELLED,
+            BookingStatus.DECLINED,
+            BookingStatus.COMPLETED
+          ]
+        },
         OR: [
           {
             paymentStatus: {

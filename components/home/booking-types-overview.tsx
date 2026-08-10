@@ -1,13 +1,8 @@
 import Link from "next/link";
 import {
-  ArrowRight,
-  Building2,
   CalendarDays,
-  Camera,
   Check,
-  Clock3,
   Images,
-  Palette,
   UserRound
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -15,32 +10,10 @@ import { Button } from "@/components/ui/button";
 const bookingTypes = [
   {
     number: "01",
-    eyebrow: "Полный продакшн",
-    title: "Фотосессия под ключ",
-    description:
-      "Для тех, кто хочет получить готовую съемку без самостоятельной координации команды и локации.",
-    href: "/booking/new?type=FULL_SHOOT",
-    cta: "Собрать фотосессию",
-    icon: Camera,
-    inclusions: [
-      "Выбор стиля и формата съемки",
-      "Подходящий фотограф",
-      "Студия и свободное время",
-      "Единая итоговая стоимость"
-    ],
-    route: [
-      { label: "Стиль", icon: Palette },
-      { label: "Фотограф", icon: UserRound },
-      { label: "Студия", icon: Building2 },
-      { label: "Время", icon: CalendarDays }
-    ]
-  },
-  {
-    number: "02",
     eyebrow: "Специалист",
     title: "Забронировать фотографа",
     description:
-      "Когда локация уже есть, выберите фотографа по специализации, портфолио, рейтингу и стоимости часа.",
+      "Выберите фотографа по специализации, портфолио, рейтингу и стоимости часа.",
     href: "/photographers?mode=booking",
     cta: "Выбрать фотографа",
     icon: UserRound,
@@ -54,28 +27,6 @@ const bookingTypes = [
       { label: "Каталог", icon: Images },
       { label: "Профиль", icon: UserRound },
       { label: "Дата", icon: CalendarDays },
-      { label: "Бронь", icon: Check }
-    ]
-  },
-  {
-    number: "03",
-    eyebrow: "Пространство",
-    title: "Арендовать студию",
-    description:
-      "Подберите зал под свою команду и задачу: изучите интерьер, оборудование, вместимость и правила аренды.",
-    href: "/studios?mode=booking",
-    cta: "Выбрать студию",
-    icon: Building2,
-    inclusions: [
-      "Фотографии залов и интерьера",
-      "Оборудование и удобства",
-      "Вместимость и правила",
-      "Цена и длительность аренды"
-    ],
-    route: [
-      { label: "Студии", icon: Building2 },
-      { label: "Зал", icon: Images },
-      { label: "Время", icon: Clock3 },
       { label: "Бронь", icon: Check }
     ]
   }
@@ -125,7 +76,7 @@ export function BookingTypesOverview() {
                 <Button asChild size="lg" className="mt-8">
                   <Link href={bookingType.href}>
                     {bookingType.cta}
-                    <ArrowRight className="size-4" aria-hidden="true" />
+                    {/* <ArrowRight className="size-4" aria-hidden="true" /> */}
                   </Link>
                 </Button>
               </div>

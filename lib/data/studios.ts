@@ -17,7 +17,10 @@ interface StudioFilters {
 const studioInclude = {
   halls: {
     include: {
-      availabilitySlots: true
+      availabilitySlots: true,
+      galleryImages: {
+        orderBy: { sortOrder: "asc" as const }
+      }
     }
   }
 };
@@ -144,11 +147,20 @@ export async function getStudioProfileByOwnerId(ownerId: string): Promise<Studio
       name: studio.name,
       city: studio.city,
       address: studio.address,
+      googleMapsUrl: studio.googleMapsUrl ?? undefined,
+      googleMapsEmbedUrl: studio.googleMapsEmbedUrl ?? undefined,
+      twoGisUrl: studio.twoGisUrl ?? undefined,
+      twoGisEmbedUrl: studio.twoGisEmbedUrl ?? undefined,
       imageUrl: studio.imageUrl ?? undefined,
       imagePublicId: studio.imagePublicId ?? undefined,
       description: studio.description,
       rules: studio.rules.split("\n").filter(Boolean),
       status: mapProfileStatus(studio.status),
+      confirmationMode: studio.confirmationMode,
+      whatsappBookingPhone: studio.whatsappBookingPhone ?? undefined,
+      whatsappContactName: studio.whatsappContactName ?? undefined,
+      whatsappResponseTimeoutMinutes: studio.whatsappResponseTimeoutMinutes,
+      whatsappConfirmationEnabled: studio.whatsappConfirmationEnabled,
       halls: studio.halls.map((hall) => ({
         id: hall.id,
         name: hall.name,
@@ -157,7 +169,13 @@ export async function getStudioProfileByOwnerId(ownerId: string): Promise<Studio
         amenities: Array.isArray(hall.amenities) ? (hall.amenities as string[]) : [],
         status: hall.status === "ACTIVE" ? "Active" : "Inactive",
         imageUrl: hall.imageUrl,
-        imagePublicId: hall.imagePublicId ?? undefined
+        imagePublicId: hall.imagePublicId ?? undefined,
+        galleryImages: hall.galleryImages.map((image) => ({
+          id: image.id,
+          imageUrl: image.imageUrl,
+          imagePublicId: image.imagePublicId ?? undefined,
+          sortOrder: image.sortOrder
+        }))
       }))
     };
   } catch {
@@ -183,11 +201,20 @@ export async function getOrCreateStudioProfileByOwnerId(ownerId: string): Promis
       name: existing.name,
       city: existing.city,
       address: existing.address,
+      googleMapsUrl: existing.googleMapsUrl ?? undefined,
+      googleMapsEmbedUrl: existing.googleMapsEmbedUrl ?? undefined,
+      twoGisUrl: existing.twoGisUrl ?? undefined,
+      twoGisEmbedUrl: existing.twoGisEmbedUrl ?? undefined,
       imageUrl: existing.imageUrl ?? undefined,
       imagePublicId: existing.imagePublicId ?? undefined,
       description: existing.description,
       rules: existing.rules.split("\n").filter(Boolean),
       status: mapProfileStatus(existing.status),
+      confirmationMode: existing.confirmationMode,
+      whatsappBookingPhone: existing.whatsappBookingPhone ?? undefined,
+      whatsappContactName: existing.whatsappContactName ?? undefined,
+      whatsappResponseTimeoutMinutes: existing.whatsappResponseTimeoutMinutes,
+      whatsappConfirmationEnabled: existing.whatsappConfirmationEnabled,
       halls: existing.halls.map(mapHall)
     };
   }
@@ -212,11 +239,20 @@ export async function getOrCreateStudioProfileByOwnerId(ownerId: string): Promis
     name: created.name,
     city: created.city,
     address: created.address,
+    googleMapsUrl: created.googleMapsUrl ?? undefined,
+    googleMapsEmbedUrl: created.googleMapsEmbedUrl ?? undefined,
+    twoGisUrl: created.twoGisUrl ?? undefined,
+    twoGisEmbedUrl: created.twoGisEmbedUrl ?? undefined,
     imageUrl: created.imageUrl ?? undefined,
     imagePublicId: created.imagePublicId ?? undefined,
     description: created.description,
     rules: created.rules.split("\n").filter(Boolean),
     status: "Draft",
+    confirmationMode: created.confirmationMode,
+    whatsappBookingPhone: created.whatsappBookingPhone ?? undefined,
+    whatsappContactName: created.whatsappContactName ?? undefined,
+    whatsappResponseTimeoutMinutes: created.whatsappResponseTimeoutMinutes,
+    whatsappConfirmationEnabled: created.whatsappConfirmationEnabled,
     halls: []
   };
 }
@@ -229,6 +265,11 @@ export async function getStudioHalls(studioId: string) {
   try {
     const halls = await prisma.studioHall.findMany({
       where: { studioId },
+      include: {
+        galleryImages: {
+          orderBy: { sortOrder: "asc" }
+        }
+      },
       orderBy: { name: "asc" }
     });
     return halls.map(mapHall);
@@ -285,6 +326,12 @@ function mapHall(hall: {
   imagePublicId?: string | null;
   amenities: unknown;
   status: string;
+  galleryImages?: Array<{
+    id: string;
+    imageUrl: string;
+    imagePublicId?: string | null;
+    sortOrder: number;
+  }>;
 }): StudioHall {
   return {
     id: hall.id,
@@ -294,6 +341,13 @@ function mapHall(hall: {
     amenities: Array.isArray(hall.amenities) ? (hall.amenities as string[]) : [],
     status: hall.status === "ACTIVE" ? "Active" : "Inactive",
     imageUrl: hall.imageUrl,
-    imagePublicId: hall.imagePublicId ?? undefined
+    imagePublicId: hall.imagePublicId ?? undefined,
+    galleryImages:
+      hall.galleryImages?.map((image) => ({
+        id: image.id,
+        imageUrl: image.imageUrl,
+        imagePublicId: image.imagePublicId ?? undefined,
+        sortOrder: image.sortOrder
+      })) ?? []
   };
 }

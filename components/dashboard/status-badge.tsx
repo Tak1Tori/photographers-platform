@@ -29,6 +29,30 @@ const styles: Record<string, string> = {
   Inactive: "bg-secondary text-secondary-foreground"
 };
 
+const labels: Record<string, string> = {
+  Pending: "Ожидает",
+  Confirmed: "Подтверждена",
+  "In progress": "В работе",
+  Completed: "Завершена",
+  Cancelled: "Отменена",
+  Declined: "Отклонена",
+  UNPAID: "Не оплачено",
+  DEPOSIT_PENDING: "Ожидает сбор",
+  DEPOSIT_PAID: "Сбор оплачен",
+  FINAL_PAYMENT_PENDING: "Оплата исполнителю",
+  FULLY_PAID: "Оплачено",
+  REFUNDED: "Возврат",
+  FAILED: "Ошибка оплаты",
+  FULL_SHOOT: "Под ключ",
+  PHOTOGRAPHER_ONLY: "Фотограф",
+  STUDIO_ONLY: "Студия",
+  Published: "Опубликован",
+  Draft: "Черновик",
+  Blocked: "Заблокирован",
+  Active: "Активен",
+  Inactive: "Неактивен"
+};
+
 export function StatusBadge({ status }: StatusBadgeProps) {
   return (
     <span
@@ -37,7 +61,7 @@ export function StatusBadge({ status }: StatusBadgeProps) {
         styles[status]
       )}
     >
-      {status}
+      {labels[status] ?? status}
     </span>
   );
 }

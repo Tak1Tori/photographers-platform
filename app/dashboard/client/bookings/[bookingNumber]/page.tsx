@@ -1,12 +1,11 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { ArrowLeft, CalendarClock, CreditCard, MapPin, UserRound } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { ClientBookingActions } from "@/components/dashboard/client-booking-actions";
+import { MobileBookingSection } from "@/components/dashboard/mobile-booking-section";
 import { StatusBadge } from "@/components/dashboard/status-badge";
 import { EmptyState } from "@/components/shared/empty-state";
-import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getClientBookingByNumber } from "@/lib/data/client";
 import {
   EQUIPMENT_OPTIONS,
@@ -37,68 +36,54 @@ export default async function ClientBookingDetailsPage({ params }: ClientBooking
 
   if (!booking) {
     return (
-      <>
-        <PageHeader
-          eyebrow="Booking"
-          title="Бронь не найдена"
-          description="Такой брони нет или она не принадлежит вашему аккаунту."
-        />
-        <section className="section">
-          <div className="container">
-            <EmptyState
-              title="Доступ к брони закрыт"
-              description="Клиентский кабинет показывает только бронирования, созданные под текущим аккаунтом."
-              actionLabel="Мои брони"
-              actionHref="/dashboard/client/bookings"
-            />
-          </div>
-        </section>
-      </>
+      <section className="section">
+        <div className="container">
+          <EmptyState
+            title="Доступ к брони закрыт"
+            description="Клиентский кабинет показывает только бронирования, созданные под текущим аккаунтом."
+            actionLabel="Мои брони"
+            actionHref="/dashboard/client/bookings"
+          />
+        </div>
+      </section>
     );
   }
 
+  const directPhotographerAmount = booking.photographerTotal;
+  const directStudioAmount = booking.studioTotal;
+  const directProvidersTotal = directPhotographerAmount + directStudioAmount;
+
   return (
-    <>
-      <PageHeader
-        eyebrow="Booking details"
-        title={`Бронь ${booking.id}`}
-        description={getStatusText(booking.status)}
-      />
-      <section className="section">
-        <div className="container grid gap-6">
+    <section className="section">
+      <div className="container grid gap-6">
+        <div className="grid gap-3">
           <Button asChild variant="outline" className="w-fit">
             <Link href="/dashboard/client/bookings">
               <ArrowLeft className="size-4" aria-hidden="true" />
               Назад к броням
             </Link>
           </Button>
+          <div>
+            <h1 className="text-3xl font-semibold tracking-normal">Бронь {booking.id}</h1>
+            <p className="mt-2 text-muted-foreground">{getStatusText(booking.status)}</p>
+          </div>
+        </div>
 
-          <div className="grid gap-6 lg:grid-cols-[1fr_390px]">
-            <div className="grid gap-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <CalendarClock className="size-5" aria-hidden="true" />
-                    Основная информация
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-6 lg:grid-cols-[1fr_390px]">
+          <div className="grid gap-6">
+              <MobileBookingSection
+                title="Основная информация"
+                icon="calendar"
+                contentClassName="md:grid-cols-2"
+              >
                   <Summary label="Номер брони" value={booking.id} />
                   <Summary label="Дата создания" value={formatDateTime(booking.createdAt)} />
                   <Summary label="Тип брони" value={<StatusBadge status={booking.bookingType ?? "FULL_SHOOT"} />} />
                   <Summary label="Статус брони" value={<StatusBadge status={booking.status} />} />
                   <Summary label="Статус оплаты" value={<StatusBadge status={booking.paymentStatus} />} />
-                </CardContent>
-              </Card>
+              </MobileBookingSection>
 
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <MapPin className="size-5" aria-hidden="true" />
-                    Детали съемки
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="grid gap-4 md:grid-cols-2">
+              <MobileBookingSection title="Детали съемки" icon="location" contentClassName="md:grid-cols-2">
                   <Summary label="Стиль" value={booking.styleName} />
                   <Summary label="Фотограф" value={booking.photographerName} />
                   {booking.bookingType === "FULL_SHOOT" ? (
@@ -112,15 +97,10 @@ export default async function ClientBookingDetailsPage({ params }: ClientBooking
                   <Summary label="Начало" value={booking.time} />
                   <Summary label="Окончание" value={booking.endTime} />
                   <Summary label="Длительность" value={`${booking.durationHours} ч`} />
-                </CardContent>
-              </Card>
+              </MobileBookingSection>
 
               {booking.bookingType === "PHOTOGRAPHER_ONLY" ? (
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Бриф для фотографа</CardTitle>
-                  </CardHeader>
-                  <CardContent className="grid gap-4 md:grid-cols-2">
+                <MobileBookingSection title="Бриф для фотографа" contentClassName="md:grid-cols-2">
                     <Summary label="Тип съемки" value={getOptionLabel(SHOOT_TYPES, booking.shootType)} />
                     <Summary label="Описание" value={booking.shootDescription ?? "-"} />
                     <Summary label="Локация" value={getOptionLabel(LOCATION_TYPES, booking.locationType)} />
@@ -135,16 +115,11 @@ export default async function ClientBookingDetailsPage({ params }: ClientBooking
                       }
                     />
                     <Summary label="Особые требования" value={booking.specialRequirements ?? "-"} />
-                  </CardContent>
-                </Card>
+                </MobileBookingSection>
               ) : null}
 
               {booking.bookingType === "STUDIO_ONLY" ? (
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Детали аренды студии</CardTitle>
-                  </CardHeader>
-                  <CardContent className="grid gap-4 md:grid-cols-2">
+                <MobileBookingSection title="Детали аренды студии" contentClassName="md:grid-cols-2">
                     <Summary label="Цель аренды" value={getOptionLabel(RENTAL_PURPOSES, booking.rentalPurpose)} />
                     <Summary label="Студия" value={booking.studioName} />
                     <Summary label="Зал" value={booking.hallName} />
@@ -153,53 +128,52 @@ export default async function ClientBookingDetailsPage({ params }: ClientBooking
                     <Summary label="Удобства/оборудование" value={booking.selectedAmenities?.join(", ") ?? "-"} />
                     <Summary label="Описание" value={booking.shootDescription ?? "-"} />
                     <Summary label="Особые требования" value={booking.specialRequirements ?? "-"} />
-                  </CardContent>
-                </Card>
+                </MobileBookingSection>
               ) : null}
 
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <UserRound className="size-5" aria-hidden="true" />
-                    Клиентские данные
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="grid gap-4 md:grid-cols-2">
+              <MobileBookingSection
+                title="Клиентские данные"
+                icon="user"
+                contentClassName="md:grid-cols-2"
+              >
                   <Summary label="Имя" value={booking.clientName} />
-                  <Summary label="Email" value={booking.clientEmail || "-"} />
                   <Summary label="Телефон" value={booking.clientPhone || "-"} />
                   <Summary label="Комментарий" value={booking.clientComment || "-"} />
-                </CardContent>
-              </Card>
+              </MobileBookingSection>
             </div>
 
             <div className="grid h-fit gap-6 lg:sticky lg:top-24">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <CreditCard className="size-5" aria-hidden="true" />
-                    Финансы
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="grid gap-3 text-sm">
+              <MobileBookingSection title="Финансы" icon="payment" contentClassName="text-sm">
                   <MoneyLine label="Фотограф" value={booking.photographerTotal} />
                   <MoneyLine label="Студия" value={booking.studioTotal} />
-                  <MoneyLine label="Сервисный сбор" value={booking.serviceFee} />
+                  <MoneyLine
+                    label="Сервисный сбор платформы"
+                    value={booking.platformFeeAmount ?? booking.depositAmount}
+                  />
                   <div className="border-t border-border pt-3">
-                    <MoneyLine label="Общая сумма" value={booking.totalAmount} strong />
+                    <MoneyLine
+                      label="Стоимость услуги"
+                      value={booking.totalServicePrice ?? booking.totalAmount}
+                      strong
+                    />
                   </div>
-                  <MoneyLine label="Депозит" value={booking.depositAmount} />
-                  <MoneyLine label="Оплачено" value={booking.paidAmount} />
-                  <MoneyLine label="Остаток" value={booking.remainingAmount} />
-                </CardContent>
-              </Card>
+                  <MoneyLine label="Оплачено платформе" value={booking.paidAmount} />
+                  {directPhotographerAmount > 0 ? (
+                    <MoneyLine label="К оплате фотографу" value={directPhotographerAmount} />
+                  ) : null}
+                  {directStudioAmount > 0 ? (
+                    <MoneyLine label="К оплате студии" value={directStudioAmount} />
+                  ) : null}
+                  {directPhotographerAmount > 0 && directStudioAmount > 0 ? (
+                    <MoneyLine label="К оплате исполнителям" value={directProvidersTotal} strong />
+                  ) : null}
+              </MobileBookingSection>
 
-              <ClientBookingActions booking={booking} />
-            </div>
+            <ClientBookingActions booking={booking} />
           </div>
         </div>
+      </div>
       </section>
-    </>
   );
 }
 

@@ -1,11 +1,16 @@
 import { prisma } from "@/lib/prisma";
-import { unstable_cache } from "next/cache";
+import { revalidateTag, unstable_cache } from "next/cache";
 import { mockPhotographerProfile } from "@/lib/mock-data";
 import { canUseDatabase } from "@/lib/data/db";
 import { getDevStore } from "@/lib/data/dev-store";
 import { mapPhotographer } from "@/lib/data/mappers";
 import { mapSlots } from "@/lib/data/mappers";
-import type { DashboardAvailabilitySlot, PhotographerProfile, PortfolioItem } from "@/lib/types";
+import type {
+  DashboardAvailabilitySlot,
+  PhotographerProfile,
+  PhotographerReview,
+  PortfolioItem
+} from "@/lib/types";
 
 interface PhotographerFilters {
   style?: string;
@@ -19,6 +24,26 @@ const demoPhotographerEmails = [
   "daniyar@example.com",
   "leila@example.com"
 ];
+const publicPhotographersCacheTag = "public-photographers";
+
+function getPublicPhotographerCacheTag(id: string) {
+  return `public-photographer:${id}`;
+}
+
+function getPublicAlbumCacheTag(id: string) {
+  return `public-photographer-album:${id}`;
+}
+
+export function revalidatePhotographerPublicData(
+  photographerId: string,
+  albumIds: string[] = []
+) {
+  revalidateTag(publicPhotographersCacheTag, { expire: 0 });
+  revalidateTag(getPublicPhotographerCacheTag(photographerId), { expire: 0 });
+  albumIds.forEach((albumId) =>
+    revalidateTag(getPublicAlbumCacheTag(albumId), { expire: 0 })
+  );
+}
 
 const photographerInclude = {
   styles: true,
@@ -29,7 +54,12 @@ const photographerInclude = {
       }
     }
   },
-  availabilitySlots: true
+  availabilitySlots: true,
+  reviews: {
+    select: {
+      rating: true
+    }
+  }
 };
 
 const getCachedPublicPhotographers = unstable_cache(
@@ -39,6 +69,7 @@ const getCachedPublicPhotographers = unstable_cache(
         status: "PUBLISHED",
         city: city || undefined,
         user: {
+          role: "PHOTOGRAPHER",
           email: {
             notIn: demoPhotographerEmails
           }
@@ -59,9 +90,15 @@ const getCachedPublicPhotographers = unstable_cache(
         avatarUrl: true,
         hourlyRate: true,
         rating: true,
+        reviews: {
+          select: {
+            rating: true
+          }
+        },
         styles: {
           select: {
-            slug: true
+            slug: true,
+            name: true
           }
         },
         portfolioItems: {
@@ -77,10 +114,10 @@ const getCachedPublicPhotographers = unstable_cache(
       orderBy: { rating: "desc" }
     });
 
-    return photographers.map(mapPhotographer);
+    return photographers.map(mapPhotographer).sort((a, b) => b.rating - a.rating);
   },
-  ["public-photographers-v1"],
-  { revalidate: 30 }
+  ["public-photographers-v3"],
+  { revalidate: 30, tags: [publicPhotographersCacheTag] }
 );
 
 export async function getPhotographers(filters: PhotographerFilters = {}) {
@@ -95,13 +132,15 @@ export async function getPhotographers(filters: PhotographerFilters = {}) {
   }
 }
 
-const getCachedPublicPhotographerPageData = unstable_cache(
-  async (id: string) => {
+function getCachedPublicPhotographerPageData(id: string) {
+  return unstable_cache(
+  async () => {
     const profile = await prisma.photographerProfile.findFirst({
       where: {
         id,
         status: "PUBLISHED",
         user: {
+          role: "PHOTOGRAPHER",
           email: {
             notIn: demoPhotographerEmails
           }
@@ -117,7 +156,8 @@ const getCachedPublicPhotographerPageData = unstable_cache(
         rating: true,
         styles: {
           select: {
-            slug: true
+            slug: true,
+            name: true
           }
         },
         portfolioItems: {
@@ -137,6 +177,29 @@ const getCachedPublicPhotographerPageData = unstable_cache(
             isAvailable: true
           },
           orderBy: [{ date: "asc" }, { startTime: "asc" }]
+        },
+        reviews: {
+          select: {
+            id: true,
+            rating: true,
+            comment: true,
+            createdAt: true,
+            clientName: true,
+            booking: {
+              select: {
+                clientName: true,
+                client: {
+                  select: {
+                    name: true
+                  }
+                }
+              }
+            }
+          },
+          orderBy: {
+            createdAt: "desc"
+          },
+          take: 24
         }
       }
     });
@@ -148,12 +211,14 @@ const getCachedPublicPhotographerPageData = unstable_cache(
     return {
       photographer: mapPhotographer(profile),
       portfolioItems: profile.portfolioItems.map(mapPortfolioItem),
-      slots: mapSlots(profile.availabilitySlots)
+      slots: mapSlots(profile.availabilitySlots),
+      reviews: profile.reviews.map(mapPhotographerReview)
     };
   },
-  ["public-photographer-page-v1"],
-  { revalidate: 30 }
-);
+    ["public-photographer-page-v5", id],
+    { revalidate: 30, tags: [getPublicPhotographerCacheTag(id)] }
+  )();
+}
 
 export async function getPublicPhotographerPageData(id: string) {
   if (!canUseDatabase()) {
@@ -165,6 +230,26 @@ export async function getPublicPhotographerPageData(id: string) {
   } catch {
     return undefined;
   }
+}
+
+function mapPhotographerReview(review: {
+  id: string;
+  rating: number;
+  comment: string | null;
+  createdAt: Date;
+  clientName: string | null;
+  booking: {
+    clientName: string;
+    client: { name: string } | null;
+  } | null;
+}): PhotographerReview {
+  return {
+    id: review.id,
+    rating: review.rating,
+    comment: review.comment ?? undefined,
+    createdAt: review.createdAt.toISOString(),
+    clientName: review.clientName ?? review.booking?.client?.name ?? review.booking?.clientName ?? "Клиент"
+  };
 }
 
 export async function getPhotographerById(id?: string) {
@@ -182,6 +267,7 @@ export async function getPhotographerById(id?: string) {
         id,
         status: "PUBLISHED",
         user: {
+          role: "PHOTOGRAPHER",
           email: {
             notIn: demoPhotographerEmails
           }
@@ -210,6 +296,7 @@ export async function getPhotographerForBooking(id?: string) {
         id,
         status: "PUBLISHED",
         user: {
+          role: "PHOTOGRAPHER",
           email: {
             notIn: demoPhotographerEmails
           }
@@ -249,7 +336,7 @@ export async function getPhotographerProfileByUserId(userId: string): Promise<Ph
       pricePerHour: profile.hourlyRate,
       bio: profile.bio,
       status: mapProfileStatus(profile.status),
-      rating: profile.rating,
+      rating: getAverageReviewRating(profile.reviews),
       portfolio: profile.portfolioItems.map((item) => item.imageUrl)
     };
   } catch {
@@ -281,7 +368,7 @@ export async function getOrCreatePhotographerProfileByUserId(
       pricePerHour: existing.hourlyRate,
       bio: existing.bio,
       status: mapProfileStatus(existing.status),
-      rating: existing.rating,
+      rating: getAverageReviewRating(existing.reviews),
       portfolio: existing.portfolioItems.map((item) => item.imageUrl)
     };
   }
@@ -311,9 +398,15 @@ export async function getOrCreatePhotographerProfileByUserId(
     pricePerHour: created.hourlyRate,
     bio: created.bio,
     status: "Draft",
-    rating: created.rating,
+    rating: getAverageReviewRating(created.reviews),
     portfolio: []
   };
+}
+
+function getAverageReviewRating(reviews?: Array<{ rating: number }>) {
+  if (!reviews?.length) return 0;
+  const average = reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length;
+  return Number(average.toFixed(1));
 }
 
 export async function getPortfolioItems(photographerId: string): Promise<PortfolioItem[]> {
@@ -335,6 +428,10 @@ export async function getPortfolioItems(photographerId: string): Promise<Portfol
     id: item.id,
     imageUrl: item.imageUrl,
     imagePublicId: item.imagePublicId ?? undefined,
+    coverCropX: item.coverCropX ?? undefined,
+    coverCropY: item.coverCropY ?? undefined,
+    coverCropWidth: item.coverCropWidth ?? undefined,
+    coverCropHeight: item.coverCropHeight ?? undefined,
     title: item.title ?? "",
     description: item.description ?? "",
     albumImages: item.albumImages.map((image) => ({
@@ -362,6 +459,7 @@ export async function getPublicPortfolioItem(
       photographer: {
         status: "PUBLISHED",
         user: {
+          role: "PHOTOGRAPHER",
           email: {
             notIn: demoPhotographerEmails
           }
@@ -383,6 +481,10 @@ export async function getPublicPortfolioItem(
     id: item.id,
     imageUrl: item.imageUrl,
     imagePublicId: item.imagePublicId ?? undefined,
+    coverCropX: item.coverCropX ?? undefined,
+    coverCropY: item.coverCropY ?? undefined,
+    coverCropWidth: item.coverCropWidth ?? undefined,
+    coverCropHeight: item.coverCropHeight ?? undefined,
     title: item.title ?? "",
     description: item.description ?? "",
     albumImages: item.albumImages.map((image) => ({
@@ -395,8 +497,12 @@ export async function getPublicPortfolioItem(
   };
 }
 
-const getCachedPublicAlbumPageData = unstable_cache(
-  async (photographerId: string, portfolioItemId: string) => {
+function getCachedPublicAlbumPageData(
+  photographerId: string,
+  portfolioItemId: string
+) {
+  return unstable_cache(
+  async () => {
     const item = await prisma.photographerPortfolioItem.findFirst({
       where: {
         id: portfolioItemId,
@@ -404,6 +510,7 @@ const getCachedPublicAlbumPageData = unstable_cache(
         photographer: {
           status: "PUBLISHED",
           user: {
+            role: "PHOTOGRAPHER",
             email: {
               notIn: demoPhotographerEmails
             }
@@ -414,6 +521,10 @@ const getCachedPublicAlbumPageData = unstable_cache(
         id: true,
         imageUrl: true,
         imagePublicId: true,
+        coverCropX: true,
+        coverCropY: true,
+        coverCropWidth: true,
+        coverCropHeight: true,
         title: true,
         description: true,
         photographer: {
@@ -439,9 +550,16 @@ const getCachedPublicAlbumPageData = unstable_cache(
       album: mapPortfolioItem(item)
     };
   },
-  ["public-photographer-album-v2"],
-  { revalidate: 30 }
-);
+    ["public-photographer-album-v3", photographerId, portfolioItemId],
+    {
+      revalidate: 30,
+      tags: [
+        getPublicPhotographerCacheTag(photographerId),
+        getPublicAlbumCacheTag(portfolioItemId)
+      ]
+    }
+  )();
+}
 
 export async function getPublicAlbumPageData(
   photographerId: string,
@@ -508,10 +626,14 @@ function mapProfileStatus(status: string): PhotographerProfile["status"] {
   return map[status] ?? "Draft";
 }
 
-function mapPortfolioItem(item: {
+export function mapPortfolioItem(item: {
   id: string;
   imageUrl: string;
   imagePublicId: string | null;
+  coverCropX: number | null;
+  coverCropY: number | null;
+  coverCropWidth: number | null;
+  coverCropHeight: number | null;
   title: string | null;
   description: string | null;
   albumImages: Array<{
@@ -526,6 +648,10 @@ function mapPortfolioItem(item: {
     id: item.id,
     imageUrl: item.imageUrl,
     imagePublicId: item.imagePublicId ?? undefined,
+    coverCropX: item.coverCropX ?? undefined,
+    coverCropY: item.coverCropY ?? undefined,
+    coverCropWidth: item.coverCropWidth ?? undefined,
+    coverCropHeight: item.coverCropHeight ?? undefined,
     title: item.title ?? "",
     description: item.description ?? "",
     albumImages: item.albumImages.map((image) => ({

@@ -4,6 +4,7 @@ import Image from "next/image";
 import { ChevronLeft, ChevronRight, Play, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { getCloudinaryVideoPosterUrl } from "@/lib/cloudinary-media";
 import { cn } from "@/lib/utils";
 import type { PortfolioAlbumImage } from "@/lib/types";
 
@@ -82,11 +83,9 @@ export function AlbumPhotoGrid({
           >
             {isVideo(image) ? (
               <div className="relative aspect-video">
-                <video
-                  src={image.imageUrl}
-                  muted
-                  playsInline
-                  preload="metadata"
+                <VideoPreview
+                  image={image}
+                  alt={`${albumTitle}, видео ${index + 1}`}
                   className="size-full object-cover transition-transform duration-500 group-hover:scale-[1.02]"
                 />
                 <span className="absolute inset-0 flex items-center justify-center bg-background/20">
@@ -138,6 +137,7 @@ export function AlbumPhotoGrid({
               <video
                 key={images[activeIndex].id}
                 src={images[activeIndex].imageUrl}
+                poster={getCloudinaryVideoPosterUrl(images[activeIndex].imageUrl) || undefined}
                 controls
                 autoPlay
                 playsInline
@@ -195,13 +195,7 @@ export function AlbumPhotoGrid({
                 >
                   {isVideo(image) ? (
                     <>
-                      <video
-                        src={image.imageUrl}
-                        muted
-                        playsInline
-                        preload="metadata"
-                        className="size-full object-cover"
-                      />
+                      <VideoPreview image={image} alt="" className="size-full object-cover" />
                       <Play
                         className="absolute left-1/2 top-1/2 size-4 -translate-x-1/2 -translate-y-1/2 fill-current"
                         aria-hidden="true"
@@ -217,5 +211,31 @@ export function AlbumPhotoGrid({
         </div>
       ) : null}
     </>
+  );
+}
+
+function VideoPreview({
+  image,
+  alt,
+  className
+}: {
+  image: PortfolioAlbumImage;
+  alt: string;
+  className?: string;
+}) {
+  const posterUrl = getCloudinaryVideoPosterUrl(image.imageUrl);
+
+  if (posterUrl) {
+    return <img src={posterUrl} alt={alt} loading="lazy" className={className} />;
+  }
+
+  return (
+    <video
+      src={image.imageUrl}
+      muted
+      playsInline
+      preload="metadata"
+      className={className}
+    />
   );
 }

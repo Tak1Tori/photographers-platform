@@ -3,6 +3,7 @@ import {
   getCalendarEventsForDashboard
 } from "@/lib/calendar/calendar-service";
 import { getAvailabilityRules } from "@/lib/calendar/availability-service";
+import { autoCompletePastBookings } from "@/lib/bookings/status-service";
 import { dateKey, localDateTime } from "@/lib/calendar/time-utils";
 import { getOrCreatePhotographerProfileByUserId } from "@/lib/data/photographers";
 import { requireSession } from "@/lib/guards";
@@ -22,6 +23,7 @@ export default async function PhotographerCalendarPage({
     type: "PHOTOGRAPHER" as const,
     photographerProfileId: profile.photographerId
   };
+  await autoCompletePastBookings();
   const [rules, events] = await Promise.all([
     getAvailabilityRules(owner),
     getCalendarEventsForDashboard(owner, range)
@@ -38,6 +40,7 @@ export default async function PhotographerCalendarPage({
           previousMonthHref={`/dashboard/photographer/calendar?month=${shiftMonth(monthStart, -1)}`}
           nextMonthHref={`/dashboard/photographer/calendar?month=${shiftMonth(monthStart, 1)}`}
           backHref="/dashboard/photographer"
+          bookingDetailsBaseHref="/dashboard/photographer/bookings"
           rules={rules.map(serializeRule)}
           events={events.map(serializeEvent)}
         />
@@ -81,6 +84,7 @@ function serializeEvent(event: Awaited<ReturnType<typeof getCalendarEventsForDas
   return {
     ...event,
     startTime: event.startTime.toISOString(),
-    endTime: event.endTime.toISOString()
+    endTime: event.endTime.toISOString(),
+    rescheduleRequestedAt: event.rescheduleRequestedAt?.toISOString()
   };
 }
