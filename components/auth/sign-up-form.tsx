@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { signIn } from "next-auth/react";
-import { UserPlus } from "lucide-react";
+import { Send, UserPlus } from "lucide-react";
 import { registerUserAction } from "@/app/auth/actions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,7 +15,7 @@ const roles = [
   { label: "Я монтажер", value: "EDITOR" }
 ] as const;
 
-export function SignUpForm() {
+export function SignUpForm({ telegramEnabled }: { telegramEnabled: boolean }) {
   const router = useRouter();
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -47,6 +47,13 @@ export function SignUpForm() {
     });
   }
 
+  function signUpWithTelegram() {
+    setError("");
+    startTransition(async () => {
+      await signIn("telegram", { callbackUrl: "/" });
+    });
+  }
+
   return (
     <Card className="mx-auto w-full max-w-xl">
       <CardHeader>
@@ -58,6 +65,27 @@ export function SignUpForm() {
             {error}
           </p>
         ) : null}
+        <Button
+          variant="outline"
+          className="h-11 w-full"
+          onClick={signUpWithTelegram}
+          disabled={isPending || !telegramEnabled}
+        >
+          <Send className="size-4" aria-hidden="true" />
+          {isPending ? "Открываем Telegram..." : "Продолжить через Telegram"}
+        </Button>
+        {telegramEnabled ? (
+          <p className="-mt-2 text-center text-xs leading-5 text-muted-foreground">
+            Номер телефона подтвердится через Telegram. Пароль создавать не нужно.
+          </p>
+        ) : (
+          <p className="-mt-2 text-center text-xs leading-5 text-muted-foreground">
+            Регистрация через Telegram станет доступна после настройки интеграции.
+          </p>
+        )}
+        <div className="relative py-1 text-center text-xs text-muted-foreground before:absolute before:inset-x-0 before:top-1/2 before:border-t before:border-border">
+          <span className="relative bg-card px-3">или</span>
+        </div>
         <div className="grid gap-2 sm:grid-cols-2">
           {roles.map((item) => (
             <button
