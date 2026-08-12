@@ -12,13 +12,14 @@ import {
 } from "@/lib/data/photographers";
 
 interface PhotographerDetailPageProps {
-  params: {
+  params: Promise<{
     id: string;
-  };
+  }>;
 }
 
 export async function generateMetadata({ params }: PhotographerDetailPageProps): Promise<Metadata> {
-  const pageData = await getPublicPhotographerPageData(params.id);
+  const { id } = await params;
+  const pageData = await getPublicPhotographerPageData(id);
 
   if (!pageData) {
     return {
@@ -91,7 +92,8 @@ function getOpenGraphImage(url: string, alt: string) {
 }
 
 async function PhotographerDetail({ params }: PhotographerDetailPageProps) {
-  const pageData = await getPublicPhotographerPageData(params.id);
+  const { id } = await params;
+  const pageData = await getPublicPhotographerPageData(id);
 
   if (!pageData) {
     notFound();

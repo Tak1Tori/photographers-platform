@@ -10,14 +10,15 @@ import {
 } from "@/lib/data/photographers";
 
 interface AlbumPageProps {
-  params: {
+  params: Promise<{
     id: string;
     albumId: string;
-  };
+  }>;
 }
 
 export default async function PhotographerAlbumPage({ params }: AlbumPageProps) {
-  const pageData = await getPublicAlbumPageData(params.id, params.albumId);
+  const { id, albumId } = await params;
+  const pageData = await getPublicAlbumPageData(id, albumId);
 
   if (!pageData) {
     notFound();

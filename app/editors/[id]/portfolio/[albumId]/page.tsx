@@ -9,8 +9,13 @@ import { getPublicEditorAlbumPageData } from "@/lib/data/editors";
 
 export const dynamic = "force-dynamic";
 
-export default async function EditorAlbumPage({ params }: { params: { id: string; albumId: string } }) {
-  const pageData = await getPublicEditorAlbumPageData(params.id, params.albumId);
+export default async function EditorAlbumPage({
+  params
+}: {
+  params: Promise<{ id: string; albumId: string }>;
+}) {
+  const { id, albumId } = await params;
+  const pageData = await getPublicEditorAlbumPageData(id, albumId);
   if (!pageData) notFound();
 
   const { editor, album } = pageData;

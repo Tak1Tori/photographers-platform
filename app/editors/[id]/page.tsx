@@ -7,8 +7,9 @@ import { getPublicEditorPageData } from "@/lib/data/editors";
 
 export const dynamic = "force-dynamic";
 
-export default async function EditorDetailPage({ params }: { params: { id: string } }) {
-  const pageData = await getPublicEditorPageData(params.id);
+export default async function EditorDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const pageData = await getPublicEditorPageData(id);
   if (!pageData) notFound();
 
   const { editor, portfolioItems, reviews } = pageData;
