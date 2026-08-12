@@ -1,9 +1,24 @@
+import type { Metadata } from "next";
 import { BenefitsSlider } from "@/components/home/benefits-slider";
 import { HeroSection } from "@/components/home/hero-section";
 import { MarketplaceSlider } from "@/components/home/marketplace-slider";
 import { getEditors } from "@/lib/data/editors";
 import { getPhotographers } from "@/lib/data/photographers";
 import { getStyles } from "@/lib/data/styles";
+
+export const metadata: Metadata = {
+  alternates: {
+    canonical: "https://framelyphoto.com/"
+  },
+  openGraph: {
+    title: "Framely | Фотографы Алматы",
+    description: "Находите фотографов в Алматы, смотрите портфолио и выбирайте удобное время для съёмки на Framely.",
+    url: "/",
+    siteName: "Framely",
+    locale: "ru_KZ",
+    type: "website"
+  }
+};
 
 const HOME_GROUP_LIMIT = 3;
 

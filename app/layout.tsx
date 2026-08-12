@@ -9,8 +9,9 @@ import { Header } from "@/components/layout/header";
 const manrope = Manrope({ subsets: ["latin", "cyrillic"] });
 
 export const metadata: Metadata = {
-  title: "Framely | Бронирование фотосессий",
-  description: "Marketplace для подбора фотографа и времени съемки."
+  title: "Framely | Фотографы Алматы",
+  description: "Находите фотографов в Алматы, смотрите портфолио и выбирайте удобное время для съёмки на Framely.",
+  metadataBase: new URL("https://framelyphoto.com")
 };
 
 export default function RootLayout({

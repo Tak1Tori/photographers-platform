@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { CalendarCheck, MapPin, Star } from "lucide-react";
 import { PhotographerProfileTabs } from "@/components/photographers/photographer-profile-tabs";
@@ -15,8 +16,77 @@ interface PhotographerDetailPageProps {
   };
 }
 
+export async function generateMetadata({ params }: PhotographerDetailPageProps): Promise<Metadata> {
+  const pageData = await getPublicPhotographerPageData(params.id);
+
+  if (!pageData) {
+    return {
+      robots: {
+        index: false,
+        follow: false
+      }
+    };
+  }
+
+  const { photographer } = pageData;
+  const city = photographer.city || "Алматы";
+  const title = `${photographer.name} — фотограф в ${city} | Framely`;
+  const description = buildPhotographerDescription(
+    photographer.name,
+    city,
+    photographer.specializationTitles ?? [],
+    photographer.bio
+  );
+  const image = getOpenGraphImage(photographer.imageUrl, photographer.name);
+
+  return {
+    title,
+    description,
+    alternates: {
+      canonical: `/photographers/${photographer.id}`
+    },
+    openGraph: {
+      title,
+      description,
+      url: `/photographers/${photographer.id}`,
+      siteName: "Framely",
+      locale: "ru_KZ",
+      type: "profile",
+      images: image ? [image] : undefined
+    }
+  };
+}
+
 export default function PhotographerDetailPage({ params }: PhotographerDetailPageProps) {
   return <PhotographerDetail params={params} />;
+}
+
+function buildPhotographerDescription(name: string, city: string, styles: string[], bio: string) {
+  const specialization = styles.slice(0, 3).join(", ");
+  const normalizedBio = bio.replace(/\s+/g, " ").trim();
+  const profileSummary =
+    normalizedBio && normalizedBio !== "Заполните описание профиля."
+      ? normalizedBio.slice(0, 130).replace(/[.,;:]?$/, "")
+      : "";
+  const details = [
+    specialization ? `Специализации: ${specialization}.` : "",
+    profileSummary || "Смотрите портфолио и выбирайте удобное время для съёмки."
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  return `${name} — фотограф в ${city}. ${details}`.trim();
+}
+
+function getOpenGraphImage(url: string, alt: string) {
+  if (!/^https?:\/\//.test(url)) {
+    return undefined;
+  }
+
+  return {
+    url,
+    alt
+  };
 }
 
 async function PhotographerDetail({ params }: PhotographerDetailPageProps) {

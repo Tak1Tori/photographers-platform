@@ -8,6 +8,25 @@ import {
   normalizePhotographerMaxPrice,
   normalizePhotographerRating
 } from "@/lib/photographer-filter-options";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Фотографы Алматы — цены, портфолио и свободное время | Framely",
+  description:
+    "Найдите фотографа в Алматы по стилю, цене и отзывам. Смотрите портфолио, выбирайте свободное время и бронируйте онлайн на Framely.",
+  alternates: {
+    canonical: "/photographers"
+  },
+  openGraph: {
+    title: "Фотографы Алматы — цены, портфолио и свободное время | Framely",
+    description:
+      "Найдите фотографа в Алматы по стилю, цене и отзывам. Смотрите портфолио, выбирайте свободное время и бронируйте онлайн на Framely.",
+    url: "/photographers",
+    siteName: "Framely",
+    locale: "ru_KZ",
+    type: "website"
+  }
+};
 
 interface PhotographersPageProps {
   searchParams: {
@@ -37,6 +56,13 @@ export default async function PhotographersPage({ searchParams }: PhotographersP
   return (
     <section className="py-6 md:py-10">
       <div className="container">
+        <div className="mb-6 max-w-3xl md:mb-8">
+          <h1 className="text-3xl font-semibold tracking-normal md:text-5xl">Фотографы Алматы</h1>
+          <p className="mt-3 text-sm leading-6 text-muted-foreground md:text-base md:leading-7">
+            Выбирайте фотографов в Алматы по стилю съёмки, стоимости и отзывам. Смотрите портфолио и
+            находите свободное время без долгих переписок.
+          </p>
+        </div>
         <PhotographerFilters
           styles={styles}
           selectedStyle={searchParams.style}
