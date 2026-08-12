@@ -224,6 +224,28 @@
     color: #2e3c28;
   }
 
+  :root.light .service-editor-card {
+    border-color: #2e3c28;
+    background: #2e3c28;
+    color: #f6f0e6;
+    box-shadow: 0 0.75rem 1.5rem rgb(27 38 23 / 0.14);
+  }
+
+  :root.light .service-editor-card .service-editor-input {
+    border-color: #ddd5c9;
+    background: #f6f0e6;
+    color: #2e3c28;
+  }
+
+  :root.light .service-editor-card .service-editor-input:focus {
+    outline: none;
+    --tw-ring-color: #f6f0e6;
+  }
+
+  :root.light .service-editor-card .service-editor-input::placeholder {
+    color: rgb(46 60 40 / 0.6);
+  }
+
   :root.light .calendar-event {
     font-weight: 600;
   }

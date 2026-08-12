@@ -90,6 +90,7 @@ export function PhotographerDashboardManager({
   const [customStyleName, setCustomStyleName] = useState("");
   const [activeSection, setActiveSection] = useState<PhotographerSection>(initialSection);
   const [isPublicLinkCopied, setIsPublicLinkCopied] = useState(false);
+  const [isCreateServiceOpen, setIsCreateServiceOpen] = useState(false);
   const rescheduleRequestsCount = bookings.filter((booking) => booking.rescheduleRequestedAt).length;
   const sections: DashboardSectionTab<PhotographerSection>[] = [
     {
@@ -161,6 +162,9 @@ export function PhotographerDashboardManager({
               : result.error ?? "Ошибка сохранения."
           });
           if (result.success) {
+            if (area === "service-create") {
+              setIsCreateServiceOpen(false);
+            }
             router.refresh();
           }
         } catch {
@@ -373,47 +377,116 @@ export function PhotographerDashboardManager({
 
       {activeSection === "services" ? (
         <Card>
-          <CardHeader>
-            <CardTitle>Услуги</CardTitle>
-            <p className="text-sm text-muted-foreground">
-              Клиенты видят только активные услуги. Цена, длительность и состав выбранной услуги сохраняются в брони.
-            </p>
-          </CardHeader>
-          <CardContent className="grid gap-6">
-            <form action={run("services", savePhotographerServiceAction)} className="grid gap-4 rounded-lg border border-primary/25 bg-primary/[0.04] p-4 sm:p-5">
-              <div>
-                <h3 className="text-lg font-semibold tracking-normal">Новая услуга</h3>
-                <p className="mt-1 text-sm text-muted-foreground">Укажите итоговую стоимость услуги, а не почасовую ставку.</p>
+          <CardHeader className="space-y-0">
+            <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
+              <div className="grid gap-1.5">
+                <CardTitle>Услуги</CardTitle>
+                <p className="max-w-2xl text-sm text-muted-foreground">
+                  Клиенты видят только активные услуги. Цена, длительность и состав выбранной услуги сохраняются в брони.
+                </p>
               </div>
-              <Message state={state} area="services" />
-              <ServiceFields />
-              <label className="flex items-center gap-2 text-sm font-medium"><input type="checkbox" name="isActive" defaultChecked /> Показывать клиентам</label>
-              <Button disabled={isPending || !databaseReady} className="w-full sm:w-fit sm:justify-self-end"><Plus className="size-4" aria-hidden="true" />Добавить услугу</Button>
-            </form>
-
+              <Button
+                type="button"
+                className="shrink-0"
+                disabled={isPending || !databaseReady}
+                onClick={() => {
+                  setState(null);
+                  setIsCreateServiceOpen(true);
+                }}
+              >
+                <Plus className="size-4" aria-hidden="true" />
+                Добавить услугу
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="grid gap-4">
+            {state?.area === "service-create" && state.success ? <SuccessToast message={state.message} /> : null}
             {profile.services.length === 0 ? <EmptyText text="Услуг пока нет. Добавьте первую, чтобы клиент мог выбрать конкретный формат съёмки." /> : (
               <div className="grid gap-4">
                 {profile.services.map((service, index) => (
-                  <article key={service.id} className="grid gap-4 rounded-lg border border-border p-4 sm:p-5">
-                    <form id={`service-${service.id}`} action={run("services", savePhotographerServiceAction)} className="grid gap-4">
+                  <article key={service.id} className="service-editor-card grid gap-4 rounded-lg border border-border p-4 sm:p-5">
+                    <form id={`service-${service.id}`} action={run(`service:${service.id}`, savePhotographerServiceAction)} className="grid gap-4">
                       <input type="hidden" name="serviceId" value={service.id} />
                       <div className="flex flex-wrap items-center justify-between gap-2">
-                        <h3 className="font-semibold">Услуга {index + 1}</h3>
-                        <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="isActive" defaultChecked={service.isActive} /> Активна</label>
+                        <div>
+                          <p className="text-sm opacity-75">Услуга {index + 1}</p>
+                          <h3 className="font-semibold">{service.title}</h3>
+                        </div>
+                        <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="isActive" defaultChecked={service.isActive} /> Показывать клиентам</label>
                       </div>
-                      <ServiceFields service={service} />
+                      <Message state={state} area={`service:${service.id}`} />
+                      <ServiceFields service={service} compact appearance="service-editor" />
                     </form>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-wrap items-center gap-2 border-t border-current/20 pt-4">
                       <Button form={`service-${service.id}`} size="sm" disabled={isPending || !databaseReady}><Save className="size-4" aria-hidden="true" />Сохранить</Button>
-                      <form action={run("services", movePhotographerServiceAction)}><input type="hidden" name="serviceId" value={service.id} /><input type="hidden" name="direction" value="up" /><Button size="sm" variant="outline" disabled={isPending || !databaseReady || index === 0}>Выше</Button></form>
-                      <form action={run("services", movePhotographerServiceAction)}><input type="hidden" name="serviceId" value={service.id} /><input type="hidden" name="direction" value="down" /><Button size="sm" variant="outline" disabled={isPending || !databaseReady || index === profile.services.length - 1}>Ниже</Button></form>
-                      <form action={run("services", deletePhotographerServiceAction)} className="sm:ml-auto"><input type="hidden" name="serviceId" value={service.id} /><Button size="sm" variant="outline" disabled={isPending || !databaseReady}><Trash2 className="size-4" aria-hidden="true" />Удалить</Button></form>
+                      <form action={run(`service:${service.id}`, movePhotographerServiceAction)}><input type="hidden" name="serviceId" value={service.id} /><input type="hidden" name="direction" value="up" /><Button size="sm" variant="outline" disabled={isPending || !databaseReady || index === 0}>Выше</Button></form>
+                      <form action={run(`service:${service.id}`, movePhotographerServiceAction)}><input type="hidden" name="serviceId" value={service.id} /><input type="hidden" name="direction" value="down" /><Button size="sm" variant="outline" disabled={isPending || !databaseReady || index === profile.services.length - 1}>Ниже</Button></form>
+                      <form action={run(`service:${service.id}`, deletePhotographerServiceAction)} className="sm:ml-auto"><input type="hidden" name="serviceId" value={service.id} /><Button size="sm" variant="outline" disabled={isPending || !databaseReady}><Trash2 className="size-4" aria-hidden="true" />Удалить</Button></form>
                     </div>
                   </article>
                 ))}
               </div>
             )}
           </CardContent>
+
+          {isCreateServiceOpen ? (
+            <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 sm:p-6" role="dialog" aria-modal="true" aria-labelledby="create-service-title">
+              <button
+                type="button"
+                className="absolute inset-0 cursor-default bg-black/55 backdrop-blur-md"
+                aria-label="Закрыть форму добавления услуги"
+                onClick={() => {
+                  setState(null);
+                  setIsCreateServiceOpen(false);
+                }}
+              />
+              <section className="relative z-10 grid max-h-[calc(100dvh-2rem)] w-full max-w-3xl overflow-y-auto rounded-lg border border-[#ddd5c9]/55 bg-[#2e3c28] p-5 text-[#f6f0e6] shadow-2xl shadow-black/40 sm:p-6">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <h3 id="create-service-title" className="text-xl font-semibold tracking-normal">Новая услуга</h3>
+                    <p className="mt-1 text-sm text-[#f6f0e6]/75">Укажите итоговую стоимость услуги, а не почасовую ставку.</p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="size-9 shrink-0 p-0 text-[#f6f0e6] hover:bg-[#f6f0e6]/10 hover:text-[#f6f0e6]"
+                    aria-label="Закрыть"
+                    title="Закрыть"
+                    onClick={() => {
+                      setState(null);
+                      setIsCreateServiceOpen(false);
+                    }}
+                  >
+                    <X className="size-5" aria-hidden="true" />
+                  </Button>
+                </div>
+                <form action={run("service-create", savePhotographerServiceAction)} className="mt-5 grid gap-5">
+                  {state?.area === "service-create" && !state.success ? <Notice tone="error" message={state.message} /> : null}
+                  <ServiceFields compact appearance="modal" />
+                  <label className="flex items-center gap-2 text-sm font-medium"><input type="checkbox" name="isActive" defaultChecked /> Показывать клиентам</label>
+                  <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="border-[#ddd5c9]/65 bg-transparent text-[#f6f0e6] hover:border-[#f6f0e6] hover:bg-[#f6f0e6]/10 hover:text-[#f6f0e6]"
+                      disabled={isPending}
+                      onClick={() => {
+                        setState(null);
+                        setIsCreateServiceOpen(false);
+                      }}
+                    >
+                      Отмена
+                    </Button>
+                    <Button disabled={isPending || !databaseReady} className="bg-[#f6f0e6] text-[#2e3c28] hover:bg-[#ddd5c9]">
+                      <Plus className="size-4" aria-hidden="true" />
+                      {isPending ? "Создаём..." : "Добавить услугу"}
+                    </Button>
+                  </div>
+                </form>
+              </section>
+            </div>
+          ) : null}
         </Card>
       ) : null}
 
@@ -977,31 +1050,47 @@ function Field({
   label,
   name,
   defaultValue = "",
-  type = "text"
+  type = "text",
+  className = inputClass
 }: {
   label: string;
   name: string;
   defaultValue?: string;
   type?: string;
+  className?: string;
 }) {
   return (
     <label className="grid gap-2 text-sm font-medium">
       {label}
-      <input name={name} type={type} defaultValue={defaultValue} className={inputClass} />
+      <input name={name} type={type} defaultValue={defaultValue} className={className} />
     </label>
   );
 }
 
-function ServiceFields({ service }: { service?: PhotographerService }) {
+function ServiceFields({
+  service,
+  compact = false,
+  appearance = "default"
+}: {
+  service?: PhotographerService;
+  compact?: boolean;
+  appearance?: "default" | "service-editor" | "modal";
+}) {
+  const isModal = appearance === "modal";
+  const controlClass = cn(inputClass, appearance === "service-editor" && "service-editor-input", isModal && "border-[#ddd5c9] bg-[#f6f0e6] text-[#2e3c28] placeholder:text-[#68715f] focus:ring-[#f6f0e6]");
+  const notesClass = cn(textareaClass, appearance === "service-editor" && "service-editor-input", isModal && "border-[#ddd5c9] bg-[#f6f0e6] text-[#2e3c28] placeholder:text-[#68715f] focus:ring-[#f6f0e6]");
+
   return (
-    <div className="grid gap-4">
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Название" name="title" defaultValue={service?.title ?? ""} />
-        <Field label="Стоимость, ₸" name="price" type="number" defaultValue={service ? String(service.price) : ""} />
-        <label className="grid gap-2 text-sm font-medium sm:col-span-2">Длительность<input name="durationMinutes" type="number" min={30} max={720} step={30} defaultValue={service ? String(service.durationMinutes) : "60"} className={inputClass} /></label>
+    <div className={cn("grid gap-4", compact && "gap-3")}>
+      <div className={cn("grid gap-4 sm:grid-cols-2", compact && "lg:grid-cols-[minmax(0,1.4fr)_minmax(9rem,0.7fr)_minmax(9rem,0.7fr)] lg:gap-3")}>
+        <Field label="Название" name="title" defaultValue={service?.title ?? ""} className={controlClass} />
+        <Field label="Стоимость, ₸" name="price" type="number" defaultValue={service ? String(service.price) : ""} className={controlClass} />
+        <label className={cn("grid gap-2 text-sm font-medium sm:col-span-2", compact && "lg:col-span-1")}>Длительность<input name="durationMinutes" type="number" min={30} max={720} step={30} defaultValue={service ? String(service.durationMinutes) : "60"} className={controlClass} /></label>
       </div>
-      <label className="grid gap-2 text-sm font-medium">Описание<textarea name="description" defaultValue={service?.description ?? ""} className={textareaClass} /></label>
-      <label className="grid gap-2 text-sm font-medium">Что входит<textarea name="included" defaultValue={service?.included.join("\n") ?? ""} placeholder="По одному пункту на строку" className={textareaClass} /></label>
+      <div className={cn("grid gap-4", compact && "lg:grid-cols-2 lg:gap-3")}>
+        <label className="grid gap-2 text-sm font-medium">Описание<textarea name="description" defaultValue={service?.description ?? ""} className={notesClass} /></label>
+        <label className="grid gap-2 text-sm font-medium">Что входит<textarea name="included" defaultValue={service?.included.join("\n") ?? ""} placeholder="По одному пункту на строку" className={notesClass} /></label>
+      </div>
     </div>
   );
 }
