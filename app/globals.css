@@ -246,6 +246,70 @@
     color: rgb(46 60 40 / 0.6);
   }
 
+  :root.light .service-editor-card .service-save-button {
+    background: #f6f0e6;
+    color: #2e3c28;
+  }
+
+  :root.light .service-editor-card .service-save-button:hover {
+    background: #ddd5c9;
+  }
+
+  :root.light .service-create-modal {
+    border-color: rgb(221 213 201 / 0.55);
+    background: #2e3c28;
+    color: #f6f0e6;
+  }
+
+  :root.light .service-create-modal-subtitle {
+    color: rgb(246 240 230 / 0.75);
+  }
+
+  :root.light .service-create-modal .service-create-input {
+    border-color: #ddd5c9;
+    background: #f6f0e6;
+    color: #2e3c28;
+  }
+
+  :root.light .service-create-modal .service-create-input:focus {
+    outline: none;
+    --tw-ring-color: #f6f0e6;
+  }
+
+  :root.light .service-create-modal .service-create-input::placeholder {
+    color: rgb(46 60 40 / 0.6);
+  }
+
+  :root.light .service-create-modal .service-create-modal-close {
+    color: #f6f0e6;
+  }
+
+  :root.light .service-create-modal .service-create-modal-close:hover {
+    background: rgb(246 240 230 / 0.1);
+    color: #f6f0e6;
+  }
+
+  :root.light .service-create-modal .service-create-modal-cancel {
+    border-color: rgb(221 213 201 / 0.65);
+    background: transparent;
+    color: #f6f0e6;
+  }
+
+  :root.light .service-create-modal .service-create-modal-cancel:hover {
+    border-color: #f6f0e6;
+    background: rgb(246 240 230 / 0.1);
+    color: #f6f0e6;
+  }
+
+  :root.light .service-create-modal .service-create-modal-submit {
+    background: #f6f0e6;
+    color: #2e3c28;
+  }
+
+  :root.light .service-create-modal .service-create-modal-submit:hover {
+    background: #ddd5c9;
+  }
+
   :root.light .calendar-event {
     font-weight: 600;
   }

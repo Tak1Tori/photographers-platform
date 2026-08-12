@@ -19,7 +19,6 @@ import {
 import {
   createCustomPhotographerStyleAction,
   deletePhotographerServiceAction,
-  movePhotographerServiceAction,
   deletePortfolioItemAction,
   requestPhotographerFinalPaymentAction,
   resolvePhotographerRescheduleAction,
@@ -402,9 +401,9 @@ export function PhotographerDashboardManager({
           <CardContent className="grid gap-4">
             {state?.area === "service-create" && state.success ? <SuccessToast message={state.message} /> : null}
             {profile.services.length === 0 ? <EmptyText text="Услуг пока нет. Добавьте первую, чтобы клиент мог выбрать конкретный формат съёмки." /> : (
-              <div className="grid gap-4">
+              <div className="grid gap-6">
                 {profile.services.map((service, index) => (
-                  <article key={service.id} className="service-editor-card grid gap-4 rounded-lg border border-border p-4 sm:p-5">
+                  <article key={service.id} className="service-editor-card grid gap-4 rounded-lg border-2 border-border p-4 shadow-lg shadow-black/10 sm:p-5">
                     <form id={`service-${service.id}`} action={run(`service:${service.id}`, savePhotographerServiceAction)} className="grid gap-4">
                       <input type="hidden" name="serviceId" value={service.id} />
                       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -418,9 +417,7 @@ export function PhotographerDashboardManager({
                       <ServiceFields service={service} compact appearance="service-editor" />
                     </form>
                     <div className="flex flex-wrap items-center gap-2 border-t border-current/20 pt-4">
-                      <Button form={`service-${service.id}`} size="sm" disabled={isPending || !databaseReady}><Save className="size-4" aria-hidden="true" />Сохранить</Button>
-                      <form action={run(`service:${service.id}`, movePhotographerServiceAction)}><input type="hidden" name="serviceId" value={service.id} /><input type="hidden" name="direction" value="up" /><Button size="sm" variant="outline" disabled={isPending || !databaseReady || index === 0}>Выше</Button></form>
-                      <form action={run(`service:${service.id}`, movePhotographerServiceAction)}><input type="hidden" name="serviceId" value={service.id} /><input type="hidden" name="direction" value="down" /><Button size="sm" variant="outline" disabled={isPending || !databaseReady || index === profile.services.length - 1}>Ниже</Button></form>
+                      <Button form={`service-${service.id}`} size="sm" className="service-save-button" disabled={isPending || !databaseReady}><Save className="size-4" aria-hidden="true" />Сохранить</Button>
                       <form action={run(`service:${service.id}`, deletePhotographerServiceAction)} className="sm:ml-auto"><input type="hidden" name="serviceId" value={service.id} /><Button size="sm" variant="outline" disabled={isPending || !databaseReady}><Trash2 className="size-4" aria-hidden="true" />Удалить</Button></form>
                     </div>
                   </article>
@@ -440,17 +437,17 @@ export function PhotographerDashboardManager({
                   setIsCreateServiceOpen(false);
                 }}
               />
-              <section className="relative z-10 grid max-h-[calc(100dvh-2rem)] w-full max-w-3xl overflow-y-auto rounded-lg border border-[#ddd5c9]/55 bg-[#2e3c28] p-5 text-[#f6f0e6] shadow-2xl shadow-black/40 sm:p-6">
+              <section className="service-create-modal relative z-10 grid max-h-[calc(100dvh-2rem)] w-full max-w-3xl overflow-y-auto rounded-lg border border-border bg-card p-5 text-card-foreground shadow-2xl shadow-black/40 sm:p-6">
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <h3 id="create-service-title" className="text-xl font-semibold tracking-normal">Новая услуга</h3>
-                    <p className="mt-1 text-sm text-[#f6f0e6]/75">Укажите итоговую стоимость услуги, а не почасовую ставку.</p>
+                    <p className="service-create-modal-subtitle mt-1 text-sm text-muted-foreground">Укажите итоговую стоимость услуги, а не почасовую ставку.</p>
                   </div>
                   <Button
                     type="button"
                     variant="ghost"
                     size="sm"
-                    className="size-9 shrink-0 p-0 text-[#f6f0e6] hover:bg-[#f6f0e6]/10 hover:text-[#f6f0e6]"
+                    className="service-create-modal-close size-9 shrink-0 p-0"
                     aria-label="Закрыть"
                     title="Закрыть"
                     onClick={() => {
@@ -469,7 +466,7 @@ export function PhotographerDashboardManager({
                     <Button
                       type="button"
                       variant="outline"
-                      className="border-[#ddd5c9]/65 bg-transparent text-[#f6f0e6] hover:border-[#f6f0e6] hover:bg-[#f6f0e6]/10 hover:text-[#f6f0e6]"
+                      className="service-create-modal-cancel"
                       disabled={isPending}
                       onClick={() => {
                         setState(null);
@@ -478,7 +475,7 @@ export function PhotographerDashboardManager({
                     >
                       Отмена
                     </Button>
-                    <Button disabled={isPending || !databaseReady} className="bg-[#f6f0e6] text-[#2e3c28] hover:bg-[#ddd5c9]">
+                    <Button disabled={isPending || !databaseReady} className="service-create-modal-submit">
                       <Plus className="size-4" aria-hidden="true" />
                       {isPending ? "Создаём..." : "Добавить услугу"}
                     </Button>
@@ -1076,9 +1073,16 @@ function ServiceFields({
   compact?: boolean;
   appearance?: "default" | "service-editor" | "modal";
 }) {
-  const isModal = appearance === "modal";
-  const controlClass = cn(inputClass, appearance === "service-editor" && "service-editor-input", isModal && "border-[#ddd5c9] bg-[#f6f0e6] text-[#2e3c28] placeholder:text-[#68715f] focus:ring-[#f6f0e6]");
-  const notesClass = cn(textareaClass, appearance === "service-editor" && "service-editor-input", isModal && "border-[#ddd5c9] bg-[#f6f0e6] text-[#2e3c28] placeholder:text-[#68715f] focus:ring-[#f6f0e6]");
+  const controlClass = cn(
+    inputClass,
+    appearance === "service-editor" && "service-editor-input",
+    appearance === "modal" && "service-create-input"
+  );
+  const notesClass = cn(
+    textareaClass,
+    appearance === "service-editor" && "service-editor-input",
+    appearance === "modal" && "service-create-input"
+  );
 
   return (
     <div className={cn("grid gap-4", compact && "gap-3")}>
