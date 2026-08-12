@@ -448,6 +448,10 @@ export function PhotographerOnlyForm({
         }}
         onNext={() => {
           clearFormError();
+          if (mobileStep === 1) {
+            router.push("/booking/payment-unavailable");
+            return;
+          }
           setMobileStep((step) => Math.min(step + 1, 2));
         }}
       />
