@@ -2,6 +2,7 @@ import type {
   AvailableSlot,
   Booking,
   Photographer,
+  PhotographerService,
   PhotoStyle,
   Studio
 } from "@/lib/types";
@@ -26,6 +27,16 @@ type PrismaPhotographerLike = {
   styles?: Array<{ slug: string; name?: string }>;
   reviews?: Array<{ rating: number }>;
   portfolioItems?: Array<{ imageUrl: string }>;
+  services?: Array<{
+    id: string;
+    title: string;
+    description?: string | null;
+    price: number;
+    durationMinutes: number;
+    included?: unknown;
+    isActive: boolean;
+    sortOrder: number;
+  }>;
   availabilitySlots?: Array<{
     id: string;
     date: Date;
@@ -84,6 +95,10 @@ type PrismaBookingLike = {
   clientComment?: string | null;
   bookingType?: string;
   photographerId?: string | null;
+  photographerServiceId?: string | null;
+  photographerServiceTitle?: string | null;
+  photographerServicePrice?: number | null;
+  photographerServiceDurationMinutes?: number | null;
   studioId?: string | null;
   styleId?: string | null;
   shootType?: string | null;
@@ -149,6 +164,9 @@ export function mapPhotographer(profile: PrismaPhotographerLike): Photographer {
       ? profile.reviews.reduce((sum, review) => sum + review.rating, 0) / profile.reviews.length
       : 0;
 
+  const services = mapPhotographerServices(profile.services);
+  const activeServices = services.filter((service) => service.isActive);
+
   return {
     id: profile.id,
     name: profile.name,
@@ -157,6 +175,11 @@ export function mapPhotographer(profile: PrismaPhotographerLike): Photographer {
     specializationIds: profile.styles?.map((style) => style.slug) ?? [],
     specializationTitles: profile.styles?.map((style) => style.name ?? style.slug) ?? [],
     pricePerHour: profile.hourlyRate,
+    lowestServicePrice:
+      activeServices.length > 0
+        ? Math.min(...activeServices.map((service) => service.price))
+        : profile.hourlyRate,
+    services,
     rating: Number(reviewRating.toFixed(1)),
     imageUrl: profile.avatarUrl,
     portfolio: profile.portfolioItems?.map((item) => item.imageUrl) ?? [],
@@ -241,6 +264,11 @@ export function mapBooking(booking: PrismaBookingLike): Booking {
     clientComment: booking.clientComment ?? undefined,
     bookingType: mapBookingType(booking.bookingType),
     photographerId: booking.photographerId ?? "",
+    photographerServiceId: booking.photographerServiceId ?? undefined,
+    photographerServiceTitle: booking.photographerServiceTitle ?? undefined,
+    photographerServicePrice: booking.photographerServicePrice ?? undefined,
+    photographerServiceDurationMinutes:
+      booking.photographerServiceDurationMinutes ?? undefined,
     studioId: booking.studioId ?? "",
     photographerName: booking.photographer?.name ?? undefined,
     studioName: booking.studio?.name ?? undefined,
@@ -297,6 +325,25 @@ export function mapBooking(booking: PrismaBookingLike): Booking {
     rescheduleComment: booking.rescheduleComment ?? undefined,
     status: mapBookingStatus(booking.status)
   };
+}
+
+export function mapPhotographerServices(
+  services?: PrismaPhotographerLike["services"]
+): PhotographerService[] {
+  return (services ?? [])
+    .map((service) => ({
+      id: service.id,
+      title: service.title,
+      description: service.description ?? undefined,
+      price: service.price,
+      durationMinutes: service.durationMinutes,
+      included: Array.isArray(service.included)
+        ? service.included.filter((item): item is string => typeof item === "string")
+        : [],
+      isActive: service.isActive,
+      sortOrder: service.sortOrder
+    }))
+    .sort((first, second) => first.sortOrder - second.sortOrder || first.price - second.price);
 }
 
 function mapBookingType(type?: string): Booking["bookingType"] {

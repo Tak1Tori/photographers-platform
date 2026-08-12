@@ -30,6 +30,7 @@ export interface AvailableSlotsRequest {
   date: string;
   durationMinutes: number;
   photographerId?: string;
+  photographerServiceId?: string;
   studioHallId?: string;
 }
 
@@ -68,13 +69,10 @@ export async function getBookingCalendarDaysAction(
     if (!/^\d{4}-\d{2}$/.test(input.month)) {
       return { success: false, days: [], error: "Некорректный месяц." };
     }
-    if (
-      !Number.isInteger(input.durationMinutes) ||
-      input.durationMinutes < 30 ||
-      input.durationMinutes > 12 * 60
-    ) {
-      return { success: false, days: [], error: "Некорректная длительность." };
-    }
+    const resolvedInput = await resolveRequestedDuration({
+      ...input,
+      date: `${input.month}-01`
+    });
 
     await expireOldHolds();
 
@@ -94,7 +92,10 @@ export async function getBookingCalendarDaysAction(
         continue;
       }
 
-      const slots = await getCalendarPreviewSlots(input, date);
+      const slots = await getCalendarPreviewSlots(
+        { ...resolvedInput, month: input.month },
+        date
+      );
       days.push({
         date,
         status: slots.length > 0 ? "AVAILABLE" : "UNAVAILABLE",
@@ -129,21 +130,21 @@ export async function getBookingDaySlotsAction(
         error: "Войдите как клиент, чтобы увидеть свободное время."
       };
     }
-    validateSlotsRequest(input);
+    const resolvedInput = await resolveRequestedDuration(input);
 
     await expireOldHolds();
 
-    const baseOwner = getBaseCalendarOwner(input);
+    const baseOwner = getBaseCalendarOwner(resolvedInput);
     const allSlots = await getAllCandidateSlots(
       baseOwner,
       input.date,
-      input.durationMinutes
+      resolvedInput.durationMinutes
     );
-    const availableSlots = await getAvailableBookingSlots(input);
+    const availableSlots = await getAvailableBookingSlots(resolvedInput);
     const availableKeys = new Set(
       availableSlots.map((slot) => `${slot.startLabel}-${slot.endLabel}`)
     );
-    const busyKeys = await getBusySlotKeys(input, allSlots);
+    const busyKeys = await getBusySlotKeys(resolvedInput, allSlots);
 
     return {
       success: true,
@@ -185,11 +186,11 @@ export async function getAvailableSlotsAction(
         error: "Войдите как клиент, чтобы увидеть свободное время."
       };
     }
-    validateSlotsRequest(input);
+    const resolvedInput = await resolveRequestedDuration(input);
 
     await expireOldHolds();
 
-    const slots = await getAvailableBookingSlots(input);
+    const slots = await getAvailableBookingSlots(resolvedInput);
     return { success: true, slots: serialize(slots) };
   } catch (error) {
     return {
@@ -281,6 +282,34 @@ function validateSlotsRequest(input: AvailableSlotsRequest) {
   ) {
     throw new Error("Некорректная длительность.");
   }
+}
+
+async function resolveRequestedDuration<T extends AvailableSlotsRequest>(input: T): Promise<T> {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.date)) {
+    throw new Error("Выберите дату.");
+  }
+
+  if (input.bookingType !== BookingType.PHOTOGRAPHER_ONLY || !input.photographerServiceId) {
+    validateSlotsRequest(input);
+    return input;
+  }
+  if (!input.photographerId) throw new Error("Фотограф не выбран.");
+
+  const service = await prisma.photographerService.findFirst({
+    where: {
+      id: input.photographerServiceId,
+      photographerId: input.photographerId,
+      isActive: true,
+      photographer: {
+        status: "PUBLISHED",
+        user: { role: UserRole.PHOTOGRAPHER }
+      }
+    },
+    select: { durationMinutes: true }
+  });
+  if (!service) throw new Error("Выбранная услуга больше недоступна.");
+
+  return { ...input, durationMinutes: service.durationMinutes };
 }
 
 function getBaseCalendarOwner(input: AvailableSlotsRequest): CalendarOwner {

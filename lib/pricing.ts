@@ -1,4 +1,4 @@
-import type { BookingType, SettlementMode } from "@prisma/client";
+import { BookingType, type SettlementMode } from "@prisma/client";
 
 const BASIS_POINTS = 10_000;
 
@@ -106,6 +106,15 @@ export function calculateBookingPricing(input: BookingPricingInput) {
     providerFee: 0,
     netPlatformRevenue: platformFeeAmount
   };
+}
+
+export function calculatePhotographerServicePricing(servicePrice: number) {
+  return calculateBookingPricing({
+    bookingType: BookingType.PHOTOGRAPHER_ONLY,
+    photographerPrice: servicePrice,
+    studioPrice: 0,
+    durationHours: 1
+  });
 }
 
 export function getPaymentSettlementMode(): SettlementMode {

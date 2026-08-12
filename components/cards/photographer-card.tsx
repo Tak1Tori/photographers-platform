@@ -3,6 +3,7 @@ import Link from "next/link";
 import { MapPin, Star } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { formatPrice, getPhotographerStyleTitles } from "@/lib/mock-data";
+import { getPhotographerDisplayPrice } from "@/lib/photographer-services";
 import type { Photographer } from "@/lib/types";
 
 interface PhotographerCardProps {
@@ -65,7 +66,7 @@ export function PhotographerCard({
         </div>
         <div className="mt-auto pt-4 sm:pt-6">
           <p className="text-center text-sm font-medium sm:text-base">
-            {formatPrice(photographer.pricePerHour)} / час
+            от {formatPrice(getPhotographerDisplayPrice(photographer.pricePerHour, photographer.lowestServicePrice))}
           </p>
         </div>
       </CardContent>

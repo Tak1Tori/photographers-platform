@@ -148,6 +148,6 @@ function serializeEvent(event: Awaited<ReturnType<typeof getCalendarEventsForDas
   };
 }
 
-function isPhotographerSection(value?: string): value is "profile" | "portfolio" | "schedule" | "bookings" {
-  return value === "profile" || value === "portfolio" || value === "schedule" || value === "bookings";
+function isPhotographerSection(value?: string): value is "profile" | "services" | "portfolio" | "schedule" | "bookings" {
+  return value === "profile" || value === "services" || value === "portfolio" || value === "schedule" || value === "bookings";
 }

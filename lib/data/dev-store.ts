@@ -38,7 +38,17 @@ const defaultStore: DevStore = {
 export async function getDevStore(): Promise<DevStore> {
   try {
     const raw = await readFile(storePath, "utf-8");
-    return { ...defaultStore, ...JSON.parse(raw) };
+    const stored = JSON.parse(raw) as Partial<DevStore>;
+    return {
+      ...defaultStore,
+      ...stored,
+      photographerProfile: {
+        ...defaultStore.photographerProfile,
+        ...stored.photographerProfile,
+        services:
+          stored.photographerProfile?.services ?? defaultStore.photographerProfile.services
+      }
+    };
   } catch {
     return defaultStore;
   }

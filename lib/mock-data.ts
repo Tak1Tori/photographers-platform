@@ -297,7 +297,8 @@ export const mockPhotographerProfile: PhotographerProfile = {
   bio: "Помогаю экспертам и командам выглядеть уверенно в кадре. Работаю с постановкой, светом и быстрым отбором кадров на площадке.",
   status: "Published",
   rating: 4.9,
-  portfolio: photographers[0]?.portfolio ?? []
+  portfolio: photographers[0]?.portfolio ?? [],
+  services: []
 };
 
 export const mockStudioHalls: StudioHall[] = [

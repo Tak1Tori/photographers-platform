@@ -6,6 +6,7 @@ import { CalendarCheck, MapPin, Star } from "lucide-react";
 import { PhotographerProfileTabs } from "@/components/photographers/photographer-profile-tabs";
 import { Button } from "@/components/ui/button";
 import { formatPrice, getPhotographerStyleTitles } from "@/lib/mock-data";
+import { formatServiceDuration, getPhotographerDisplayPrice } from "@/lib/photographer-services";
 import {
   getPublicPhotographerPageData
 } from "@/lib/data/photographers";
@@ -97,6 +98,7 @@ async function PhotographerDetail({ params }: PhotographerDetailPageProps) {
   }
 
   const { photographer, portfolioItems, reviews } = pageData;
+  const activeServices = photographer.services?.filter((service) => service.isActive) ?? [];
 
   return (
     <>
@@ -137,17 +139,55 @@ async function PhotographerDetail({ params }: PhotographerDetailPageProps) {
               ))}
             </div>
             <p className="mt-3 text-xl font-semibold">
-              {formatPrice(photographer.pricePerHour)} / час
+              от {formatPrice(getPhotographerDisplayPrice(photographer.pricePerHour, photographer.lowestServicePrice))}
             </p>
-            <Button asChild size="lg" className="photographer-booking-button mt-7 w-full sm:w-fit">
-              <Link href={`/booking/new?type=PHOTOGRAPHER_ONLY&photographerId=${photographer.id}`}>
-                <CalendarCheck className="size-4" aria-hidden="true" />
-                Забронировать фотографа
-              </Link>
-            </Button>
+            {activeServices.length === 0 ? (
+              <Button asChild size="lg" className="photographer-booking-button mt-7 w-full sm:w-fit">
+                <Link href={`/booking/new?type=PHOTOGRAPHER_ONLY&photographerId=${photographer.id}`}>
+                  <CalendarCheck className="size-4" aria-hidden="true" />
+                  Забронировать фотографа
+                </Link>
+              </Button>
+            ) : null}
           </div>
         </div>
       </section>
+      {activeServices.length > 0 ? (
+        <section className="section border-y border-border bg-card/40">
+          <div className="container">
+            <div className="mb-6 max-w-2xl">
+              <h2 className="text-2xl font-semibold tracking-normal md:text-3xl">Услуги</h2>
+              <p className="mt-2 text-sm text-muted-foreground md:text-base">
+                Выберите подходящий формат съёмки. Цена и длительность будут зафиксированы в брони.
+              </p>
+            </div>
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {activeServices.map((service) => (
+                <article key={service.id} className="flex h-full flex-col rounded-lg border border-border bg-background p-5">
+                  <div className="flex items-start justify-between gap-4">
+                    <h3 className="text-lg font-semibold tracking-normal">{service.title}</h3>
+                    <span className="shrink-0 rounded-md bg-secondary px-2 py-1 text-sm font-medium">
+                      {formatServiceDuration(service.durationMinutes)}
+                    </span>
+                  </div>
+                  {service.description ? <p className="mt-3 text-sm leading-6 text-muted-foreground">{service.description}</p> : null}
+                  {service.included.length > 0 ? (
+                    <ul className="mt-4 grid gap-2 text-sm text-muted-foreground">
+                      {service.included.map((item) => <li key={item} className="flex gap-2"><span aria-hidden="true">•</span><span>{item}</span></li>)}
+                    </ul>
+                  ) : null}
+                  <div className="mt-auto flex items-center justify-between gap-3 pt-6">
+                    <p className="text-lg font-semibold">{formatPrice(service.price)}</p>
+                    <Button asChild size="sm">
+                      <Link href={`/booking/new?type=PHOTOGRAPHER_ONLY&photographerId=${photographer.id}&serviceId=${service.id}`}>Выбрать</Link>
+                    </Button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </div>
+        </section>
+      ) : null}
       <section className="section">
         <div className="container">
           <PhotographerProfileTabs

@@ -70,12 +70,21 @@ export async function getConflictReason(
 
   const bufferedStart = addMinutes(startTime, -rule.bufferBeforeMinutes);
   const bufferedEnd = addMinutes(endTime, rule.bufferAfterMinutes);
+  // `NOT currentBookingId` alone excludes NULL in SQL, hiding manual events/holds.
+  const excludeCurrentBooking = options.ignoreBookingId
+    ? {
+        OR: [
+          { bookingId: null },
+          { bookingId: { not: options.ignoreBookingId } }
+        ]
+      }
+    : {};
   const [events, holds, bookings] = await Promise.all([
     db.calendarEvent.findMany({
       where: {
         ...ownerWhere(owner),
         status: CalendarEventStatus.BUSY,
-        bookingId: options.ignoreBookingId ? { not: options.ignoreBookingId } : undefined,
+        ...excludeCurrentBooking,
         NOT: {
           booking: {
             is: {
@@ -93,7 +102,7 @@ export async function getConflictReason(
         id: options.ignoreHoldId ? { not: options.ignoreHoldId } : undefined,
         status: AvailabilityHoldStatus.ACTIVE,
         expiresAt: { gt: new Date() },
-        bookingId: options.ignoreBookingId ? { not: options.ignoreBookingId } : undefined,
+        ...excludeCurrentBooking,
         startTime: { lt: bufferedEnd },
         endTime: { gt: bufferedStart }
       }

@@ -21,7 +21,8 @@ import {
   LOCATION_TYPES,
   SHOOT_TYPES
 } from "@/lib/booking-options";
-import { calculateBookingPricing } from "@/lib/pricing";
+import { calculateBookingPricing, calculatePhotographerServicePricing } from "@/lib/pricing";
+import { formatServiceDuration } from "@/lib/photographer-services";
 import {
   CONTACT_INFO_ERROR,
   validateNoContactInfo
@@ -31,7 +32,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SmartSlotPicker } from "@/components/booking/smart-slot-picker";
 import { formatPrice, getPhotographerStyleTitles } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
-import type { Photographer } from "@/lib/types";
+import type { Photographer, PhotographerService } from "@/lib/types";
 
 type FieldErrors = Record<string, string>;
 type CreatedBookingState = {
@@ -41,6 +42,7 @@ type CreatedBookingState = {
 
 interface PhotographerOnlyFormProps {
   photographer?: Photographer;
+  service?: PhotographerService;
   clientDefaults?: {
     name?: string | null;
     phone?: string | null;
@@ -49,6 +51,7 @@ interface PhotographerOnlyFormProps {
 
 export function PhotographerOnlyForm({
   photographer,
+  service,
   clientDefaults
 }: PhotographerOnlyFormProps) {
   const router = useRouter();
@@ -64,23 +67,27 @@ export function PhotographerOnlyForm({
   const [createdBooking, setCreatedBooking] = useState<CreatedBookingState | null>(null);
   const [mobileStep, setMobileStep] = useState(0);
   const [mobileSlot, setMobileSlot] = useState({ date: "", startTime: "" });
-  const durationHours = useMemo(() => {
+  const legacyDurationHours = useMemo(() => {
     const value = Number(durationMode === "CUSTOM" ? customDurationHours : durationMode);
     return Number.isFinite(value) && value > 0 ? value : 0;
   }, [customDurationHours, durationMode]);
+  const durationMinutes = service?.durationMinutes ?? legacyDurationHours * 60;
+  const durationHours = Math.max(1, Math.ceil(durationMinutes / 60));
   const photographerLocationTypes = useMemo(
     () => LOCATION_TYPES.filter((option) => option.value !== "NEED_STUDIO_HELP"),
     []
   );
   const pricing = useMemo(
     () =>
-      calculateBookingPricing({
-        bookingType: "PHOTOGRAPHER_ONLY",
-        photographerPrice: photographer?.pricePerHour ?? 0,
-        studioPrice: 0,
-        durationHours
-      }),
-    [durationHours, photographer?.pricePerHour]
+      service
+        ? calculatePhotographerServicePricing(service.price)
+        : calculateBookingPricing({
+            bookingType: "PHOTOGRAPHER_ONLY",
+            photographerPrice: photographer?.pricePerHour ?? 0,
+            studioPrice: 0,
+            durationHours
+          }),
+    [durationHours, photographer?.pricePerHour, service]
   );
   const hasContactErrors = Object.values(fieldErrors).some((error) => error === CONTACT_INFO_ERROR);
   const canGoNext = mobileStep !== 1 || Boolean(mobileSlot.date && mobileSlot.startTime);
@@ -177,6 +184,7 @@ export function PhotographerOnlyForm({
       className="grid gap-6"
     >
       <input type="hidden" name="photographerId" value={photographer.id} />
+      {service ? <input type="hidden" name="serviceId" value={service.id} /> : null}
 
       <div className="sticky top-16 z-20 -mx-4 border-y border-border bg-background/95 px-4 py-4 backdrop-blur sm:-mx-6 sm:px-6 md:static md:mx-0 md:rounded-xl md:border md:bg-card/70 md:px-8">
         <MobileBookingStepper currentStep={mobileStep} />
@@ -259,6 +267,12 @@ export function PhotographerOnlyForm({
                 />
               </div>
 
+              {service ? (
+                <div className="rounded-lg border border-primary/30 bg-primary/[0.06] p-4 text-sm">
+                  <p className="font-semibold">{service.title}</p>
+                  <p className="mt-1 text-muted-foreground">{formatServiceDuration(service.durationMinutes)} · {formatPrice(service.price)}</p>
+                </div>
+              ) : (
               <label className="grid gap-2 text-sm font-medium">
                 <RequiredLabel label="Длительность" required />
                 <select
@@ -276,8 +290,9 @@ export function PhotographerOnlyForm({
                 </select>
                 <ErrorText error={fieldErrors.durationHours} />
               </label>
+              )}
 
-              {durationMode === "CUSTOM" ? (
+              {!service && durationMode === "CUSTOM" ? (
                 <label className="grid gap-2 text-sm font-medium">
                   <RequiredLabel label="Сколько часов" required />
                   <input
@@ -307,7 +322,8 @@ export function PhotographerOnlyForm({
               <SmartSlotPicker
                 bookingType="PHOTOGRAPHER_ONLY"
                 photographerId={photographer.id}
-                durationHours={durationHours}
+                photographerServiceId={service?.id}
+                durationMinutes={durationMinutes}
                 dateError={fieldErrors.date}
                 timeError={fieldErrors.startTime}
                 onSelectionChange={handleMobileSlotChange}
@@ -350,7 +366,8 @@ export function PhotographerOnlyForm({
 
               <div className="grid gap-3 rounded-lg border border-border bg-secondary/20 p-4 text-sm">
                 <MoneyLine label="Фотограф" value={photographer.name} />
-                <MoneyLine label="Длительность" value={`${durationHours} ч`} />
+                {service ? <MoneyLine label="Услуга" value={service.title} /> : null}
+                <MoneyLine label="Длительность" value={formatServiceDuration(durationMinutes)} />
                 <MoneyLine label="Стоимость услуги" value={formatPrice(pricing.totalServicePrice)} strong />
                 <MoneyLine label="Сервисный сбор" value={formatPrice(pricing.platformFeeAmount)} />
                 <MoneyLine label="Остаток исполнителю" value={formatPrice(pricing.providerAmount)} />

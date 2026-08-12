@@ -439,6 +439,25 @@ model PhotographerProfile {
   calendarDrafts          CalendarDraft[]
   bookingLeads            BookingLead[]
   telegramConnectionCodes TelegramConnectionCode[]
+  services                PhotographerService[]
+}
+
+model PhotographerService {
+  id              String               @id @default(cuid())
+  photographerId  String
+  title           String
+  description     String?
+  price           Int
+  durationMinutes Int
+  included        Json?
+  isActive        Boolean              @default(true)
+  sortOrder       Int                  @default(0)
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+  photographer    PhotographerProfile  @relation(fields: [photographerId], references: [id], onDelete: Cascade)
+  bookings        Booking[]
+
+  @@index([photographerId, isActive, sortOrder])
 }
 
 model PhotographerPortfolioItem {
@@ -677,6 +696,10 @@ model Booking {
   bookingType               BookingType                @default(FULL_SHOOT)
   styleId                   String?
   photographerId            String?
+  photographerServiceId     String?
+  photographerServiceTitle  String?
+  photographerServicePrice  Int?
+  photographerServiceDurationMinutes Int?
   studioId                  String?
   studioHallId              String?
   shootType                 String?
@@ -735,6 +758,7 @@ model Booking {
   updatedAt                 DateTime                   @updatedAt
   style                     Style?                     @relation(fields: [styleId], references: [id])
   photographer              PhotographerProfile?       @relation(fields: [photographerId], references: [id])
+  photographerService       PhotographerService?        @relation(fields: [photographerServiceId], references: [id], onDelete: SetNull)
   studio                    StudioProfile?             @relation(fields: [studioId], references: [id])
   studioHall                StudioHall?                @relation(fields: [studioHallId], references: [id])
   client                    User?                      @relation("ClientBookings", fields: [clientId], references: [id], onDelete: SetNull)
@@ -751,6 +775,7 @@ model Booking {
 
   @@index([clientId, createdAt])
   @@index([photographerId, status])
+  @@index([photographerServiceId])
   @@index([studioId, status])
   @@index([paymentStatus, createdAt])
   @@index([source, createdAt])

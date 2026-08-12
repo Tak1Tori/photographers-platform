@@ -6,6 +6,7 @@ import { ChevronLeft, ChevronRight, MapPin, Star } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { formatPrice } from "@/lib/mock-data";
+import { getPhotographerDisplayPrice } from "@/lib/photographer-services";
 import type { Photographer, Studio } from "@/lib/types";
 
 const photographerFallback =
@@ -170,7 +171,7 @@ function PhotographerSlide({ photographer, profileBasePath = "/photographers", p
           {photographer.city}
         </p>
         <p className="mt-4 text-sm font-medium">
-          {formatPrice(photographer.pricePerHour)} / час
+          от {formatPrice(getPhotographerDisplayPrice(photographer.pricePerHour, photographer.lowestServicePrice))}
         </p>
       </div>
     </Link>

@@ -3,8 +3,15 @@ import { revalidateTag, unstable_cache } from "next/cache";
 import { mockPhotographerProfile } from "@/lib/mock-data";
 import { canUseDatabase } from "@/lib/data/db";
 import { getDevStore } from "@/lib/data/dev-store";
-import { mapPhotographer } from "@/lib/data/mappers";
-import { mapSlots } from "@/lib/data/mappers";
+import {
+  mapPhotographer,
+  mapPhotographerServices,
+  mapSlots
+} from "@/lib/data/mappers";
+import {
+  isMissingPhotographerServiceSchema,
+  rethrowUnexpectedDatabaseError
+} from "@/lib/data/photographer-services-rollout";
 import type {
   DashboardAvailabilitySlot,
   PhotographerProfile,
@@ -59,6 +66,9 @@ const photographerInclude = {
     select: {
       rating: true
     }
+  },
+  services: {
+    orderBy: [{ sortOrder: "asc" as const }, { createdAt: "asc" as const }]
   }
 };
 
@@ -109,6 +119,20 @@ const getCachedPublicPhotographers = unstable_cache(
             createdAt: "desc"
           },
           take: 4
+        },
+        services: {
+          where: { isActive: true },
+          select: {
+            id: true,
+            title: true,
+            description: true,
+            price: true,
+            durationMinutes: true,
+            included: true,
+            isActive: true,
+            sortOrder: true
+          },
+          orderBy: [{ price: "asc" }, { sortOrder: "asc" }]
         }
       },
       orderBy: { rating: "desc" }
@@ -116,7 +140,7 @@ const getCachedPublicPhotographers = unstable_cache(
 
     return photographers.map(mapPhotographer).sort((a, b) => b.rating - a.rating);
   },
-  ["public-photographers-v3"],
+  ["public-photographers-v4"],
   { revalidate: 30, tags: [publicPhotographersCacheTag] }
 );
 
@@ -126,9 +150,12 @@ export async function getPhotographers(filters: PhotographerFilters = {}) {
   }
 
   try {
-    return getCachedPublicPhotographers(filters.style ?? "", filters.city ?? "");
-  } catch {
-    return [];
+    return await getCachedPublicPhotographers(filters.style ?? "", filters.city ?? "");
+  } catch (error) {
+    if (isMissingPhotographerServiceSchema(error)) {
+      return [];
+    }
+    return rethrowUnexpectedDatabaseError("Failed to load public photographers", error);
   }
 }
 
@@ -200,6 +227,20 @@ function getCachedPublicPhotographerPageData(id: string) {
             createdAt: "desc"
           },
           take: 24
+        },
+        services: {
+          where: { isActive: true },
+          select: {
+            id: true,
+            title: true,
+            description: true,
+            price: true,
+            durationMinutes: true,
+            included: true,
+            isActive: true,
+            sortOrder: true
+          },
+          orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }]
         }
       }
     });
@@ -215,7 +256,7 @@ function getCachedPublicPhotographerPageData(id: string) {
       reviews: profile.reviews.map(mapPhotographerReview)
     };
   },
-    ["public-photographer-page-v5", id],
+    ["public-photographer-page-v6", id],
     { revalidate: 30, tags: [getPublicPhotographerCacheTag(id)] }
   )();
 }
@@ -227,8 +268,11 @@ export async function getPublicPhotographerPageData(id: string) {
 
   try {
     return await getCachedPublicPhotographerPageData(id);
-  } catch {
-    return undefined;
+  } catch (error) {
+    if (isMissingPhotographerServiceSchema(error)) {
+      return undefined;
+    }
+    return rethrowUnexpectedDatabaseError("Failed to load public photographer page", error);
   }
 }
 
@@ -276,8 +320,11 @@ export async function getPhotographerById(id?: string) {
       include: photographerInclude
     });
     return photographer ? mapPhotographer(photographer) : undefined;
-  } catch {
-    return undefined;
+  } catch (error) {
+    if (isMissingPhotographerServiceSchema(error)) {
+      return undefined;
+    }
+    return rethrowUnexpectedDatabaseError("Failed to load photographer", error);
   }
 }
 
@@ -305,8 +352,11 @@ export async function getPhotographerForBooking(id?: string) {
       include: photographerInclude
     });
     return photographer ? mapPhotographer(photographer) : undefined;
-  } catch {
-    return undefined;
+  } catch (error) {
+    if (isMissingPhotographerServiceSchema(error)) {
+      return undefined;
+    }
+    return rethrowUnexpectedDatabaseError("Failed to load photographer for booking", error);
   }
 }
 
@@ -337,10 +387,14 @@ export async function getPhotographerProfileByUserId(userId: string): Promise<Ph
       bio: profile.bio,
       status: mapProfileStatus(profile.status),
       rating: getAverageReviewRating(profile.reviews),
-      portfolio: profile.portfolioItems.map((item) => item.imageUrl)
+      portfolio: profile.portfolioItems.map((item) => item.imageUrl),
+      services: mapPhotographerServices(profile.services)
     };
-  } catch {
-    return mockPhotographerProfile;
+  } catch (error) {
+    if (isMissingPhotographerServiceSchema(error)) {
+      return mockPhotographerProfile;
+    }
+    return rethrowUnexpectedDatabaseError("Failed to load photographer dashboard profile", error);
   }
 }
 
@@ -369,7 +423,8 @@ export async function getOrCreatePhotographerProfileByUserId(
       bio: existing.bio,
       status: mapProfileStatus(existing.status),
       rating: getAverageReviewRating(existing.reviews),
-      portfolio: existing.portfolioItems.map((item) => item.imageUrl)
+      portfolio: existing.portfolioItems.map((item) => item.imageUrl),
+      services: mapPhotographerServices(existing.services)
     };
   }
 
@@ -399,7 +454,8 @@ export async function getOrCreatePhotographerProfileByUserId(
     bio: created.bio,
     status: "Draft",
     rating: getAverageReviewRating(created.reviews),
-    portfolio: []
+    portfolio: [],
+    services: []
   };
 }
 

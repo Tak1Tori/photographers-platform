@@ -54,6 +54,8 @@ export default async function MockCheckoutPage({ searchParams }: MockCheckoutPag
         bookingNumber: booking.bookingNumber,
         bookingType: booking.bookingType,
         style: booking.style?.name ?? booking.shootType ?? "Бронирование фотографа",
+        serviceTitle: booking.photographerServiceTitle,
+        serviceDurationMinutes: booking.photographerServiceDurationMinutes,
         photographer: booking.photographer?.name ?? "Без фотографа",
         shootType: booking.shootType,
         rentalPurpose: booking.rentalPurpose,
@@ -72,6 +74,8 @@ export default async function MockCheckoutPage({ searchParams }: MockCheckoutPag
           bookingNumber: mockBooking.id,
           bookingType: mockBooking.bookingType,
           style: mockBooking.styleId,
+          serviceTitle: mockBooking.photographerServiceTitle,
+          serviceDurationMinutes: mockBooking.photographerServiceDurationMinutes,
           photographer: mockBooking.photographerId,
           shootType: mockBooking.shootType,
           rentalPurpose: mockBooking.rentalPurpose,
@@ -96,9 +100,10 @@ export default async function MockCheckoutPage({ searchParams }: MockCheckoutPag
             <CardContent className="grid grid-cols-2 gap-3 text-sm">
               <Summary label="Номер брони" value={details?.bookingNumber ?? "-"} />
               <Summary label={details?.bookingType === "PHOTOGRAPHER_ONLY" ? "Тип съемки" : "Формат"} value={details?.style ?? "-"} />
+              {details?.serviceTitle ? <Summary label="Выбранная услуга" value={details.serviceTitle} /> : null}
               <Summary label="Фотограф" value={details?.photographer ?? "-"} />
               <Summary label="Дата и время" value={`${details?.date ?? "-"} · ${details?.time ?? "-"}`} />
-              <Summary label="Длительность" value={`${details?.durationHours ?? "-"} ч`} />
+              <Summary label="Длительность" value={formatBookingDuration(details?.serviceDurationMinutes, details?.durationHours)} />
               <Summary label="Стоимость услуги" value={formatPrice(details?.total ?? 0)} />
               <Summary label="Сервисный сбор платформы" value={formatPrice(details?.platformFee ?? 0)} />
               <Summary label="Остаток исполнителю" value={formatPrice(details?.providerAmount ?? 0)} />
@@ -148,6 +153,15 @@ export default async function MockCheckoutPage({ searchParams }: MockCheckoutPag
         </div>
       </section>
   );
+}
+
+function formatBookingDuration(durationMinutes?: number | null, durationHours?: number) {
+  if (durationMinutes) {
+    const hours = Math.floor(durationMinutes / 60);
+    const minutes = durationMinutes % 60;
+    return hours > 0 ? `${hours} ч${minutes ? ` ${minutes} мин` : ""}` : `${minutes} мин`;
+  }
+  return `${durationHours ?? "-"} ч`;
 }
 
 function Summary({ label, value }: { label: string; value: string }) {

@@ -173,6 +173,7 @@ function parsePhotographerOnlyForm(formData: FormData) {
   const fieldErrors: FieldErrors = {};
   const get = (key: string) => String(formData.get(key) ?? "").trim();
   const photographerId = get("photographerId");
+  const serviceId = get("serviceId");
   const shootTypeValue = get("shootType");
   const customShootType = sanitizeUserText(get("customShootType"));
   const shootType = shootTypeValue === "OTHER" ? customShootType : shootTypeValue;
@@ -226,12 +227,14 @@ function parsePhotographerOnlyForm(formData: FormData) {
   }
   if (!date) fieldErrors.date = "Выберите дату.";
   if (!startTime) fieldErrors.startTime = "Выберите время.";
-  if (durationValue === "CUSTOM") {
-    if (!Number.isInteger(durationHours) || durationHours < 5 || durationHours > 24) {
-      fieldErrors.customDurationHours = "Укажите длительность от 5 до 24 часов.";
+  if (!serviceId) {
+    if (durationValue === "CUSTOM") {
+      if (!Number.isInteger(durationHours) || durationHours < 5 || durationHours > 24) {
+        fieldErrors.customDurationHours = "Укажите длительность от 5 до 24 часов.";
+      }
+    } else if (!Number.isInteger(durationHours) || durationHours < 1 || durationHours > 4) {
+      fieldErrors.durationHours = "Выберите длительность.";
     }
-  } else if (!Number.isInteger(durationHours) || durationHours < 1 || durationHours > 4) {
-    fieldErrors.durationHours = "Выберите длительность.";
   }
   if (peopleCount !== undefined && (!Number.isInteger(peopleCount) || peopleCount < 1 || peopleCount > 100)) {
     fieldErrors.peopleCount = "Количество людей должно быть от 1 до 100.";
@@ -257,6 +260,7 @@ function parsePhotographerOnlyForm(formData: FormData) {
       Object.keys(fieldErrors).length === 0
         ? {
             photographerId,
+            serviceId: serviceId || undefined,
             shootType,
             shootDescription,
             locationType,
@@ -265,7 +269,7 @@ function parsePhotographerOnlyForm(formData: FormData) {
             addressDetails,
             date,
             startTime,
-            durationHours,
+            durationHours: serviceId ? undefined : durationHours,
             peopleCount,
             equipmentNeeded:
               equipmentNeeded.length > 0 ? equipmentNeeded : ["NO_SPECIAL_EQUIPMENT"],

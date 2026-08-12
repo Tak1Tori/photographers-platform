@@ -12,7 +12,15 @@ import { prisma } from "@/lib/prisma";
 import { availableSlots, mockBookings } from "@/lib/mock-data";
 import { canUseDatabase } from "@/lib/data/db";
 import { mapBooking, mapSlots } from "@/lib/data/mappers";
-import { calculateBookingPricing } from "@/lib/pricing";
+import {
+  isMissingPhotographerServiceSchema,
+  rethrowUnexpectedDatabaseError
+} from "@/lib/data/photographer-services-rollout";
+import {
+  calculateBookingPricing,
+  calculatePhotographerServicePricing
+} from "@/lib/pricing";
+import { minutesFromTime, timeFromMinutes } from "@/lib/calendar/time-utils";
 import { createPlatformFeePaymentForBooking } from "@/lib/payments/payment-service";
 import { autoCompletePastBookings } from "@/lib/bookings/status-service";
 import { createStudioConfirmationRequest } from "@/lib/studio-confirmations/studio-confirmation-service";
@@ -32,6 +40,7 @@ import type {
 const bookingInclude = {
   style: true,
   photographer: true,
+  photographerService: true,
   studio: true,
   studioHall: true
 };
@@ -126,8 +135,11 @@ export async function createPhotographerOnlyBooking(input: CreatePhotographerOnl
     throw new Error("DATABASE_URL is not configured");
   }
 
-  const photographer = await prisma.photographerProfile.findUnique({
-    where: { id: input.photographerId }
+  const photographer = await prisma.photographerProfile.findFirst({
+    where: {
+      id: input.photographerId,
+      user: { role: "PHOTOGRAPHER" }
+    }
   });
 
   if (!photographer) {
@@ -138,14 +150,44 @@ export async function createPhotographerOnlyBooking(input: CreatePhotographerOnl
     throw new Error("Этот фотограф пока недоступен для бронирования.");
   }
 
-  const pricing = calculateBookingPricing({
-    bookingType: BookingType.PHOTOGRAPHER_ONLY,
-    photographerPrice: photographer.hourlyRate,
-    studioPrice: 0,
-    durationHours: input.durationHours
-  });
+  const selectedService = input.serviceId
+    ? await prisma.photographerService.findFirst({
+        where: {
+          id: input.serviceId,
+          photographerId: photographer.id,
+          isActive: true
+        }
+      })
+    : null;
+
+  if (input.serviceId && !selectedService) {
+    throw new Error("Выбранная услуга больше недоступна. Обновите страницу и выберите другую.");
+  }
+
+  const legacyDurationHours = input.durationHours;
+  const isValidLegacyDuration =
+    Number.isInteger(legacyDurationHours) &&
+    legacyDurationHours !== undefined &&
+    legacyDurationHours >= 1 &&
+    legacyDurationHours <= 24;
+  if (!selectedService && !isValidLegacyDuration) {
+    throw new Error("Некорректная длительность бронирования.");
+  }
+
+  const durationMinutes = selectedService
+    ? selectedService.durationMinutes
+    : legacyDurationHours! * 60;
+  const durationHours = Math.max(1, Math.ceil(durationMinutes / 60));
+  const pricing = selectedService
+    ? calculatePhotographerServicePricing(selectedService.price)
+    : calculateBookingPricing({
+        bookingType: BookingType.PHOTOGRAPHER_ONLY,
+        photographerPrice: photographer.hourlyRate,
+        studioPrice: 0,
+        durationHours: legacyDurationHours!
+      });
   const bookingNumber = `BK-PH-${Date.now().toString().slice(-7)}`;
-  const endTime = calculateEndTime(input.startTime, input.durationHours);
+  const endTime = calculateEndTime(input.startTime, durationMinutes);
 
   const booking = await prisma.booking.create({
       data: {
@@ -157,6 +199,10 @@ export async function createPhotographerOnlyBooking(input: CreatePhotographerOnl
         bookingType: BookingType.PHOTOGRAPHER_ONLY,
         styleId: null,
         photographerId: photographer.id,
+        photographerServiceId: selectedService?.id ?? null,
+        photographerServiceTitle: selectedService?.title ?? null,
+        photographerServicePrice: selectedService?.price ?? null,
+        photographerServiceDurationMinutes: selectedService?.durationMinutes ?? null,
         studioId: null,
         studioHallId: null,
         shootType: input.shootType,
@@ -171,7 +217,7 @@ export async function createPhotographerOnlyBooking(input: CreatePhotographerOnl
         date: new Date(`${input.date}T00:00:00.000Z`),
         startTime: input.startTime,
         endTime,
-        durationHours: input.durationHours,
+        durationHours,
         photographerPrice: pricing.photographerTotal,
         studioPrice: 0,
         serviceFee: pricing.serviceFee,
@@ -333,8 +379,11 @@ export async function getBookingById(id: string) {
     return booking
       ? mapBooking(booking)
       : (await getMockRuntimeBookings()).find((item) => item.id === id);
-  } catch {
-    return (await getMockRuntimeBookings()).find((item) => item.id === id);
+  } catch (error) {
+    if (isMissingPhotographerServiceSchema(error)) {
+      return (await getMockRuntimeBookings()).find((item) => item.id === id);
+    }
+    return rethrowUnexpectedDatabaseError("Failed to load booking", error);
   }
 }
 
@@ -351,8 +400,11 @@ export async function getAllBookings() {
       orderBy: { createdAt: "desc" }
     });
     return bookings.length > 0 ? bookings.map(mapBooking) : getMockRuntimeBookings();
-  } catch {
-    return getMockRuntimeBookings();
+  } catch (error) {
+    if (isMissingPhotographerServiceSchema(error)) {
+      return getMockRuntimeBookings();
+    }
+    return rethrowUnexpectedDatabaseError("Failed to load bookings", error);
   }
 }
 
@@ -506,9 +558,8 @@ async function getStoredMockBookings(): Promise<Booking[]> {
   }
 }
 
-function calculateEndTime(startTime: string, durationHours: number) {
-  const [hour = "0"] = startTime.split(":");
-  return `${String(Number(hour) + durationHours).padStart(2, "0")}:00`;
+function calculateEndTime(startTime: string, durationMinutes: number) {
+  return timeFromMinutes(minutesFromTime(startTime) + durationMinutes);
 }
 
 async function reserveBookingOrRollback(bookingId: string) {

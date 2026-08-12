@@ -15,9 +15,10 @@ import { cn } from "@/lib/utils";
 interface SmartSlotPickerProps
   extends Pick<
     AvailableSlotsRequest,
-    "bookingType" | "photographerId" | "studioHallId"
+    "bookingType" | "photographerId" | "photographerServiceId" | "studioHallId"
   > {
-  durationHours: number;
+  durationHours?: number;
+  durationMinutes?: number;
   dateError?: string;
   timeError?: string;
   onSelectionChange?: (date: string, startTime: string) => void;
@@ -27,13 +28,16 @@ interface SmartSlotPickerProps
 export function SmartSlotPicker({
   bookingType,
   photographerId,
+  photographerServiceId,
   studioHallId,
   durationHours,
+  durationMinutes,
   dateError,
   timeError,
   onSelectionChange,
   presentation = "default"
 }: SmartSlotPickerProps) {
+  const requestedDurationMinutes = durationMinutes ?? (durationHours ?? 0) * 60;
   const [date, setDate] = useState(() => defaultBookingDate());
   const [month, setMonth] = useState(() => monthKey(defaultBookingDate()));
   const [selectedTime, setSelectedTime] = useState("");
@@ -84,9 +88,10 @@ export function SmartSlotPicker({
       const result = await getBookingDaySlotsAction({
         bookingType,
         photographerId,
+        photographerServiceId,
         studioHallId,
         date,
-        durationMinutes: durationHours * 60
+        durationMinutes: requestedDurationMinutes
       });
       setSlots(result.slots);
       setError(result.error ?? "");
@@ -94,7 +99,8 @@ export function SmartSlotPicker({
   }, [
     bookingType,
     date,
-    durationHours,
+    photographerServiceId,
+    requestedDurationMinutes,
     photographerId,
     studioHallId
   ]);
@@ -106,14 +112,15 @@ export function SmartSlotPicker({
       const result = await getBookingCalendarDaysAction({
         bookingType,
         photographerId,
+        photographerServiceId,
         studioHallId,
         month,
-        durationMinutes: durationHours * 60
+        durationMinutes: requestedDurationMinutes
       });
       setCalendarDays(result.days);
       setCalendarError(result.error ?? "");
     });
-  }, [bookingType, durationHours, month, photographerId, studioHallId]);
+  }, [bookingType, month, photographerId, photographerServiceId, requestedDurationMinutes, studioHallId]);
 
   function selectDate(nextDate: string) {
     setDate(nextDate);

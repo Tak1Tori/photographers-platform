@@ -547,6 +547,209 @@ export async function updatePhotographerProfileAction(formData: FormData): Promi
   }
 }
 
+export async function savePhotographerServiceAction(formData: FormData): Promise<ActionResult> {
+  try {
+    const { profile } = await requirePhotographerProfile();
+    const service = parsePhotographerServiceForm(formData);
+
+    if (service.error) {
+      return { success: false, error: service.error };
+    }
+
+    const serviceId = String(formData.get("serviceId") ?? "").trim();
+
+    if (!canUseDatabase()) {
+      await updateDevStore((store) => {
+        const services = [...store.photographerProfile.services];
+        const existingIndex = services.findIndex((item) => item.id === serviceId);
+        const next = {
+          id: serviceId || `dev-service-${crypto.randomUUID()}`,
+          ...service.data,
+          description: service.data.description ?? undefined,
+          sortOrder: existingIndex >= 0 ? services[existingIndex]!.sortOrder : services.length
+        };
+
+        if (existingIndex >= 0) services[existingIndex] = next;
+        else services.push(next);
+
+        return {
+          ...store,
+          photographerProfile: { ...store.photographerProfile, services }
+        };
+      });
+      revalidatePath("/dashboard/photographer");
+      return { success: true };
+    }
+
+    if (serviceId) {
+      const existing = await prisma.photographerService.findFirst({
+        where: { id: serviceId, photographerId: profile.id },
+        select: { id: true }
+      });
+      if (!existing) return { success: false, error: "Услуга не найдена." };
+
+      await prisma.photographerService.update({
+        where: { id: existing.id },
+        data: service.data
+      });
+    } else {
+      const lastService = await prisma.photographerService.findFirst({
+        where: { photographerId: profile.id },
+        orderBy: { sortOrder: "desc" },
+        select: { sortOrder: true }
+      });
+      await prisma.photographerService.create({
+        data: {
+          photographerId: profile.id,
+          ...service.data,
+          sortOrder: (lastService?.sortOrder ?? -1) + 1
+        }
+      });
+    }
+
+    revalidatePhotographerServiceData(profile.id);
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: getErrorMessage(error) };
+  }
+}
+
+export async function deletePhotographerServiceAction(formData: FormData): Promise<ActionResult> {
+  try {
+    const { profile } = await requirePhotographerProfile();
+    const serviceId = String(formData.get("serviceId") ?? "").trim();
+    if (!serviceId) return { success: false, error: "Услуга не выбрана." };
+
+    if (!canUseDatabase()) {
+      await updateDevStore((store) => ({
+        ...store,
+        photographerProfile: {
+          ...store.photographerProfile,
+          services: store.photographerProfile.services.filter((service) => service.id !== serviceId)
+        }
+      }));
+      revalidatePath("/dashboard/photographer");
+      return { success: true };
+    }
+
+    const deleted = await prisma.photographerService.deleteMany({
+      where: { id: serviceId, photographerId: profile.id }
+    });
+    if (!deleted.count) return { success: false, error: "Услуга не найдена." };
+
+    revalidatePhotographerServiceData(profile.id);
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: getErrorMessage(error) };
+  }
+}
+
+export async function movePhotographerServiceAction(formData: FormData): Promise<ActionResult> {
+  try {
+    const { profile } = await requirePhotographerProfile();
+    const serviceId = String(formData.get("serviceId") ?? "").trim();
+    const direction = String(formData.get("direction") ?? "");
+    const shift = direction === "up" ? -1 : direction === "down" ? 1 : 0;
+    if (!serviceId || !shift) return { success: false, error: "Не удалось изменить порядок услуги." };
+
+    if (!canUseDatabase()) {
+      await updateDevStore((store) => ({
+        ...store,
+        photographerProfile: {
+          ...store.photographerProfile,
+          services: movePhotographerService(store.photographerProfile.services, serviceId, shift)
+        }
+      }));
+      revalidatePath("/dashboard/photographer");
+      return { success: true };
+    }
+
+    const services = await prisma.photographerService.findMany({
+      where: { photographerId: profile.id },
+      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+      select: { id: true, sortOrder: true }
+    });
+    const index = services.findIndex((service) => service.id === serviceId);
+    const targetIndex = index + shift;
+    if (index < 0) return { success: false, error: "Услуга не найдена." };
+    if (targetIndex < 0 || targetIndex >= services.length) return { success: true };
+
+    const current = services[index]!;
+    const target = services[targetIndex]!;
+    await prisma.$transaction([
+      prisma.photographerService.update({ where: { id: current.id }, data: { sortOrder: target.sortOrder } }),
+      prisma.photographerService.update({ where: { id: target.id }, data: { sortOrder: current.sortOrder } })
+    ]);
+
+    revalidatePhotographerServiceData(profile.id);
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: getErrorMessage(error) };
+  }
+}
+
+function parsePhotographerServiceForm(formData: FormData) {
+  const title = String(formData.get("title") ?? "").trim().replace(/\s+/g, " ");
+  const description = String(formData.get("description") ?? "").trim();
+  const price = Number(formData.get("price") ?? 0);
+  const durationMinutes = Number(formData.get("durationMinutes") ?? 0);
+  const included = Array.from(
+    new Set(
+      String(formData.get("included") ?? "")
+        .split(/\r?\n/)
+        .map((item) => item.trim())
+        .filter(Boolean)
+    )
+  ).slice(0, 12);
+
+  if (title.length < 2 || title.length > 100) {
+    return { error: "Название услуги должно содержать от 2 до 100 символов." } as const;
+  }
+  if (description.length > 1000) {
+    return { error: "Описание услуги не должно превышать 1000 символов." } as const;
+  }
+  if (!Number.isSafeInteger(price) || price < 1 || price > 10_000_000) {
+    return { error: "Укажите стоимость услуги от 1 до 10 000 000 ₸." } as const;
+  }
+  if (!Number.isInteger(durationMinutes) || durationMinutes < 30 || durationMinutes > 12 * 60 || durationMinutes % 30 !== 0) {
+    return { error: "Длительность должна быть от 30 минут до 12 часов с шагом 30 минут." } as const;
+  }
+  if (included.some((item) => item.length > 160)) {
+    return { error: "Каждый пункт состава услуги не должен превышать 160 символов." } as const;
+  }
+
+  return {
+    data: {
+      title,
+      description: description || null,
+      price,
+      durationMinutes,
+      included,
+      isActive: formData.get("isActive") === "on"
+    }
+  } as const;
+}
+
+function movePhotographerService<T extends { id: string; sortOrder: number }>(
+  services: T[],
+  serviceId: string,
+  shift: number
+) {
+  const ordered = [...services].sort((first, second) => first.sortOrder - second.sortOrder);
+  const index = ordered.findIndex((service) => service.id === serviceId);
+  const targetIndex = index + shift;
+  if (index < 0 || targetIndex < 0 || targetIndex >= ordered.length) return ordered;
+  [ordered[index], ordered[targetIndex]] = [ordered[targetIndex]!, ordered[index]!];
+  return ordered.map((service, sortOrder) => ({ ...service, sortOrder }));
+}
+
+function revalidatePhotographerServiceData(photographerId: string) {
+  revalidatePath("/dashboard/photographer");
+  revalidatePhotographerPublicData(photographerId);
+  revalidatePath("/photographers");
+  revalidatePath(`/photographers/${photographerId}`);
+}
+
 export async function createPortfolioItemAction(formData: FormData): Promise<ActionResult> {
   try {
     const { profile } = await requirePhotographerProfile();

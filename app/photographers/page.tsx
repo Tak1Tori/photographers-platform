@@ -46,7 +46,7 @@ export default async function PhotographersPage({ searchParams }: PhotographersP
     searchParams.style ? getPhotographersByStyle(searchParams.style) : getPhotographers()
   ]);
   const filteredPhotographers = photographers
-    .filter((photographer) => matchesPrice(photographer.pricePerHour, searchParams.price))
+    .filter((photographer) => matchesPrice(photographer.lowestServicePrice ?? photographer.pricePerHour, searchParams.price))
     .filter((photographer) => matchesReviews(photographer.rating, searchParams.reviews));
   const canShowCatalog =
     isBookingMode ||
@@ -100,9 +100,9 @@ export default async function PhotographersPage({ searchParams }: PhotographersP
   );
 }
 
-function matchesPrice(pricePerHour: number, price?: string) {
+function matchesPrice(startingPrice: number, price?: string) {
   const maxPrice = normalizePhotographerMaxPrice(price);
-  return maxPrice >= PHOTOGRAPHER_MAX_PRICE || pricePerHour <= maxPrice;
+  return maxPrice >= PHOTOGRAPHER_MAX_PRICE || startingPrice <= maxPrice;
 }
 
 function matchesReviews(rating: number, reviews?: string) {

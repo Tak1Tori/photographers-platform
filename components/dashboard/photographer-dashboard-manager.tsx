@@ -8,6 +8,7 @@ import {
   Check,
   ExternalLink,
   Images,
+  ListChecks,
   Link as LinkIcon,
   Plus,
   Save,
@@ -17,10 +18,13 @@ import {
 } from "lucide-react";
 import {
   createCustomPhotographerStyleAction,
+  deletePhotographerServiceAction,
+  movePhotographerServiceAction,
   deletePortfolioItemAction,
   requestPhotographerFinalPaymentAction,
   resolvePhotographerRescheduleAction,
   savePhotographerPortfolioAction,
+  savePhotographerServiceAction,
   updatePhotographerBookingStatusAction,
   updatePhotographerProfileAction
 } from "@/app/dashboard/photographer/actions";
@@ -47,7 +51,8 @@ import type {
   Booking,
   PhotographerProfile,
   PhotoStyle,
-  PortfolioItem
+  PortfolioItem,
+  PhotographerService
 } from "@/lib/types";
 
 interface PhotographerDashboardManagerProps {
@@ -67,7 +72,7 @@ type ActionState = {
 } | null;
 
 const maxServerActionUploadBytes = 4 * 1024 * 1024;
-type PhotographerSection = "profile" | "portfolio" | "schedule" | "bookings";
+type PhotographerSection = "profile" | "services" | "portfolio" | "schedule" | "bookings";
 
 export function PhotographerDashboardManager({
   profile,
@@ -92,6 +97,13 @@ export function PhotographerDashboardManager({
       label: "Профиль",
       description: "Данные и специализации",
       icon: UserRound
+    },
+    {
+      id: "services",
+      label: "Услуги",
+      description: "Форматы, цены и длительность",
+      icon: ListChecks,
+      count: profile.services.length
     },
     {
       id: "portfolio",
@@ -282,7 +294,7 @@ export function PhotographerDashboardManager({
                   <Field label="Имя" name="name" defaultValue={profile.name} />
                   <Field label="Город" name="city" defaultValue={profile.city} />
                 </div>
-                <Field label="Цена за час" name="hourlyRate" type="number" defaultValue={String(profile.pricePerHour)} />
+                <Field label="Базовая цена за час для старых бронирований" name="hourlyRate" type="number" defaultValue={String(profile.pricePerHour)} />
                 <label className="grid gap-2 text-sm font-medium">
                   Описание
                   <textarea name="bio" defaultValue={profile.bio} className={textareaClass} />
@@ -357,6 +369,52 @@ export function PhotographerDashboardManager({
           </form>
         </CardContent>
       </Card>
+      ) : null}
+
+      {activeSection === "services" ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Услуги</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Клиенты видят только активные услуги. Цена, длительность и состав выбранной услуги сохраняются в брони.
+            </p>
+          </CardHeader>
+          <CardContent className="grid gap-6">
+            <form action={run("services", savePhotographerServiceAction)} className="grid gap-4 rounded-lg border border-primary/25 bg-primary/[0.04] p-4 sm:p-5">
+              <div>
+                <h3 className="text-lg font-semibold tracking-normal">Новая услуга</h3>
+                <p className="mt-1 text-sm text-muted-foreground">Укажите итоговую стоимость услуги, а не почасовую ставку.</p>
+              </div>
+              <Message state={state} area="services" />
+              <ServiceFields />
+              <label className="flex items-center gap-2 text-sm font-medium"><input type="checkbox" name="isActive" defaultChecked /> Показывать клиентам</label>
+              <Button disabled={isPending || !databaseReady} className="w-full sm:w-fit sm:justify-self-end"><Plus className="size-4" aria-hidden="true" />Добавить услугу</Button>
+            </form>
+
+            {profile.services.length === 0 ? <EmptyText text="Услуг пока нет. Добавьте первую, чтобы клиент мог выбрать конкретный формат съёмки." /> : (
+              <div className="grid gap-4">
+                {profile.services.map((service, index) => (
+                  <article key={service.id} className="grid gap-4 rounded-lg border border-border p-4 sm:p-5">
+                    <form id={`service-${service.id}`} action={run("services", savePhotographerServiceAction)} className="grid gap-4">
+                      <input type="hidden" name="serviceId" value={service.id} />
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <h3 className="font-semibold">Услуга {index + 1}</h3>
+                        <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="isActive" defaultChecked={service.isActive} /> Активна</label>
+                      </div>
+                      <ServiceFields service={service} />
+                    </form>
+                    <div className="flex flex-wrap gap-2">
+                      <Button form={`service-${service.id}`} size="sm" disabled={isPending || !databaseReady}><Save className="size-4" aria-hidden="true" />Сохранить</Button>
+                      <form action={run("services", movePhotographerServiceAction)}><input type="hidden" name="serviceId" value={service.id} /><input type="hidden" name="direction" value="up" /><Button size="sm" variant="outline" disabled={isPending || !databaseReady || index === 0}>Выше</Button></form>
+                      <form action={run("services", movePhotographerServiceAction)}><input type="hidden" name="serviceId" value={service.id} /><input type="hidden" name="direction" value="down" /><Button size="sm" variant="outline" disabled={isPending || !databaseReady || index === profile.services.length - 1}>Ниже</Button></form>
+                      <form action={run("services", deletePhotographerServiceAction)} className="sm:ml-auto"><input type="hidden" name="serviceId" value={service.id} /><Button size="sm" variant="outline" disabled={isPending || !databaseReady}><Trash2 className="size-4" aria-hidden="true" />Удалить</Button></form>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       ) : null}
 
       {activeSection === "portfolio" ? (
@@ -931,6 +989,20 @@ function Field({
       {label}
       <input name={name} type={type} defaultValue={defaultValue} className={inputClass} />
     </label>
+  );
+}
+
+function ServiceFields({ service }: { service?: PhotographerService }) {
+  return (
+    <div className="grid gap-4">
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label="Название" name="title" defaultValue={service?.title ?? ""} />
+        <Field label="Стоимость, ₸" name="price" type="number" defaultValue={service ? String(service.price) : ""} />
+        <label className="grid gap-2 text-sm font-medium sm:col-span-2">Длительность<input name="durationMinutes" type="number" min={30} max={720} step={30} defaultValue={service ? String(service.durationMinutes) : "60"} className={inputClass} /></label>
+      </div>
+      <label className="grid gap-2 text-sm font-medium">Описание<textarea name="description" defaultValue={service?.description ?? ""} className={textareaClass} /></label>
+      <label className="grid gap-2 text-sm font-medium">Что входит<textarea name="included" defaultValue={service?.included.join("\n") ?? ""} placeholder="По одному пункту на строку" className={textareaClass} /></label>
+    </div>
   );
 }
 

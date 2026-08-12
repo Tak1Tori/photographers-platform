@@ -9,6 +9,7 @@ interface BookingNewPageProps {
   searchParams: Promise<{
     type?: BookingType;
     photographerId?: string;
+    serviceId?: string;
   }>;
 }
 
@@ -23,6 +24,9 @@ export default async function BookingNewPage({ searchParams }: BookingNewPagePro
     getPhotographerForBooking(params.photographerId),
     getSession()
   ]);
+  const selectedService = params.serviceId
+    ? photographer?.services?.find((service) => service.id === params.serviceId && service.isActive)
+    : undefined;
 
   return (
     <section className="py-6 md:py-10">
@@ -35,9 +39,18 @@ export default async function BookingNewPage({ searchParams }: BookingNewPagePro
             actionHref="/photographers?mode=booking"
           />
         ) : null}
-        {!params.photographerId || photographer ? (
+        {params.photographerId && params.serviceId && photographer && !selectedService ? (
+          <EmptyState
+            title="Услуга недоступна"
+            description="Эта услуга была отключена или удалена. Выберите актуальный формат на странице фотографа."
+            actionLabel="К услугам фотографа"
+            actionHref={`/photographers/${photographer.id}`}
+          />
+        ) : null}
+        {(!params.photographerId || photographer) && (!params.serviceId || selectedService) ? (
           <PhotographerOnlyForm
             photographer={photographer}
+            service={selectedService}
             clientDefaults={{
               name: session?.user.name,
               phone: session?.user.phone

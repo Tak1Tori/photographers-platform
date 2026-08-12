@@ -189,10 +189,23 @@ export interface Photographer {
   specializationIds: string[];
   specializationTitles?: string[];
   pricePerHour: number;
+  lowestServicePrice?: number;
+  services?: PhotographerService[];
   rating: number;
   imageUrl: string;
   portfolio: string[];
   availableSlotIds: string[];
+}
+
+export interface PhotographerService {
+  id: string;
+  title: string;
+  description?: string;
+  price: number;
+  durationMinutes: number;
+  included: string[];
+  isActive: boolean;
+  sortOrder: number;
 }
 
 export interface PhotographerReview {
@@ -287,6 +300,10 @@ export interface Booking {
   clientComment?: string;
   bookingType: BookingType;
   photographerId: string;
+  photographerServiceId?: string;
+  photographerServiceTitle?: string;
+  photographerServicePrice?: number;
+  photographerServiceDurationMinutes?: number;
   studioId: string;
   photographerName?: string;
   studioName?: string;
@@ -400,6 +417,7 @@ export interface CreatePhotographerOnlyBookingInput {
   clientEmail: string;
   clientPhone: string;
   photographerId: string;
+  serviceId?: string;
   shootType: string;
   shootDescription: string;
   locationType: string;
@@ -408,7 +426,7 @@ export interface CreatePhotographerOnlyBookingInput {
   addressDetails?: string;
   date: string;
   startTime: string;
-  durationHours: number;
+  durationHours?: number;
   peopleCount?: number;
   equipmentNeeded: string[];
   specialRequirements?: string;
@@ -530,6 +548,7 @@ export interface PhotographerProfile {
   status: ProfileStatus;
   rating: number;
   portfolio: string[];
+  services: PhotographerService[];
 }
 
 export interface StudioProfile {
