@@ -422,7 +422,7 @@ export function PhotographerDashboardManager({
                     </form>
                     <div className="flex flex-wrap items-center gap-2 border-t border-current/20 pt-4">
                       <Button form={`service-${service.id}`} size="sm" className="service-save-button" disabled={isPending || !databaseReady}><Save className="size-4" aria-hidden="true" />Сохранить</Button>
-                      <form action={run(`service:${service.id}`, deletePhotographerServiceAction)} className="sm:ml-auto"><input type="hidden" name="serviceId" value={service.id} /><Button size="sm" variant="outline" className="service-delete-button" disabled={isPending || !databaseReady}><Trash2 className="size-4" aria-hidden="true" />Удалить</Button></form>
+                      <form action={run(`service:${service.id}`, deletePhotographerServiceAction)} className="sm:ml-auto"><input type="hidden" name="serviceId" value={service.id} /><Button size="sm" variant="outline" className="service-delete-button !border-[#2e3c28] !bg-[#2e3c28] !text-[#f6f0e6] hover:!border-[#ddd5c9] hover:!bg-[#ddd5c9] hover:!text-[#2e3c28]" disabled={isPending || !databaseReady}><Trash2 className="size-4" aria-hidden="true" />Удалить</Button></form>
                     </div>
                   </article>
                 ))}
@@ -556,7 +556,7 @@ export function PhotographerDashboardManager({
                       size="sm"
                       variant="outline"
                       type="button"
-                      className="portfolio-delete-button w-fit"
+                      className="portfolio-delete-button w-fit !border-[#2e3c28] !bg-[#2e3c28] !text-[#f6f0e6] hover:!border-[#ddd5c9] hover:!bg-[#ddd5c9] hover:!text-[#2e3c28]"
                       onClick={() => {
                         if (!window.confirm("Удалить работу из портфолио?")) return;
                         const data = new FormData();

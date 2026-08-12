@@ -305,6 +305,7 @@
   .portfolio-title-input {
     height: 3.25rem;
     font-size: 1rem;
+    padding-inline: 1rem;
   }
 
   :root.light .service-create-modal .service-create-modal-close {
@@ -347,6 +348,16 @@
     border-color: hsl(var(--primary) / 0.9);
     background: hsl(var(--primary) / 0.9);
     color: hsl(var(--primary-foreground));
+  }
+
+  :root.light .service-create-modal .album-upload-dropzone {
+    border-color: rgb(246 240 230 / 0.68);
+    background: rgb(246 240 230 / 0.06);
+  }
+
+  :root.light .service-create-modal .album-upload-dropzone:hover {
+    border-color: #f6f0e6;
+    background: rgb(246 240 230 / 0.12);
   }
 
   :root.light .album-crop-dialog .album-crop-cancel {

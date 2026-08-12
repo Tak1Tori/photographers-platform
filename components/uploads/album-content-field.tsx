@@ -393,7 +393,7 @@ export function AlbumContentField({
 
       <label
         className={cn(
-          "flex min-h-36 cursor-pointer flex-col items-center justify-center gap-2 rounded-md border border-dashed border-border bg-secondary/30 px-5 py-6 text-center transition-colors hover:border-primary/60 hover:bg-secondary/60",
+          "album-upload-dropzone flex min-h-36 cursor-pointer flex-col items-center justify-center gap-2 rounded-md border border-dashed border-border bg-secondary/30 px-5 py-6 text-center transition-colors hover:border-primary/60 hover:bg-secondary/60",
           isDragging && "border-primary bg-primary/10",
           isUploading && "pointer-events-none opacity-70"
         )}
