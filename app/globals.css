@@ -255,6 +255,18 @@
     background: #ddd5c9;
   }
 
+  :root.light .service-editor-card .service-delete-button {
+    border-color: #f6f0e6;
+    background: #f6f0e6;
+    color: #2e3c28;
+  }
+
+  :root.light .service-editor-card .service-delete-button:hover {
+    border-color: #ddd5c9;
+    background: #ddd5c9;
+    color: #2e3c28;
+  }
+
   :root.light .service-create-modal {
     border-color: rgb(221 213 201 / 0.55);
     background: #2e3c28;

@@ -90,6 +90,7 @@ export function PhotographerDashboardManager({
   const [activeSection, setActiveSection] = useState<PhotographerSection>(initialSection);
   const [isPublicLinkCopied, setIsPublicLinkCopied] = useState(false);
   const [isCreateServiceOpen, setIsCreateServiceOpen] = useState(false);
+  const [isCreatePortfolioOpen, setIsCreatePortfolioOpen] = useState(false);
   const rescheduleRequestsCount = bookings.filter((booking) => booking.rescheduleRequestedAt).length;
   const sections: DashboardSectionTab<PhotographerSection>[] = [
     {
@@ -163,6 +164,9 @@ export function PhotographerDashboardManager({
           if (result.success) {
             if (area === "service-create") {
               setIsCreateServiceOpen(false);
+            }
+            if (area === "portfolio-create") {
+              setIsCreatePortfolioOpen(false);
             }
             router.refresh();
           }
@@ -418,7 +422,7 @@ export function PhotographerDashboardManager({
                     </form>
                     <div className="flex flex-wrap items-center gap-2 border-t border-current/20 pt-4">
                       <Button form={`service-${service.id}`} size="sm" className="service-save-button" disabled={isPending || !databaseReady}><Save className="size-4" aria-hidden="true" />Сохранить</Button>
-                      <form action={run(`service:${service.id}`, deletePhotographerServiceAction)} className="sm:ml-auto"><input type="hidden" name="serviceId" value={service.id} /><Button size="sm" variant="outline" disabled={isPending || !databaseReady}><Trash2 className="size-4" aria-hidden="true" />Удалить</Button></form>
+                      <form action={run(`service:${service.id}`, deletePhotographerServiceAction)} className="sm:ml-auto"><input type="hidden" name="serviceId" value={service.id} /><Button size="sm" variant="outline" className="service-delete-button" disabled={isPending || !databaseReady}><Trash2 className="size-4" aria-hidden="true" />Удалить</Button></form>
                     </div>
                   </article>
                 ))}
@@ -489,55 +493,45 @@ export function PhotographerDashboardManager({
 
       {activeSection === "portfolio" ? (
       <Card>
-        <CardHeader>
-          <CardTitle>Портфолио фотографа</CardTitle>
-        </CardHeader>
-        <CardContent className="grid gap-5">
-          <form
-            action={run("portfolio", savePhotographerPortfolioAction)}
-            className="grid gap-5 rounded-lg border border-emerald-500/25 bg-emerald-500/[0.04] p-4 sm:p-5"
-          >
-            <div>
-              <h4 className="text-lg font-semibold tracking-normal">Новый альбом</h4>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Добавьте название и материалы новой съемки. Первую фотографию можно
-                кадрировать прямо на обложке.
-              </p>
-            </div>
-            <Message state={state} area="portfolio" />
-            <div className="grid content-start gap-3">
-              <Field label="Название" name="newPortfolioTitle" />
-              <AlbumContentField name="newAlbumImages" />
-              <p className="text-sm text-muted-foreground">
-                Первая фотография станет обложкой альбома. Кадрирование доступно на
-                самой обложке.
+        <CardHeader className="space-y-0">
+          <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
+            <div className="grid gap-1.5">
+              <CardTitle>Портфолио фотографа</CardTitle>
+              <p className="max-w-2xl text-sm text-muted-foreground">
+                Добавляйте готовые работы и обновляйте обложки, названия и материалы каждого альбома.
               </p>
             </div>
             <Button
+              type="button"
+              className="shrink-0"
               disabled={isPending || !databaseReady}
-              className="w-full sm:w-fit sm:justify-self-end"
+              onClick={() => {
+                setState(null);
+                setIsCreatePortfolioOpen(true);
+              }}
             >
               <Plus className="size-4" aria-hidden="true" />
-              {isPending ? "Создаём..." : "Создать альбом"}
+              Добавить альбом
             </Button>
-          </form>
-
-          <div className="border-t border-border pt-6">
-            <div className="mb-5 flex flex-col justify-between gap-2 sm:flex-row sm:items-end">
-              <div>
-                <h4 className="text-lg font-semibold tracking-normal">Существующие альбомы</h4>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Обновляйте обложки, названия и содержимое каждого альбома.
-                </p>
-              </div>
-              <span className="text-sm text-muted-foreground">
-                {portfolioItems.length} альбомов
-              </span>
+          </div>
+        </CardHeader>
+        <CardContent className="grid gap-5">
+          {state?.area === "portfolio-create" && state.success ? <SuccessToast message={state.message} /> : null}
+          <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-end">
+            <div>
+              <h4 className="text-lg font-semibold tracking-normal">Существующие альбомы</h4>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Обновляйте обложки, названия и содержимое каждого альбома.
+              </p>
             </div>
-            {portfolioItems.length === 0 ? (
-              <EmptyText text="Портфолио пока пустое. Добавьте первую работу выше." />
-            ) : (
-              <form action={run("portfolio", savePhotographerPortfolioAction)} className="grid gap-5">
+            <span className="text-sm text-muted-foreground">
+              {portfolioItems.length} альбомов
+            </span>
+          </div>
+          {portfolioItems.length === 0 ? (
+            <EmptyText text="Портфолио пока пустое. Добавьте первую работу через кнопку выше." />
+          ) : (
+            <form action={run("portfolio-save", savePhotographerPortfolioAction)} className="grid gap-5">
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {portfolioItems.map((item) => (
                   <div key={item.id} className="grid gap-3 rounded-lg border border-border p-4">
@@ -567,7 +561,7 @@ export function PhotographerDashboardManager({
                         if (!window.confirm("Удалить работу из портфолио?")) return;
                         const data = new FormData();
                         data.set("id", item.id);
-                        run("portfolio", deletePortfolioItemAction)(data);
+                        run("portfolio-delete", deletePortfolioItemAction)(data);
                       }}
                     >
                       <Trash2 className="size-4" aria-hidden="true" />
@@ -584,9 +578,74 @@ export function PhotographerDashboardManager({
                   {isPending ? "Сохраняем..." : "Сохранить альбомы"}
                 </Button>
               </form>
-            )}
-          </div>
+          )}
         </CardContent>
+
+        {isCreatePortfolioOpen ? (
+          <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 sm:p-6" role="dialog" aria-modal="true" aria-labelledby="create-portfolio-title">
+            <button
+              type="button"
+              className="absolute inset-0 cursor-default bg-black/55 backdrop-blur-md"
+              aria-label="Закрыть форму добавления альбома"
+              onClick={() => {
+                setState(null);
+                setIsCreatePortfolioOpen(false);
+              }}
+            />
+            <section className="service-create-modal relative z-10 grid max-h-[calc(100dvh-2rem)] w-full max-w-3xl overflow-y-auto rounded-lg border border-border bg-card p-5 text-card-foreground shadow-2xl shadow-black/40 sm:p-6">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h3 id="create-portfolio-title" className="text-xl font-semibold tracking-normal">Новый альбом</h3>
+                  <p className="service-create-modal-subtitle mt-1 text-sm text-muted-foreground">
+                    Добавьте название и материалы новой съемки. Первую фотографию можно кадрировать прямо на обложке.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="service-create-modal-close size-9 shrink-0 p-0"
+                  aria-label="Закрыть"
+                  title="Закрыть"
+                  onClick={() => {
+                    setState(null);
+                    setIsCreatePortfolioOpen(false);
+                  }}
+                >
+                  <X className="size-5" aria-hidden="true" />
+                </Button>
+              </div>
+              <form action={run("portfolio-create", savePhotographerPortfolioAction)} className="mt-5 grid gap-5">
+                {state?.area === "portfolio-create" && !state.success ? <Notice tone="error" message={state.message} /> : null}
+                <div className="grid content-start gap-4">
+                  <Field label="Название" name="newPortfolioTitle" className="service-create-input" />
+                  <AlbumContentField name="newAlbumImages" />
+                  <p className="service-create-modal-subtitle text-sm text-muted-foreground">
+                    Первая фотография станет обложкой альбома. Кадрирование доступно на самой обложке.
+                  </p>
+                </div>
+                <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="service-create-modal-cancel"
+                    disabled={isPending}
+                    onClick={() => {
+                      setState(null);
+                      setIsCreatePortfolioOpen(false);
+                    }}
+                  >
+                    Отмена
+                  </Button>
+                  <Button disabled={isPending || !databaseReady} className="service-create-modal-submit">
+                    <Plus className="size-4" aria-hidden="true" />
+                    {isPending ? "Создаём..." : "Добавить альбом"}
+                  </Button>
+                </div>
+              </form>
+            </section>
+          </div>
+        ) : null}
       </Card>
       ) : null}
 
