@@ -368,10 +368,6 @@ export function StudioOnlyForm({ studio, hall, clientDefaults }: StudioOnlyFormP
         }}
         onBack={() => setMobileStep((step) => Math.max(step - 1, 0))}
         onNext={() => {
-          if (mobileStep === 1) {
-            router.push("/booking/payment-unavailable");
-            return;
-          }
           setMobileStep((step) => Math.min(step + 1, 2));
         }}
       />
