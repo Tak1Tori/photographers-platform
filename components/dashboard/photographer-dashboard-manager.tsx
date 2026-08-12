@@ -556,7 +556,7 @@ export function PhotographerDashboardManager({
                       size="sm"
                       variant="outline"
                       type="button"
-                      className="w-fit"
+                      className="portfolio-delete-button w-fit"
                       onClick={() => {
                         if (!window.confirm("Удалить работу из портфолио?")) return;
                         const data = new FormData();
@@ -618,7 +618,7 @@ export function PhotographerDashboardManager({
               <form action={run("portfolio-create", savePhotographerPortfolioAction)} className="mt-5 grid gap-5">
                 {state?.area === "portfolio-create" && !state.success ? <Notice tone="error" message={state.message} /> : null}
                 <div className="grid content-start gap-4">
-                  <Field label="Название" name="newPortfolioTitle" className="service-create-input" />
+                  <Field label="Название" name="newPortfolioTitle" className="service-create-input portfolio-title-input" />
                   <AlbumContentField name="newAlbumImages" />
                   <p className="service-create-modal-subtitle text-sm text-muted-foreground">
                     Первая фотография станет обложкой альбома. Кадрирование доступно на самой обложке.

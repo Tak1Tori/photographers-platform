@@ -654,7 +654,7 @@ function CoverCropDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/85 p-4 backdrop-blur-md">
+    <div className="album-crop-dialog fixed inset-0 z-50 flex items-center justify-center bg-background/85 p-4 backdrop-blur-md">
       <div className="w-full max-w-5xl rounded-lg border border-border bg-card p-4 shadow-2xl md:p-5">
         <div className="mb-4 flex items-center justify-between gap-4">
           <div>
@@ -663,7 +663,7 @@ function CoverCropDialog({
               Перетащите прямоугольник по фото.
             </p>
           </div>
-          <Button type="button" variant="ghost" onClick={onClose}>
+          <Button type="button" variant="ghost" className="album-crop-cancel" onClick={onClose}>
             Отмена
           </Button>
         </div>
@@ -686,7 +686,7 @@ function CoverCropDialog({
           />
         </div>
         <div className="mt-4 flex justify-end gap-2">
-          <Button type="button" variant="outline" onClick={onClose}>
+          <Button type="button" variant="outline" className="album-crop-cancel" onClick={onClose}>
             Отмена
           </Button>
           <Button

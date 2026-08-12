@@ -256,9 +256,9 @@
   }
 
   :root.light .service-editor-card .service-delete-button {
-    border-color: #f6f0e6;
-    background: #f6f0e6;
-    color: #2e3c28;
+    border-color: #2e3c28;
+    background: #2e3c28;
+    color: #f6f0e6;
   }
 
   :root.light .service-editor-card .service-delete-button:hover {
@@ -268,6 +268,16 @@
   }
 
   :root.light .service-create-modal {
+    --foreground: 37.5 47.0588% 93.3333%;
+    --card-foreground: 37.5 47.0588% 93.3333%;
+    --muted-foreground: 37.5 30% 78%;
+    --primary: 37.5 47.0588% 93.3333%;
+    --primary-foreground: 102 20% 19.6078%;
+    --secondary: 37.5 25% 22%;
+    --secondary-foreground: 37.5 47.0588% 93.3333%;
+    --border: 36 23% 77%;
+    --input: 36 23% 77%;
+    --ring: 37.5 47.0588% 93.3333%;
     border-color: rgb(221 213 201 / 0.55);
     background: #2e3c28;
     color: #f6f0e6;
@@ -292,6 +302,11 @@
     color: rgb(46 60 40 / 0.6);
   }
 
+  .portfolio-title-input {
+    height: 3.25rem;
+    font-size: 1rem;
+  }
+
   :root.light .service-create-modal .service-create-modal-close {
     color: #f6f0e6;
   }
@@ -302,15 +317,15 @@
   }
 
   :root.light .service-create-modal .service-create-modal-cancel {
-    border-color: rgb(221 213 201 / 0.65);
-    background: transparent;
-    color: #f6f0e6;
+    border-color: #f6f0e6;
+    background: #f6f0e6;
+    color: #2e3c28;
   }
 
   :root.light .service-create-modal .service-create-modal-cancel:hover {
-    border-color: #f6f0e6;
-    background: rgb(246 240 230 / 0.1);
-    color: #f6f0e6;
+    border-color: #ddd5c9;
+    background: #ddd5c9;
+    color: #2e3c28;
   }
 
   :root.light .service-create-modal .service-create-modal-submit {
@@ -320,6 +335,30 @@
 
   :root.light .service-create-modal .service-create-modal-submit:hover {
     background: #ddd5c9;
+  }
+
+  .portfolio-delete-button {
+    border-color: hsl(var(--primary));
+    background: hsl(var(--primary));
+    color: hsl(var(--primary-foreground));
+  }
+
+  .portfolio-delete-button:hover {
+    border-color: hsl(var(--primary) / 0.9);
+    background: hsl(var(--primary) / 0.9);
+    color: hsl(var(--primary-foreground));
+  }
+
+  :root.light .album-crop-dialog .album-crop-cancel {
+    border-color: #2e3c28;
+    background: #f6f0e6;
+    color: #2e3c28;
+  }
+
+  :root.light .album-crop-dialog .album-crop-cancel:hover {
+    border-color: #2e3c28;
+    background: #ddd5c9;
+    color: #2e3c28;
   }
 
   :root.light .calendar-event {
