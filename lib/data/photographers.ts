@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import type { Prisma } from "@prisma/client";
 import { revalidateTag, unstable_cache } from "next/cache";
 import { mockPhotographerProfile } from "@/lib/mock-data";
 import { canUseDatabase } from "@/lib/data/db";
@@ -32,6 +33,13 @@ const demoPhotographerEmails = [
   "leila@example.com"
 ];
 const publicPhotographersCacheTag = "public-photographers";
+
+const publicPhotographerUserWhere = {
+  role: "PHOTOGRAPHER",
+  // Phone and Telegram registrations do not have an email. `notIn` alone
+  // filters NULL values out in PostgreSQL, hiding those real profiles.
+  OR: [{ email: null }, { email: { notIn: demoPhotographerEmails } }]
+} satisfies Prisma.UserWhereInput;
 
 function getPublicPhotographerCacheTag(id: string) {
   return `public-photographer:${id}`;
@@ -78,12 +86,7 @@ const getCachedPublicPhotographers = unstable_cache(
       where: {
         status: "PUBLISHED",
         city: city || undefined,
-        user: {
-          role: "PHOTOGRAPHER",
-          email: {
-            notIn: demoPhotographerEmails
-          }
-        },
+        user: publicPhotographerUserWhere,
         styles: style
           ? {
               some: {
@@ -166,12 +169,7 @@ function getCachedPublicPhotographerPageData(id: string) {
       where: {
         id,
         status: "PUBLISHED",
-        user: {
-          role: "PHOTOGRAPHER",
-          email: {
-            notIn: demoPhotographerEmails
-          }
-        }
+        user: publicPhotographerUserWhere
       },
       select: {
         id: true,
@@ -310,12 +308,7 @@ export async function getPhotographerById(id?: string) {
       where: {
         id,
         status: "PUBLISHED",
-        user: {
-          role: "PHOTOGRAPHER",
-          email: {
-            notIn: demoPhotographerEmails
-          }
-        }
+        user: publicPhotographerUserWhere
       },
       include: photographerInclude
     });
@@ -342,12 +335,7 @@ export async function getPhotographerForBooking(id?: string) {
       where: {
         id,
         status: "PUBLISHED",
-        user: {
-          role: "PHOTOGRAPHER",
-          email: {
-            notIn: demoPhotographerEmails
-          }
-        }
+        user: publicPhotographerUserWhere
       },
       include: photographerInclude
     });
@@ -514,12 +502,7 @@ export async function getPublicPortfolioItem(
       photographerId,
       photographer: {
         status: "PUBLISHED",
-        user: {
-          role: "PHOTOGRAPHER",
-          email: {
-            notIn: demoPhotographerEmails
-          }
-        }
+        user: publicPhotographerUserWhere
       }
     },
     include: {
@@ -565,12 +548,7 @@ function getCachedPublicAlbumPageData(
         photographerId,
         photographer: {
           status: "PUBLISHED",
-          user: {
-            role: "PHOTOGRAPHER",
-            email: {
-              notIn: demoPhotographerEmails
-            }
-          }
+          user: publicPhotographerUserWhere
         }
       },
       select: {

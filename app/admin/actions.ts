@@ -10,6 +10,7 @@ import {
 } from "@/lib/notifications/notification-service";
 import { cancelPlatformBookingEvent } from "@/lib/calendar/calendar-service";
 import { cancelBookingHolds } from "@/lib/calendar/hold-service";
+import { revalidatePhotographerPublicData } from "@/lib/data/photographers";
 import {
   cancelPayment,
   markPaymentAsFailed,
@@ -57,6 +58,7 @@ export async function updatePhotographerProfileStatusAction(
       data: { status }
     });
 
+    revalidatePhotographerPublicData(id);
     revalidatePath("/admin");
     revalidatePath("/photographers");
     revalidatePath("/editors");
