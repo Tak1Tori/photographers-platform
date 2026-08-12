@@ -45,7 +45,7 @@ export default async function PhotographerDashboardPage({
   );
   const pendingBookings = photographerBookings.filter((booking) => booking.status === "Pending");
   const monthlyRevenue = photographerBookings
-    .filter((booking) => booking.status !== "Cancelled")
+    .filter((booking) => !["Cancelled", "Declined"].includes(booking.status))
     .reduce((sum, booking) => sum + calculateProviderPayouts(booking).photographerPayout, 0);
 
   return (

@@ -9,8 +9,11 @@ const cancelledBookingStatuses = [
   PrismaBookingStatus.CANCELLED_BY_PROVIDER,
   PrismaBookingStatus.CANCELLED_BY_PLATFORM,
   PrismaBookingStatus.NO_SHOW_CLIENT,
-  PrismaBookingStatus.NO_SHOW_PROVIDER
+  PrismaBookingStatus.NO_SHOW_PROVIDER,
+  PrismaBookingStatus.DECLINED
 ];
+
+const nonRevenueBookingStatuses = new Set(["Cancelled", "Declined"]);
 
 const emptyAdminStats = {
   totalBookings: 0,
@@ -74,7 +77,9 @@ export async function getPhotographerDashboardStats(photographerId: string) {
       ["Pending", "Confirmed"].includes(booking.status)
     ).length,
     pendingBookings: bookings.filter((booking) => booking.status === "Pending").length,
-    monthlyRevenue: bookings.reduce((sum, booking) => sum + booking.photographerTotal, 0)
+    monthlyRevenue: bookings
+      .filter((booking) => !nonRevenueBookingStatuses.has(booking.status))
+      .reduce((sum, booking) => sum + booking.photographerTotal, 0)
   };
 }
 
@@ -84,6 +89,8 @@ export async function getStudioDashboardStats(studioId: string) {
     activeBookings: bookings.filter((booking) =>
       ["Pending", "Confirmed"].includes(booking.status)
     ).length,
-    monthlyRevenue: bookings.reduce((sum, booking) => sum + booking.studioTotal, 0)
+    monthlyRevenue: bookings
+      .filter((booking) => !nonRevenueBookingStatuses.has(booking.status))
+      .reduce((sum, booking) => sum + booking.studioTotal, 0)
   };
 }
