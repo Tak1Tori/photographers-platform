@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useMemo, useState, useTransition } from "react";
+import { type FormEvent, useCallback, useMemo, useState, useTransition } from "react";
 import { AlertCircle, ArrowLeft, Building2, CalendarDays, Check, CreditCard, MapPin, Users } from "lucide-react";
 import { createStudioOnlyBookingAction } from "@/app/booking/new/actions";
 import {
@@ -117,6 +117,16 @@ export function StudioOnlyForm({ studio, hall, clientDefaults }: StudioOnlyFormP
     });
   }
 
+  function handleFormSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (mobileStep !== 2) {
+      return;
+    }
+
+    submit(new FormData(event.currentTarget));
+  }
+
   if (!studio) {
     return (
       <Card>
@@ -139,7 +149,7 @@ export function StudioOnlyForm({ studio, hall, clientDefaults }: StudioOnlyFormP
   }
 
   return (
-    <form action={submit} className="grid gap-6">
+    <form onSubmit={handleFormSubmit} className="grid gap-6">
       <input type="hidden" name="studioId" value={studio.id} />
       <input type="hidden" name="studioHallId" value={selectedHall?.id ?? ""} />
       <input type="hidden" name="selectedHallCapacity" value={selectedHall?.capacity ?? 0} />

@@ -127,12 +127,14 @@ export function PhotographerOnlyForm({
   }
 
   function handleFormSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
     if (mobileStep !== mobileSteps.length - 1) {
-      event.preventDefault();
       return;
     }
 
     setHasSubmitAttempt(true);
+    submit(new FormData(event.currentTarget));
   }
 
   function submit(formData: FormData) {
@@ -178,7 +180,6 @@ export function PhotographerOnlyForm({
 
   return (
     <form
-      action={submit}
       onSubmit={handleFormSubmit}
       onChange={clearFormError}
       className="grid gap-6"
