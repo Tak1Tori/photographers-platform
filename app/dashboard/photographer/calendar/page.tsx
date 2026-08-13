@@ -13,11 +13,12 @@ export const dynamic = "force-dynamic";
 export default async function PhotographerCalendarPage({
   searchParams
 }: {
-  searchParams: { month?: string };
+  searchParams: Promise<{ month?: string }>;
 }) {
+  const resolvedSearchParams = await searchParams;
   const session = await requireSession(["PHOTOGRAPHER", "ADMIN"]);
   const profile = await getOrCreatePhotographerProfileByUserId(session.user.id);
-  const monthStart = normalizeMonth(searchParams.month);
+  const monthStart = normalizeMonth(resolvedSearchParams.month);
   const range = monthRange(monthStart);
   const owner = {
     type: "PHOTOGRAPHER" as const,

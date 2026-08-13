@@ -29,28 +29,29 @@ export const metadata: Metadata = {
 };
 
 interface PhotographersPageProps {
-  searchParams: {
+  searchParams: Promise<{
     style?: string;
     mode?: string;
     photographer?: string;
     price?: string;
     reviews?: string;
-  };
+  }>;
 }
 
 export default async function PhotographersPage({ searchParams }: PhotographersPageProps) {
-  const isBookingMode = searchParams.mode === "booking";
+  const resolvedSearchParams = await searchParams;
+  const isBookingMode = resolvedSearchParams.mode === "booking";
   const [styles, selectedStyle, photographers] = await Promise.all([
     getStyles(),
-    getStyleBySlug(searchParams.style),
-    searchParams.style ? getPhotographersByStyle(searchParams.style) : getPhotographers()
+    getStyleBySlug(resolvedSearchParams.style),
+    resolvedSearchParams.style ? getPhotographersByStyle(resolvedSearchParams.style) : getPhotographers()
   ]);
   const filteredPhotographers = photographers
-    .filter((photographer) => matchesPrice(photographer.lowestServicePrice ?? photographer.pricePerHour, searchParams.price))
-    .filter((photographer) => matchesReviews(photographer.rating, searchParams.reviews));
+    .filter((photographer) => matchesPrice(photographer.lowestServicePrice ?? photographer.pricePerHour, resolvedSearchParams.price))
+    .filter((photographer) => matchesReviews(photographer.rating, resolvedSearchParams.reviews));
   const canShowCatalog =
     isBookingMode ||
-    !searchParams.style ||
+    !resolvedSearchParams.style ||
     Boolean(selectedStyle);
 
   return (
@@ -65,13 +66,13 @@ export default async function PhotographersPage({ searchParams }: PhotographersP
         </div>
         <PhotographerFilters
           styles={styles}
-          selectedStyle={searchParams.style}
-          selectedPrice={searchParams.price}
-          selectedReviews={searchParams.reviews}
-          mode={searchParams.mode}
+          selectedStyle={resolvedSearchParams.style}
+          selectedPrice={resolvedSearchParams.price}
+          selectedReviews={resolvedSearchParams.reviews}
+          mode={resolvedSearchParams.mode}
         />
 
-        {!isBookingMode && searchParams.style && !selectedStyle ? (
+        {!isBookingMode && resolvedSearchParams.style && !selectedStyle ? (
           <EmptyState
             title="Такой стиль не найден"
             description="Похоже, ссылка устарела или содержит неверный slug. Вернитесь к каталогу и выберите стиль заново."

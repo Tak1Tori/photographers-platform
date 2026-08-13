@@ -11,7 +11,8 @@
     "db:migrate": "prisma migrate dev",
     "db:seed": "prisma db seed",
     "db:studio": "prisma studio",
-    "usage:audit": "tsx scripts/usage-audit.ts"
+    "usage:audit": "tsx scripts/usage-audit.ts",
+    "cloudinary:orphan-audit": "tsx scripts/cloudinary-orphan-audit.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

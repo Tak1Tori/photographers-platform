@@ -15,15 +15,16 @@ type NotificationFilter = "All" | "Unread" | "Read";
 const filters: NotificationFilter[] = ["All", "Unread", "Read"];
 
 interface NotificationsPageProps {
-  searchParams: {
+  searchParams: Promise<{
     filter?: NotificationFilter;
-  };
+  }>;
 }
 
 export default async function NotificationsPage({ searchParams }: NotificationsPageProps) {
+  const resolvedSearchParams = await searchParams;
   const session = await requireSession();
-  const activeFilter = filters.includes(searchParams.filter ?? "All")
-    ? searchParams.filter ?? "All"
+  const activeFilter = filters.includes(resolvedSearchParams.filter ?? "All")
+    ? resolvedSearchParams.filter ?? "All"
     : "All";
   const notifications = await getUserNotifications(session.user.id);
   const visibleNotifications = notifications.filter((notification) => {

@@ -4,7 +4,6 @@ import Image from "next/image";
 import {
   Film,
   Images,
-  LoaderCircle,
   Play,
   Scan,
   Trash2,
@@ -18,6 +17,10 @@ import {
   useState
 } from "react";
 import { Button } from "@/components/ui/button";
+import {
+  type AlbumMediaDraft,
+  registerAlbumMediaDrafts
+} from "@/components/uploads/album-media-upload";
 import { getCloudinaryVideoPosterUrl } from "@/lib/cloudinary-media";
 import { getCoverCropPresentation } from "@/lib/cover-crop";
 import {
@@ -32,24 +35,7 @@ import type { PortfolioAlbumImage } from "@/lib/types";
 const accept =
   "image/jpeg,image/png,image/webp,video/mp4,video/webm,video/quicktime";
 const allowedTypes = new Set(accept.split(","));
-const maxDimension = 1920;
-const optimizedImageQuality = 0.82;
-
-interface UploadedMedia {
-  imageUrl: string;
-  imagePublicId: string;
-  mediaType: "IMAGE" | "VIDEO";
-  provider: "CLOUDINARY" | "SUPABASE" | "LOCAL";
-  bytes: number;
-  originalBytes: number;
-  width?: number;
-  height?: number;
-  format?: string;
-  fileName: string;
-  previewUrl: string;
-}
-
-type MediaSource = "existing" | "uploaded";
+type MediaSource = "existing" | "draft";
 
 type AlbumMediaItem = {
   key: string;
@@ -70,46 +56,16 @@ type AlbumCoverCrop = {
   height: number;
 };
 
-interface SignedCloudinaryImageUpload {
-  cloudName: string;
-  apiKey: string;
-  folder: string;
-  format: string;
-  timestamp: number;
-  transformation: string;
-  signature: string;
-  error?: string;
-}
-
-interface SignedCloudinaryVideoUpload {
-  cloudName: string;
-  apiKey: string;
-  folder: string;
-  timestamp: number;
-  signature: string;
-  error?: string;
-}
-
-interface CloudinaryVideoUploadResult {
-  secure_url?: string;
-  public_id?: string;
-  bytes?: number;
-  width?: number;
-  height?: number;
-  format?: string;
-  error?: {
-    message?: string;
-  };
-}
-
-interface CloudinaryImageUploadResult extends CloudinaryVideoUploadResult {}
-
 export function AlbumContentField({
   name,
+  uploadScope,
+  disabled = false,
   existingImages = [],
   initialCoverCrop
 }: {
   name: string;
+  uploadScope: string;
+  disabled?: boolean;
   existingImages?: PortfolioAlbumImage[];
   initialCoverCrop?: {
     x?: number | null;
@@ -118,13 +74,11 @@ export function AlbumContentField({
     height?: number | null;
   };
 }) {
-  const selectedMediaRef = useRef<UploadedMedia[]>([]);
-  const [selectedMedia, setSelectedMedia] = useState<UploadedMedia[]>([]);
+  const selectedMediaRef = useRef<AlbumMediaDraft[]>([]);
+  const [selectedMedia, setSelectedMedia] = useState<AlbumMediaDraft[]>([]);
   const [removedIds, setRemovedIds] = useState<string[]>([]);
   const [error, setError] = useState("");
   const [isDragging, setIsDragging] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
-  const [progress, setProgress] = useState("");
   const [draggedMediaKey, setDraggedMediaKey] = useState("");
   const [cropTarget, setCropTarget] = useState<AlbumMediaItem | null>(null);
   const initialCoverMedia = existingImages.find(
@@ -148,6 +102,21 @@ export function AlbumContentField({
     };
   }, []);
 
+  useEffect(
+    () =>
+      registerAlbumMediaDrafts(
+        uploadScope,
+        name,
+        () => selectedMediaRef.current,
+        () => {
+          selectedMediaRef.current.forEach((media) => URL.revokeObjectURL(media.previewUrl));
+          selectedMediaRef.current = [];
+          setSelectedMedia([]);
+        }
+      ),
+    [name, uploadScope]
+  );
+
   const visibleExistingMedia = existingImages.filter(
     (media) => !removedIds.includes(media.id)
   );
@@ -164,10 +133,9 @@ export function AlbumContentField({
     ),
     ...selectedMedia.map(
       (media): AlbumMediaItem => ({
-        key: getMediaKey(media),
-        source: "uploaded",
-        imageUrl: media.imageUrl,
-        imagePublicId: media.imagePublicId,
+        key: media.key,
+        source: "draft",
+        imageUrl: media.previewUrl,
         mediaType: media.mediaType,
         fileName: media.fileName,
         previewUrl: media.previewUrl
@@ -217,7 +185,8 @@ export function AlbumContentField({
 
   }, [mediaItems]);
 
-  async function addFiles(fileList: FileList | File[]) {
+  function addFiles(fileList: FileList | File[]) {
+    if (disabled) return;
     setError("");
     const incoming = Array.from(fileList);
     const availableSlots =
@@ -247,60 +216,40 @@ export function AlbumContentField({
       }
     }
 
-    setIsUploading(true);
-    const uploaded: UploadedMedia[] = [];
-
-    try {
-      for (let index = 0; index < files.length; index += 1) {
-        const original = files[index];
-        const isVideo = original.type.startsWith("video/");
-        setProgress(`Загружаем ${index + 1} из ${files.length}`);
-        if (isVideo) {
-          uploaded.push(await uploadVideoToCloudinary(original));
-          continue;
-        }
-
-        const optimized = await optimizeAlbumImage(original);
-        uploaded.push(await uploadImageToCloudinary(optimized, original));
-      }
-
-      const next = [...selectedMedia, ...uploaded];
-      selectedMediaRef.current = next;
-      setSelectedMedia(next);
-      setMediaOrder((currentOrder) => [
-        ...currentOrder,
-        ...uploaded.map(getMediaKey).filter((key) => !currentOrder.includes(key))
-      ]);
-    } catch (uploadError) {
-      await Promise.all(
-        uploaded.map((media) => deleteUploadedMedia(media.imagePublicId))
-      );
-      uploaded.forEach((media) => URL.revokeObjectURL(media.previewUrl));
-      setError(getReadableUploadError(uploadError));
-    } finally {
-      setIsUploading(false);
-      setProgress("");
-    }
+    const drafts = files.map((file): AlbumMediaDraft => ({
+      key: `draft:${crypto.randomUUID()}`,
+      file,
+      mediaType: file.type.startsWith("video/") ? "VIDEO" : "IMAGE",
+      fileName: file.name,
+      previewUrl: URL.createObjectURL(file)
+    }));
+    const next = [...selectedMedia, ...drafts];
+    selectedMediaRef.current = next;
+    setSelectedMedia(next);
+    setMediaOrder((currentOrder) => [
+      ...currentOrder,
+      ...drafts.map((media) => media.key).filter((key) => !currentOrder.includes(key))
+    ]);
   }
 
   function handleDrop(event: DragEvent<HTMLLabelElement>) {
     event.preventDefault();
+    if (disabled) return;
     setIsDragging(false);
-    void addFiles(event.dataTransfer.files);
+    addFiles(event.dataTransfer.files);
   }
 
-  async function removeSelected(index: number) {
+  function removeSelected(index: number) {
     const media = selectedMedia[index];
     const next = selectedMedia.filter((_, mediaIndex) => mediaIndex !== index);
-    const mediaKey = getMediaKey(media);
+    const mediaKey = media.key;
     selectedMediaRef.current = next;
     setSelectedMedia(next);
     setMediaOrder((order) => order.filter((key) => key !== mediaKey));
     URL.revokeObjectURL(media.previewUrl);
-    await deleteUploadedMedia(media.imagePublicId);
   }
 
-  async function removeMedia(media: AlbumMediaItem) {
+  function removeMedia(media: AlbumMediaItem) {
     setMediaOrder((order) => order.filter((key) => key !== media.key));
 
     if (media.source === "existing" && media.id) {
@@ -309,10 +258,10 @@ export function AlbumContentField({
     }
 
     const selectedIndex = selectedMedia.findIndex(
-      (item) => getMediaKey(item) === media.key
+      (item) => item.key === media.key
     );
     if (selectedIndex >= 0) {
-      await removeSelected(selectedIndex);
+      removeSelected(selectedIndex);
     }
   }
 
@@ -361,7 +310,7 @@ export function AlbumContentField({
                 media={media}
                 isDragging={draggedMediaKey === media.key}
                 isCover={media.key === coverMedia?.key}
-                selected={media.source === "uploaded"}
+                selected={media.source === "draft"}
                 onDragStart={(event) => {
                   setDraggedMediaKey(media.key);
                   event.dataTransfer.effectAllowed = "move";
@@ -380,7 +329,7 @@ export function AlbumContentField({
                   setDraggedMediaKey("");
                 }}
                 onDragEnd={() => setDraggedMediaKey("")}
-                onRemove={() => void removeMedia(media)}
+                onRemove={() => removeMedia(media)}
               />
             ))}
         </div>
@@ -395,7 +344,7 @@ export function AlbumContentField({
         className={cn(
           "album-upload-dropzone flex min-h-36 cursor-pointer flex-col items-center justify-center gap-2 rounded-md border border-dashed border-border bg-secondary/30 px-5 py-6 text-center transition-colors hover:border-primary/60 hover:bg-secondary/60",
           isDragging && "border-primary bg-primary/10",
-          isUploading && "pointer-events-none opacity-70"
+          disabled && "pointer-events-none cursor-not-allowed opacity-60"
         )}
         onDragEnter={(event) => {
           event.preventDefault();
@@ -409,14 +358,8 @@ export function AlbumContentField({
         }}
         onDrop={handleDrop}
       >
-        {isUploading ? (
-          <LoaderCircle className="size-6 animate-spin text-primary" aria-hidden="true" />
-        ) : (
-          <UploadCloud className="size-6 text-primary" aria-hidden="true" />
-        )}
-        <span className="text-sm font-medium">
-          {isUploading ? progress : "Добавить фото или видео"}
-        </span>
+        <UploadCloud className="size-6 text-primary" aria-hidden="true" />
+        <span className="text-sm font-medium">Добавить фото или видео</span>
         <span className="text-xs text-muted-foreground">
           Перетащите несколько файлов или нажмите для выбора
         </span>
@@ -424,33 +367,15 @@ export function AlbumContentField({
           type="file"
           accept={accept}
           multiple
-          disabled={isUploading}
+          disabled={disabled}
           className="sr-only"
           onChange={(event) => {
-            if (event.target.files) void addFiles(event.target.files);
+            if (event.target.files) addFiles(event.target.files);
             event.currentTarget.value = "";
           }}
         />
       </label>
 
-      {selectedMedia.map((media) => (
-        <input
-          key={media.imagePublicId}
-          type="hidden"
-          name={`uploadedMedia:${name}`}
-          value={JSON.stringify({
-            imageUrl: media.imageUrl,
-            imagePublicId: media.imagePublicId,
-            mediaType: media.mediaType,
-            provider: media.provider,
-            bytes: media.bytes,
-            originalBytes: media.originalBytes,
-            width: media.width,
-            height: media.height,
-            format: media.format
-          })}
-        />
-      ))}
       <input
         type="hidden"
         name={`mediaOrder:${name}`}
@@ -591,6 +516,7 @@ function MediaPreview({
           src={source}
           alt="Кадр альбома"
           fill
+          unoptimized={Boolean(media.previewUrl)}
           draggable={false}
           className="pointer-events-none object-cover"
         />
@@ -705,9 +631,9 @@ function CoverCropDialog({
 }
 
 function getMediaKey(
-  media: Pick<PortfolioAlbumImage, "id" | "imageUrl" | "imagePublicId"> | UploadedMedia
+  media: Pick<PortfolioAlbumImage, "id" | "imageUrl" | "imagePublicId">
 ) {
-  return media.imagePublicId || media.imageUrl || ("id" in media ? media.id : "");
+  return media.imagePublicId || media.imageUrl || media.id;
 }
 
 function orderMediaItems(items: AlbumMediaItem[], order: string[]) {
@@ -782,190 +708,4 @@ function getCropFrameStyle(crop: AlbumCoverCrop) {
 
 function clampNumber(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
-}
-
-async function getSignedImageUpload(
-  file: File
-): Promise<SignedCloudinaryImageUpload> {
-  const response = await fetch("/api/uploads/album-image-sign", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      fileName: file.name,
-      contentType: file.type,
-      size: file.size
-    })
-  });
-  const result = (await response.json()) as SignedCloudinaryImageUpload;
-
-  if (!response.ok) {
-    throw new Error(result.error ?? "Не удалось подготовить загрузку фото.");
-  }
-
-  return result;
-}
-
-async function uploadImageToCloudinary(
-  file: File,
-  original: File
-): Promise<UploadedMedia> {
-  const signed = await getSignedImageUpload(file);
-  const formData = new FormData();
-  formData.append("file", file);
-  formData.append("api_key", signed.apiKey);
-  formData.append("timestamp", String(signed.timestamp));
-  formData.append("folder", signed.folder);
-  formData.append("format", signed.format);
-  formData.append("transformation", signed.transformation);
-  formData.append("signature", signed.signature);
-
-  const response = await fetch(
-    `https://api.cloudinary.com/v1_1/${signed.cloudName}/image/upload`,
-    {
-      method: "POST",
-      body: formData
-    }
-  );
-  const result = (await response.json()) as CloudinaryImageUploadResult;
-
-  if (!response.ok || !result.secure_url || !result.public_id) {
-    throw new Error(
-      result.error?.message ?? "Не удалось загрузить фото в Cloudinary."
-    );
-  }
-
-  return {
-    imageUrl: result.secure_url,
-    imagePublicId: `cloudinary:image:${result.public_id}`,
-    mediaType: "IMAGE",
-    provider: "CLOUDINARY",
-    bytes: result.bytes ?? file.size,
-    originalBytes: original.size,
-    width: result.width,
-    height: result.height,
-    format: result.format ?? "webp",
-    fileName: original.name,
-    previewUrl: URL.createObjectURL(file)
-  };
-}
-
-async function uploadVideoToCloudinary(file: File): Promise<UploadedMedia> {
-  const signed = await getSignedVideoUpload(file);
-  const formData = new FormData();
-  formData.append("file", file);
-  formData.append("api_key", signed.apiKey);
-  formData.append("timestamp", String(signed.timestamp));
-  formData.append("folder", signed.folder);
-  formData.append("signature", signed.signature);
-
-  const response = await fetch(
-    `https://api.cloudinary.com/v1_1/${signed.cloudName}/video/upload`,
-    {
-      method: "POST",
-      body: formData
-    }
-  );
-  const result = (await response.json()) as CloudinaryVideoUploadResult;
-
-  if (!response.ok || !result.secure_url || !result.public_id) {
-    throw new Error(
-      result.error?.message ?? "Не удалось загрузить видео в Cloudinary."
-    );
-  }
-
-  return {
-    imageUrl: result.secure_url,
-    imagePublicId: `cloudinary:video:${result.public_id}`,
-    mediaType: "VIDEO",
-    provider: "CLOUDINARY",
-    bytes: result.bytes ?? file.size,
-    originalBytes: file.size,
-    width: result.width,
-    height: result.height,
-    format: result.format,
-    fileName: file.name,
-    previewUrl: URL.createObjectURL(file)
-  };
-}
-
-async function getSignedVideoUpload(
-  file: File
-): Promise<SignedCloudinaryVideoUpload> {
-  const response = await fetch("/api/uploads/album-video-sign", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      fileName: file.name,
-      contentType: file.type,
-      size: file.size
-    })
-  });
-  const result = (await response.json()) as SignedCloudinaryVideoUpload;
-
-  if (!response.ok) {
-    throw new Error(result.error ?? "Не удалось подготовить загрузку видео.");
-  }
-
-  return result;
-}
-
-async function deleteUploadedMedia(publicId: string) {
-  await fetch("/api/uploads/delete", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ publicId })
-  });
-}
-
-async function optimizeAlbumImage(file: File) {
-  const bitmap = await createImageBitmap(file);
-  const scale = Math.min(1, maxDimension / Math.max(bitmap.width, bitmap.height));
-  const canvas = document.createElement("canvas");
-  canvas.width = Math.max(1, Math.round(bitmap.width * scale));
-  canvas.height = Math.max(1, Math.round(bitmap.height * scale));
-  const context = canvas.getContext("2d");
-
-  if (!context) {
-    bitmap.close();
-    throw new Error("Не удалось обработать изображение.");
-  }
-
-  context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-  bitmap.close();
-
-  const blob = await canvasToBlob(canvas, optimizedImageQuality);
-  return new File([blob], replaceExtension(file.name, "webp"), {
-    type: "image/webp",
-    lastModified: Date.now()
-  });
-}
-
-function canvasToBlob(canvas: HTMLCanvasElement, quality: number) {
-  return new Promise<Blob>((resolve, reject) => {
-    canvas.toBlob(
-      (blob) => (blob ? resolve(blob) : reject(new Error("Ошибка кодирования"))),
-      "image/webp",
-      quality
-    );
-  });
-}
-
-function replaceExtension(fileName: string, extension: string) {
-  const baseName = fileName.replace(/\.[^.]+$/, "") || "album-photo";
-  return `${baseName}.${extension}`;
-}
-
-function getReadableUploadError(error: unknown) {
-  const message =
-    error instanceof Error ? error.message : "Не удалось загрузить медиафайл.";
-
-  if (/cloudinary|CLOUDINARY/i.test(message)) {
-    return message;
-  }
-
-  if (/maximum|exceed|size|слишком|превыш/i.test(message)) {
-    return `Файл превышает лимит загрузки. Видео можно загружать до ${formatMegabytes(albumVideoMaxBytes)} МБ.`;
-  }
-
-  return message;
 }

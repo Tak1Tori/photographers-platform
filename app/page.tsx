@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { connection } from "next/server";
 import { BenefitsSlider } from "@/components/home/benefits-slider";
 import { HeroSection } from "@/components/home/hero-section";
 import { MarketplaceSlider } from "@/components/home/marketplace-slider";
@@ -27,6 +28,7 @@ function compareGroups<T extends { photographers: unknown[]; title: string }>(a:
 }
 
 export default async function HomePage() {
+  await connection();
   const [photographers, styles, editors] = await Promise.all([
     getPhotographers(),
     getStyles(),

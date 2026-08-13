@@ -22,11 +22,12 @@ export const dynamic = "force-dynamic";
 export default async function PhotographerDashboardPage({
   searchParams
 }: {
-  searchParams: { month?: string; section?: string };
+  searchParams: Promise<{ month?: string; section?: string }>;
 }) {
+  const resolvedSearchParams = await searchParams;
   const session = await requireSession(["PHOTOGRAPHER", "ADMIN"]);
   const profile = await getOrCreatePhotographerProfileByUserId(session.user.id);
-  const monthStart = normalizeMonth(searchParams.month);
+  const monthStart = normalizeMonth(resolvedSearchParams.month);
   const owner = {
     type: "PHOTOGRAPHER" as const,
     photographerProfileId: profile.photographerId
@@ -101,7 +102,7 @@ export default async function PhotographerDashboardPage({
           }}
           bookings={photographerBookings}
           databaseReady={canUseDatabase() || process.env.NODE_ENV === "development"}
-          initialSection={isPhotographerSection(searchParams.section) ? searchParams.section : undefined}
+          initialSection={isPhotographerSection(resolvedSearchParams.section) ? resolvedSearchParams.section : undefined}
         />
       </div>
     </section>

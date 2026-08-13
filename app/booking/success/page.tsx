@@ -9,13 +9,14 @@ import { getSession } from "@/lib/auth";
 import { formatPrice } from "@/lib/mock-data";
 
 interface BookingSuccessPageProps {
-  searchParams: {
+  searchParams: Promise<{
     bookingNumber?: string;
-  };
+  }>;
 }
 
 export default async function BookingSuccessPage({ searchParams }: BookingSuccessPageProps) {
-  const booking = await getBookingById(searchParams.bookingNumber ?? "");
+  const { bookingNumber } = await searchParams;
+  const booking = await getBookingById(bookingNumber ?? "");
   const session = await getSession();
   const showClientCta = Boolean(
     session?.user.role === "CLIENT" && booking?.clientId === session.user.id

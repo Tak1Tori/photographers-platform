@@ -13,17 +13,18 @@ export const dynamic = "force-dynamic";
 type BookingTab = "current" | "history";
 
 interface ClientBookingsPageProps {
-  searchParams: {
+  searchParams: Promise<{
     tab?: BookingTab;
-  };
+  }>;
 }
 
 export default async function ClientBookingsPage({ searchParams }: ClientBookingsPageProps) {
+  const resolvedSearchParams = await searchParams;
   const session = await requireSession(["CLIENT", "ADMIN"]);
   const bookings = await getClientBookings(session.user.id, {
     role: session.user.role
   });
-  const activeTab: BookingTab = searchParams.tab === "history" ? "history" : "current";
+  const activeTab: BookingTab = resolvedSearchParams.tab === "history" ? "history" : "current";
   const visibleBookings = bookings.filter((booking) =>
     activeTab === "history" ? isHistoryBooking(booking) : !isHistoryBooking(booking)
   );

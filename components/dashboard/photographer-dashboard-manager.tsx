@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Fragment, useState, useTransition } from "react";
+import { type FormEvent, Fragment, useState, useTransition } from "react";
 import {
   AlertTriangle,
   CalendarDays,
@@ -37,6 +37,12 @@ import {
   type DashboardSectionTab
 } from "@/components/dashboard/dashboard-section-tabs";
 import { AlbumContentField } from "@/components/uploads/album-content-field";
+import {
+  clearAlbumMediaDrafts,
+  cleanupUploadedAlbumMedia,
+  getReadableAlbumUploadError,
+  uploadAlbumMediaForSubmission
+} from "@/components/uploads/album-media-upload";
 import { ImageUploadField } from "@/components/uploads/image-upload-field";
 import { EQUIPMENT_OPTIONS, LOCATION_TYPES, SHOOT_TYPES, getOptionLabel } from "@/lib/booking-options";
 import {
@@ -91,6 +97,8 @@ export function PhotographerDashboardManager({
   const [isPublicLinkCopied, setIsPublicLinkCopied] = useState(false);
   const [isCreateServiceOpen, setIsCreateServiceOpen] = useState(false);
   const [isCreatePortfolioOpen, setIsCreatePortfolioOpen] = useState(false);
+  const [portfolioUploadProgress, setPortfolioUploadProgress] = useState<string | null>(null);
+  const isPortfolioBusy = isPending || Boolean(portfolioUploadProgress);
   const rescheduleRequestsCount = bookings.filter((booking) => booking.rescheduleRequestedAt).length;
   const sections: DashboardSectionTab<PhotographerSection>[] = [
     {
@@ -177,6 +185,62 @@ export function PhotographerDashboardManager({
             message:
               "Не удалось отправить файлы. Уменьшите количество изображений и попробуйте снова."
           });
+        }
+      });
+    };
+  }
+
+  function runPortfolioSave(area: "portfolio-save" | "portfolio-create") {
+    return (event: FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      const formData = new FormData(event.currentTarget);
+      setState(null);
+      setPortfolioUploadProgress("Подготавливаем загрузку...");
+
+      startTransition(async () => {
+        let uploadedPublicIds: string[] = [];
+
+        try {
+          const upload = await uploadAlbumMediaForSubmission(
+            formData,
+            area,
+            (completed, total) =>
+              setPortfolioUploadProgress(`Загружаем ${completed} из ${total}...`)
+          );
+          uploadedPublicIds = upload.uploadedPublicIds;
+          setPortfolioUploadProgress("Сохраняем альбом...");
+
+          const result = await savePhotographerPortfolioAction(formData);
+          if (!result) {
+            throw new Error("Сервер не вернул ответ.");
+          }
+          if (!result.success) {
+            await cleanupUploadedAlbumMedia(uploadedPublicIds);
+          }
+
+          setState({
+            area,
+            success: result.success,
+            message: result.success
+              ? "Изменения сохранены."
+              : result.error ?? "Ошибка сохранения."
+          });
+          if (result.success) {
+            clearAlbumMediaDrafts(area);
+            if (area === "portfolio-create") {
+              setIsCreatePortfolioOpen(false);
+            }
+            router.refresh();
+          }
+        } catch (error) {
+          await cleanupUploadedAlbumMedia(uploadedPublicIds);
+          setState({
+            area,
+            success: false,
+            message: getReadableAlbumUploadError(error)
+          });
+        } finally {
+          setPortfolioUploadProgress(null);
         }
       });
     };
@@ -504,7 +568,7 @@ export function PhotographerDashboardManager({
             <Button
               type="button"
               className="shrink-0"
-              disabled={isPending || !databaseReady}
+              disabled={isPortfolioBusy || !databaseReady}
               onClick={() => {
                 setState(null);
                 setIsCreatePortfolioOpen(true);
@@ -531,7 +595,7 @@ export function PhotographerDashboardManager({
           {portfolioItems.length === 0 ? (
             <EmptyText text="Портфолио пока пустое. Добавьте первую работу через кнопку выше." />
           ) : (
-            <form action={run("portfolio-save", savePhotographerPortfolioAction)} className="grid gap-5">
+            <form onSubmit={runPortfolioSave("portfolio-save")} className="grid gap-5">
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {portfolioItems.map((item) => (
                   <div key={item.id} className="grid gap-3 rounded-lg border border-border p-4">
@@ -543,6 +607,8 @@ export function PhotographerDashboardManager({
                     />
                     <AlbumContentField
                       name={`albumImages:${item.id}`}
+                      uploadScope="portfolio-save"
+                      disabled={isPortfolioBusy}
                       existingImages={item.albumImages}
                       initialCoverCrop={{
                         x: item.coverCropX,
@@ -552,7 +618,7 @@ export function PhotographerDashboardManager({
                       }}
                     />
                     <Button
-                      disabled={isPending || !databaseReady}
+                      disabled={isPortfolioBusy || !databaseReady}
                       size="sm"
                       variant="outline"
                       type="button"
@@ -571,12 +637,15 @@ export function PhotographerDashboardManager({
                 ))}
               </div>
                 <Button
-                  disabled={isPending || !databaseReady}
+                  disabled={isPortfolioBusy || !databaseReady}
                   className="w-full sm:w-fit sm:justify-self-end"
                 >
                   <Save className="size-4" aria-hidden="true" />
                   {isPending ? "Сохраняем..." : "Сохранить альбомы"}
                 </Button>
+                {portfolioUploadProgress ? (
+                  <p className="text-sm text-muted-foreground">{portfolioUploadProgress}</p>
+                ) : null}
               </form>
           )}
         </CardContent>
@@ -588,6 +657,7 @@ export function PhotographerDashboardManager({
               className="absolute inset-0 cursor-default bg-black/55 backdrop-blur-md"
               aria-label="Закрыть форму добавления альбома"
               onClick={() => {
+                if (isPortfolioBusy) return;
                 setState(null);
                 setIsCreatePortfolioOpen(false);
               }}
@@ -608,18 +678,24 @@ export function PhotographerDashboardManager({
                   aria-label="Закрыть"
                   title="Закрыть"
                   onClick={() => {
+                    if (isPortfolioBusy) return;
                     setState(null);
                     setIsCreatePortfolioOpen(false);
                   }}
+                  disabled={isPortfolioBusy}
                 >
                   <X className="size-5" aria-hidden="true" />
                 </Button>
               </div>
-              <form action={run("portfolio-create", savePhotographerPortfolioAction)} className="mt-5 grid gap-5">
+              <form onSubmit={runPortfolioSave("portfolio-create")} className="mt-5 grid gap-5">
                 {state?.area === "portfolio-create" && !state.success ? <Notice tone="error" message={state.message} /> : null}
                 <div className="grid content-start gap-4">
                   <Field label="Название" name="newPortfolioTitle" className="service-create-input portfolio-title-input" />
-                  <AlbumContentField name="newAlbumImages" />
+                  <AlbumContentField
+                    name="newAlbumImages"
+                    uploadScope="portfolio-create"
+                    disabled={isPortfolioBusy}
+                  />
                   <p className="service-create-modal-subtitle text-sm text-muted-foreground">
                     Первая фотография станет обложкой альбома. Кадрирование доступно на самой обложке.
                   </p>
@@ -629,7 +705,7 @@ export function PhotographerDashboardManager({
                     type="button"
                     variant="outline"
                     className="service-create-modal-cancel"
-                    disabled={isPending}
+                    disabled={isPortfolioBusy}
                     onClick={() => {
                       setState(null);
                       setIsCreatePortfolioOpen(false);
@@ -637,11 +713,14 @@ export function PhotographerDashboardManager({
                   >
                     Отмена
                   </Button>
-                  <Button disabled={isPending || !databaseReady} className="service-create-modal-submit">
+                  <Button disabled={isPortfolioBusy || !databaseReady} className="service-create-modal-submit">
                     <Plus className="size-4" aria-hidden="true" />
                     {isPending ? "Создаём..." : "Добавить альбом"}
                   </Button>
                 </div>
+                {portfolioUploadProgress ? (
+                  <p className="text-sm text-muted-foreground">{portfolioUploadProgress}</p>
+                ) : null}
               </form>
             </section>
           </div>

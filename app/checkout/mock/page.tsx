@@ -10,15 +10,16 @@ import { formatPrice } from "@/lib/mock-data";
 import { getPaymentById } from "@/lib/payments/payment-service";
 
 interface MockCheckoutPageProps {
-  searchParams: {
+  searchParams: Promise<{
     paymentId?: string;
     cancelled?: string;
     error?: string;
-  };
+  }>;
 }
 
 export default async function MockCheckoutPage({ searchParams }: MockCheckoutPageProps) {
-  const paymentId = searchParams.paymentId;
+  const resolvedSearchParams = await searchParams;
+  const paymentId = resolvedSearchParams.paymentId;
   const payment = paymentId && canUseDatabase() ? await getPaymentById(paymentId) : undefined;
   const session = payment ? await getSession() : undefined;
   const mockBooking = !canUseDatabase() && paymentId ? await getBookingById(paymentId) : undefined;
@@ -34,13 +35,13 @@ export default async function MockCheckoutPage({ searchParams }: MockCheckoutPag
     );
   }
 
-  if (searchParams.cancelled) {
+  if (resolvedSearchParams.cancelled) {
     return (
       <section className="py-6 md:py-10"><div className="container"><EmptyBox text="Оплата отменена." /></div></section>
     );
   }
 
-  if (searchParams.error) {
+  if (resolvedSearchParams.error) {
     return (
       <section className="py-6 md:py-10"><div className="container"><EmptyBox text="Проверьте платеж и попробуйте снова." /></div></section>
     );
