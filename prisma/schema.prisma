@@ -311,6 +311,24 @@ model User {
   legalAcceptances           LegalAcceptance[]
 }
 
+model PendingRegistration {
+  id                       String   @id @default(cuid())
+  name                     String
+  phone                    String   @unique
+  passwordHash             String
+  role                     UserRole
+  acceptedTermsVersion     String
+  acceptedPrivacyVersion   String
+  telegramGatewayRequestId String?  @unique
+  expiresAt                DateTime
+  attempts                 Int      @default(0)
+  resendAvailableAt        DateTime
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  @@index([expiresAt])
+}
+
 model LegalAcceptance {
   id              String            @id @default(cuid())
   userId          String
