@@ -39,11 +39,14 @@ export function BenefitsSlider() {
     const rail = railRef.current;
     if (!rail) return;
 
+    let hasPositionedLoop = false;
+
     const placeOnMiddleLoop = () => {
       const loopWidth = rail.scrollWidth / 3;
 
-      if (loopWidth > 0) {
+      if (loopWidth > 0 && !hasPositionedLoop) {
         rail.scrollLeft = loopWidth;
+        hasPositionedLoop = true;
       }
     };
 
@@ -66,6 +69,8 @@ export function BenefitsSlider() {
 
           if (rail.scrollLeft >= loopWidth * 2) {
             rail.scrollLeft -= loopWidth;
+          } else if (rail.scrollLeft < loopWidth * 0.25) {
+            rail.scrollLeft += loopWidth;
           }
         }
       }
@@ -86,6 +91,9 @@ export function BenefitsSlider() {
   function pauseAutoplay() {
     window.clearTimeout(pauseTimeoutRef.current);
     isAutoplayPausedRef.current = true;
+    pauseTimeoutRef.current = window.setTimeout(() => {
+      isAutoplayPausedRef.current = false;
+    }, 1400);
   }
 
   function resumeAutoplay(delay = 1400) {
@@ -107,8 +115,6 @@ export function BenefitsSlider() {
         onPointerDown={pauseAutoplay}
         onPointerUp={() => resumeAutoplay()}
         onPointerCancel={() => resumeAutoplay()}
-        onMouseEnter={pauseAutoplay}
-        onMouseLeave={() => resumeAutoplay(200)}
         onFocusCapture={pauseAutoplay}
         onBlurCapture={() => resumeAutoplay(200)}
       >

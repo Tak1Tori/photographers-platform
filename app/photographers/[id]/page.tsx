@@ -2,9 +2,10 @@ import Image from "next/image";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { CalendarCheck, MapPin, Star } from "lucide-react";
+import { MapPin, Star } from "lucide-react";
+import { PhotographerBookingGate } from "@/components/booking/photographer-booking-gate";
 import { PhotographerProfileTabs } from "@/components/photographers/photographer-profile-tabs";
-import { Button } from "@/components/ui/button";
+import { getSession } from "@/lib/auth";
 import { formatPrice, getPhotographerStyleTitles } from "@/lib/mock-data";
 import { formatServiceDuration, getPhotographerDisplayPrice } from "@/lib/photographer-services";
 import {
@@ -93,7 +94,7 @@ function getOpenGraphImage(url: string, alt: string) {
 
 async function PhotographerDetail({ params }: PhotographerDetailPageProps) {
   const { id } = await params;
-  const pageData = await getPublicPhotographerPageData(id);
+  const [pageData, session] = await Promise.all([getPublicPhotographerPageData(id), getSession()]);
 
   if (!pageData) {
     notFound();
@@ -144,12 +145,13 @@ async function PhotographerDetail({ params }: PhotographerDetailPageProps) {
               от {formatPrice(getPhotographerDisplayPrice(photographer.pricePerHour, photographer.lowestServicePrice))}
             </p>
             {activeServices.length === 0 ? (
-              <Button asChild size="lg" className="photographer-booking-button mt-7 w-full sm:w-fit">
-                <Link href={`/booking/new?type=PHOTOGRAPHER_ONLY&photographerId=${photographer.id}`}>
-                  <CalendarCheck className="size-4" aria-hidden="true" />
-                  Забронировать фотографа
-                </Link>
-              </Button>
+              <PhotographerBookingGate
+                href={`/booking/new?type=PHOTOGRAPHER_ONLY&photographerId=${photographer.id}`}
+                isAuthenticated={Boolean(session?.user)}
+                label="Забронировать фотографа"
+                size="lg"
+                className="photographer-booking-button mt-7 w-full sm:w-fit"
+              />
             ) : null}
           </div>
         </div>
@@ -180,9 +182,12 @@ async function PhotographerDetail({ params }: PhotographerDetailPageProps) {
                   ) : null}
                   <div className="mt-auto flex items-center justify-between gap-3 pt-6">
                     <p className="text-lg font-semibold">{formatPrice(service.price)}</p>
-                    <Button asChild size="sm">
-                      <Link href={`/booking/new?type=PHOTOGRAPHER_ONLY&photographerId=${photographer.id}&serviceId=${service.id}`}>Выбрать</Link>
-                    </Button>
+                    <PhotographerBookingGate
+                      href={`/booking/new?type=PHOTOGRAPHER_ONLY&photographerId=${photographer.id}&serviceId=${service.id}`}
+                      isAuthenticated={Boolean(session?.user)}
+                      label="Выбрать услугу"
+                      size="sm"
+                    />
                   </div>
                 </article>
               ))}
