@@ -1280,3 +1280,24 @@
     transform: translateY(0);
   }
 }
+
+@keyframes benefits-slider-scroll {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+
+  to {
+    transform: translate3d(calc(-1 * var(--benefits-loop-width, 0px)), 0, 0);
+  }
+}
+
+.benefits-slider-track {
+  animation: benefits-slider-scroll 52s linear infinite;
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .benefits-slider-track {
+    animation: none;
+  }
+}

@@ -31,77 +31,32 @@ const benefits = [
 ] as const;
 
 export function BenefitsSlider() {
-  const railRef = useRef<HTMLDivElement>(null);
-  const pauseTimeoutRef = useRef<number>();
-  const isAutoplayPausedRef = useRef(false);
+  const trackRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const rail = railRef.current;
-    if (!rail) return;
+    const track = trackRef.current;
+    if (!track) return;
 
-    let hasPositionedLoop = false;
+    const setLoopWidth = () => {
+      const cards = track.querySelectorAll<HTMLElement>("[data-benefit-card]");
+      const firstCard = cards.item(0);
+      const firstCardOfSecondLoop = cards.item(benefits.length);
 
-    const placeOnMiddleLoop = () => {
-      const loopWidth = rail.scrollWidth / 3;
+      if (!firstCard || !firstCardOfSecondLoop) return;
 
-      if (loopWidth > 0 && !hasPositionedLoop) {
-        rail.scrollLeft = loopWidth;
-        hasPositionedLoop = true;
-      }
+      const loopWidth = firstCardOfSecondLoop.offsetLeft - firstCard.offsetLeft;
+      track.style.setProperty("--benefits-loop-width", `${loopWidth}px`);
     };
 
-    const observer = new ResizeObserver(placeOnMiddleLoop);
-    observer.observe(rail);
-    const initialFrame = window.requestAnimationFrame(placeOnMiddleLoop);
-
-    let animationFrame = 0;
-    let previousTimestamp = performance.now();
-
-    const animate = (timestamp: number) => {
-      const elapsed = timestamp - previousTimestamp;
-      previousTimestamp = timestamp;
-
-      if (!isAutoplayPausedRef.current) {
-        const loopWidth = rail.scrollWidth / 3;
-
-        if (loopWidth > rail.clientWidth + 4) {
-          rail.scrollLeft += elapsed * 0.018;
-
-          if (rail.scrollLeft >= loopWidth * 2) {
-            rail.scrollLeft -= loopWidth;
-          } else if (rail.scrollLeft < loopWidth * 0.25) {
-            rail.scrollLeft += loopWidth;
-          }
-        }
-      }
-
-      animationFrame = window.requestAnimationFrame(animate);
-    };
-
-    animationFrame = window.requestAnimationFrame(animate);
+    const observer = new ResizeObserver(setLoopWidth);
+    observer.observe(track);
+    const initialFrame = window.requestAnimationFrame(setLoopWidth);
 
     return () => {
       observer.disconnect();
       window.cancelAnimationFrame(initialFrame);
-      window.cancelAnimationFrame(animationFrame);
-      window.clearTimeout(pauseTimeoutRef.current);
     };
   }, []);
-
-  function pauseAutoplay() {
-    window.clearTimeout(pauseTimeoutRef.current);
-    isAutoplayPausedRef.current = true;
-    pauseTimeoutRef.current = window.setTimeout(() => {
-      isAutoplayPausedRef.current = false;
-    }, 1400);
-  }
-
-  function resumeAutoplay(delay = 1400) {
-    window.clearTimeout(pauseTimeoutRef.current);
-    pauseTimeoutRef.current = window.setTimeout(() => {
-      isAutoplayPausedRef.current = false;
-    }, delay);
-  }
 
   return (
     <section className="border-b border-border py-8 md:py-10">
@@ -109,22 +64,14 @@ export function BenefitsSlider() {
         <p className="text-sm font-medium uppercase tracking-[0.18em] text-primary">Framely</p>
       </div>
 
-      <div
-        ref={railRef}
-        className="flex gap-4 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-        onPointerDown={pauseAutoplay}
-        onPointerUp={() => resumeAutoplay()}
-        onPointerCancel={() => resumeAutoplay()}
-        onFocusCapture={pauseAutoplay}
-        onBlurCapture={() => resumeAutoplay(200)}
-      >
-        {[0, 1, 2].flatMap((loopIndex) =>
+      <div className="overflow-hidden pb-1">
+        <div ref={trackRef} className="benefits-slider-track flex w-max gap-4">
+          {[0, 1].flatMap((loopIndex) =>
           benefits.map((benefit) => {
             return (
               <article
                 key={`${loopIndex}-${benefit.title}`}
                 data-benefit-card
-                aria-hidden={loopIndex !== 1}
                 className="grid w-[84vw] max-w-[42rem] shrink-0 overflow-hidden rounded-lg border border-border bg-card sm:grid-cols-[1fr_13rem] sm:w-[38rem]"
               >
                 <div className="p-5 md:p-7">
@@ -146,7 +93,8 @@ export function BenefitsSlider() {
               </article>
             );
           })
-        )}
+          )}
+        </div>
       </div>
     </section>
   );
