@@ -14,11 +14,14 @@ const telegramErrors: Record<string, string> = {
   TelegramLinkRequiresPassword: "Войдите с паролем, чтобы подтвердить прежний аккаунт и связать Telegram.",
   TelegramOnboardingExpired: "Ссылка для регистрации через Telegram истекла. Войдите еще раз.",
   TelegramLinkExpired: "Ссылка для привязки Telegram истекла. Войдите через Telegram еще раз.",
-  TelegramSignInFailed: "Не удалось завершить вход через Telegram. Попробуйте еще раз.",
-  OAuthCallback: "Вход через Telegram отменен или не завершен.",
-  Callback: "Не удалось завершить вход через Telegram. Попробуйте еще раз.",
-  AccessDenied: "Telegram не предоставил доступ к аккаунту.",
-  Configuration: "Вход через Telegram пока настраивается."
+  TelegramSignInFailed: "Не удалось завершить вход через Telegram. Попробуйте еще раз."
+};
+
+const authErrors: Record<string, string> = {
+  OAuthCallback: "Не удалось завершить вход. Попробуйте еще раз.",
+  Callback: "Не удалось завершить вход. Попробуйте еще раз.",
+  AccessDenied: "Доступ к аккаунту не предоставлен.",
+  Configuration: "Сервис входа временно недоступен. Попробуйте позже."
 };
 
 export function SignInForm({ telegramEnabled }: { telegramEnabled: boolean }) {
@@ -32,7 +35,8 @@ export function SignInForm({ telegramEnabled }: { telegramEnabled: boolean }) {
   const [isPending, startTransition] = useTransition();
 
   const providerError = searchParams.get("error");
-  const displayedError = error || (providerError ? telegramErrors[providerError] : "");
+  const displayedError =
+    error || (providerError ? telegramErrors[providerError] ?? authErrors[providerError] : "");
 
   function submit() {
     setError("");
@@ -98,17 +102,16 @@ export function SignInForm({ telegramEnabled }: { telegramEnabled: boolean }) {
           <LogIn className="size-4" aria-hidden="true" />
           {isPending ? "Входим..." : "Войти"}
         </Button>
-        <div className="relative py-1 text-center text-xs text-muted-foreground before:absolute before:inset-x-0 before:top-1/2 before:border-t before:border-border">
-          <span className="relative bg-card px-3">или</span>
-        </div>
-        <Button variant="outline" onClick={signInWithTelegram} disabled={isPending || !telegramEnabled}>
-          <Send className="size-4" aria-hidden="true" />
-          {isPending ? "Открываем Telegram..." : "Продолжить через Telegram"}
-        </Button>
-        {!telegramEnabled ? (
-          <p className="text-center text-xs leading-5 text-muted-foreground">
-            Вход через Telegram станет доступен после настройки интеграции.
-          </p>
+        {telegramEnabled ? (
+          <>
+            <div className="relative py-1 text-center text-xs text-muted-foreground before:absolute before:inset-x-0 before:top-1/2 before:border-t before:border-border">
+              <span className="relative bg-card px-3">или</span>
+            </div>
+            <Button variant="outline" onClick={signInWithTelegram} disabled={isPending}>
+              <Send className="size-4" aria-hidden="true" />
+              {isPending ? "Открываем Telegram..." : "Продолжить через Telegram"}
+            </Button>
+          </>
         ) : null}
         <p className="text-sm text-muted-foreground">
           Нет аккаунта?{" "}

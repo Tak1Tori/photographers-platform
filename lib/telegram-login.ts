@@ -46,7 +46,10 @@ export type TelegramOnboardingResult =
   | { success: false; error: string };
 
 export function isTelegramLoginEnabled() {
-  return Boolean(process.env.TELEGRAM_OIDC_CLIENT_ID && process.env.TELEGRAM_OIDC_CLIENT_SECRET);
+  return (
+    process.env.TELEGRAM_OIDC_ENABLED === "true" &&
+    Boolean(process.env.TELEGRAM_OIDC_CLIENT_ID && process.env.TELEGRAM_OIDC_CLIENT_SECRET)
+  );
 }
 
 export async function handleTelegramOidcSignIn(

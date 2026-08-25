@@ -212,7 +212,7 @@ function telegramOidcProvider(): OAuthConfig<Record<string, unknown>> {
     id: "telegram",
     name: "Telegram",
     type: "oidc",
-    wellKnown: "https://oauth.telegram.org/.well-known/openid-configuration",
+    issuer: "https://oauth.telegram.org",
     clientId: process.env.TELEGRAM_OIDC_CLIENT_ID,
     clientSecret: process.env.TELEGRAM_OIDC_CLIENT_SECRET,
     authorization: {
