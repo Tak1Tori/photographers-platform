@@ -13,6 +13,14 @@ const authSecret =
   process.env.NEXTAUTH_SECRET ??
   (process.env.NODE_ENV === "development" ? "framely-local-development-secret" : undefined);
 
+export function usesSecureAuthCookies(request: NextRequest) {
+  return (
+    process.env.NODE_ENV === "production" ||
+    request.nextUrl.protocol === "https:" ||
+    request.headers.get("x-forwarded-proto") === "https"
+  );
+}
+
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -22,7 +30,10 @@ export async function proxy(request: NextRequest) {
 
   const token = await getToken({
     req: request,
-    secret: authSecret
+    secret: authSecret,
+    // Auth.js derives both the cookie name and JWT salt from this flag.
+    // Keep Proxy aligned with the session endpoint in HTTPS deployments.
+    secureCookie: usesSecureAuthCookies(request)
   });
 
   if (!token) {
