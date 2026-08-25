@@ -12,7 +12,15 @@ import type {
   VerifyWebhookSignatureInput
 } from "@/lib/payments/types";
 
-const DEFAULT_MOCK_SECRET = "framely-local-mock-webhook-secret";
+export function isMockPaymentsEnabled() {
+  return process.env.NODE_ENV !== "production" && process.env.ENABLE_MOCK_PAYMENTS === "true";
+}
+
+export function assertMockPaymentsEnabled() {
+  if (!isMockPaymentsEnabled()) {
+    throw new Error("Mock payments are disabled");
+  }
+}
 
 export class MockPaymentProvider implements PaymentProviderClient {
   readonly provider = PaymentProvider.MOCK;
@@ -20,6 +28,8 @@ export class MockPaymentProvider implements PaymentProviderClient {
   async createCheckoutSession(
     input: CreateCheckoutSessionInput
   ): Promise<CreateCheckoutSessionResult> {
+    assertMockPaymentsEnabled();
+
     return {
       checkoutUrl: `/checkout/mock?paymentId=${encodeURIComponent(input.paymentId)}`,
       providerPaymentId: `mock_${input.paymentId}`,
@@ -30,6 +40,8 @@ export class MockPaymentProvider implements PaymentProviderClient {
   }
 
   async verifyWebhookSignature(input: VerifyWebhookSignatureInput) {
+    assertMockPaymentsEnabled();
+
     const expected = createHmacSignature(input.rawBody, getMockWebhookSecret());
     return safeCompareSignatures(expected, input.signature);
   }
@@ -65,9 +77,14 @@ export class MockPaymentProvider implements PaymentProviderClient {
 }
 
 export function signMockWebhookPayload(rawBody: string) {
+  assertMockPaymentsEnabled();
   return createHmacSignature(rawBody, getMockWebhookSecret());
 }
 
 function getMockWebhookSecret() {
-  return process.env.MOCK_PAYMENT_WEBHOOK_SECRET ?? DEFAULT_MOCK_SECRET;
+  const secret = process.env.MOCK_PAYMENT_WEBHOOK_SECRET;
+  if (!secret) {
+    throw new Error("MOCK_PAYMENT_WEBHOOK_SECRET must be configured when mock payments are enabled");
+  }
+  return secret;
 }

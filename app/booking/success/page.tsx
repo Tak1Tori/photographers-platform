@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 import { CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -16,10 +17,21 @@ interface BookingSuccessPageProps {
 
 export default async function BookingSuccessPage({ searchParams }: BookingSuccessPageProps) {
   const { bookingNumber } = await searchParams;
-  const booking = await getBookingById(bookingNumber ?? "");
   const session = await getSession();
+  if (!session?.user) {
+    notFound();
+  }
+
+  const booking = await getBookingById(bookingNumber ?? "");
+  if (
+    !booking ||
+    (session.user.role !== "ADMIN" && booking.clientId !== session.user.id)
+  ) {
+    notFound();
+  }
+
   const showClientCta = Boolean(
-    session?.user.role === "CLIENT" && booking?.clientId === session.user.id
+    session.user.role === "CLIENT" && booking.clientId === session.user.id
   );
   const platformFeePaid = Boolean(
     booking &&

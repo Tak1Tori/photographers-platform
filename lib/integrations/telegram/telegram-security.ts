@@ -1,5 +1,6 @@
 // Deprecated: Telegram now works as notification-only. This legacy calendar
 // assistant security helper is kept for historical data compatibility.
+import { timingSafeEqual } from "node:crypto";
 import type { NextRequest } from "next/server";
 import { CalendarDraftStatus } from "@prisma/client";
 import type {
@@ -10,8 +11,19 @@ import type {
 
 export function verifyTelegramWebhookSecret(request: NextRequest) {
   const expected = process.env.TELEGRAM_WEBHOOK_SECRET;
-  if (!expected) return true;
-  return request.headers.get("x-telegram-bot-api-secret-token") === expected;
+  const received = request.headers.get("x-telegram-bot-api-secret-token");
+  if (!expected || !received) return false;
+
+  const expectedBuffer = Buffer.from(expected, "utf8");
+  const receivedBuffer = Buffer.from(received, "utf8");
+  return (
+    expectedBuffer.length === receivedBuffer.length &&
+    timingSafeEqual(expectedBuffer, receivedBuffer)
+  );
+}
+
+export function isTelegramWebhookSecretConfigured() {
+  return Boolean(process.env.TELEGRAM_WEBHOOK_SECRET);
 }
 
 export function validateCallbackPayload(data?: string) {

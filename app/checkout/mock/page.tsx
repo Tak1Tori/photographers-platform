@@ -1,5 +1,6 @@
 import { CreditCard, ShieldCheck } from "lucide-react";
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import { cancelMockPaymentAction, confirmMockPaymentAction } from "@/app/checkout/mock/actions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,6 +9,7 @@ import { canUseDatabase } from "@/lib/data/db";
 import { getSession } from "@/lib/auth";
 import { formatPrice } from "@/lib/mock-data";
 import { getPaymentById } from "@/lib/payments/payment-service";
+import { isMockPaymentsEnabled } from "@/lib/payments/providers/mock-provider";
 
 interface MockCheckoutPageProps {
   searchParams: Promise<{
@@ -18,6 +20,10 @@ interface MockCheckoutPageProps {
 }
 
 export default async function MockCheckoutPage({ searchParams }: MockCheckoutPageProps) {
+  if (!isMockPaymentsEnabled()) {
+    notFound();
+  }
+
   const resolvedSearchParams = await searchParams;
   const paymentId = resolvedSearchParams.paymentId;
   const payment = paymentId && canUseDatabase() ? await getPaymentById(paymentId) : undefined;

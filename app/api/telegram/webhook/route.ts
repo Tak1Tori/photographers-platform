@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { TelegramConnectionStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { sendTelegramMessage } from "@/lib/telegram/telegram-notification-service";
+import {
+  isTelegramWebhookSecretConfigured,
+  verifyTelegramWebhookSecret
+} from "@/lib/integrations/telegram/telegram-security";
 
 type TelegramWebhookPayload = {
   message?: {
@@ -33,6 +37,10 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+  if (!isTelegramWebhookSecretConfigured()) {
+    return NextResponse.json({ ok: false }, { status: 503 });
+  }
+
   if (!verifyTelegramWebhookSecret(request)) {
     return NextResponse.json({ ok: false }, { status: 401 });
   }
@@ -121,10 +129,4 @@ export async function POST(request: NextRequest) {
   } catch {
     return NextResponse.json({ ok: true });
   }
-}
-
-function verifyTelegramWebhookSecret(request: NextRequest) {
-  const expected = process.env.TELEGRAM_WEBHOOK_SECRET;
-  if (!expected) return true;
-  return request.headers.get("x-telegram-bot-api-secret-token") === expected;
 }

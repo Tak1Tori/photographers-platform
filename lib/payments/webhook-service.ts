@@ -38,23 +38,20 @@ export async function handlePaymentWebhook(
     signature,
     headers: request.headers
   });
-  const rawPayload = parsePayloadForLog(rawBody);
 
+  if (!signatureValid) {
+    return { status: 401, body: { ok: false, error: "Invalid signature" } };
+  }
+
+  const rawPayload = parsePayloadForLog(rawBody);
   const log = await prisma.paymentWebhookLog.create({
     data: {
       provider,
       eventType: "unparsed",
       payload: rawPayload as Prisma.InputJsonValue,
-      signatureValid
+      signatureValid: true
     }
   });
-
-  if (!signatureValid) {
-    await finishWebhookLog(log.id, {
-      processingError: "Invalid webhook signature"
-    });
-    return { status: 401, body: { ok: false, error: "Invalid signature" } };
-  }
 
   try {
     const event = await client.parseWebhookEvent({
@@ -101,7 +98,7 @@ export async function handlePaymentWebhook(
   } catch (error) {
     const message = error instanceof Error ? error.message : "Webhook processing failed";
     await finishWebhookLog(log.id, { processingError: message });
-    return { status: 400, body: { ok: false, error: message } };
+    return { status: 400, body: { ok: false, error: "Webhook processing failed" } };
   }
 }
 

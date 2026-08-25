@@ -2,7 +2,10 @@ import { PaymentProvider } from "@prisma/client";
 import { CloudPaymentsProvider } from "@/lib/payments/providers/cloudpayments-provider";
 import { FreedomPayProvider } from "@/lib/payments/providers/freedom-pay-provider";
 import { KaspiProvider } from "@/lib/payments/providers/kaspi-provider";
-import { MockPaymentProvider } from "@/lib/payments/providers/mock-provider";
+import {
+  assertMockPaymentsEnabled,
+  MockPaymentProvider
+} from "@/lib/payments/providers/mock-provider";
 import type { PaymentProviderClient } from "@/lib/payments/types";
 
 const providers: Partial<Record<PaymentProvider, PaymentProviderClient>> = {
@@ -13,6 +16,10 @@ const providers: Partial<Record<PaymentProvider, PaymentProviderClient>> = {
 };
 
 export function getPaymentProviderClient(provider = getConfiguredPaymentProvider()) {
+  if (provider === PaymentProvider.MOCK) {
+    assertMockPaymentsEnabled();
+  }
+
   const client = providers[provider];
   if (!client) {
     throw new Error(`Payment provider ${provider} does not support hosted checkout yet`);
@@ -21,10 +28,18 @@ export function getPaymentProviderClient(provider = getConfiguredPaymentProvider
 }
 
 export function getConfiguredPaymentProvider(): PaymentProvider {
-  const configured = String(process.env.PAYMENT_PROVIDER ?? "MOCK").toUpperCase();
-  return Object.values(PaymentProvider).includes(configured as PaymentProvider)
-    ? (configured as PaymentProvider)
-    : PaymentProvider.MOCK;
+  const configured = process.env.PAYMENT_PROVIDER?.trim().toUpperCase();
+
+  if (!configured || !Object.values(PaymentProvider).includes(configured as PaymentProvider)) {
+    throw new Error("A supported PAYMENT_PROVIDER must be configured");
+  }
+
+  const provider = configured as PaymentProvider;
+  if (provider === PaymentProvider.MOCK) {
+    assertMockPaymentsEnabled();
+  }
+
+  return provider;
 }
 
 export function parsePaymentProvider(value: string) {

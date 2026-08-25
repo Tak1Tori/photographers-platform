@@ -8,6 +8,7 @@ import { getSession } from "@/lib/auth";
 import { albumImageMaxBytes, formatMegabytes } from "@/lib/upload-limits";
 
 const allowedImageTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
+const allowedImageFormats = "jpg,jpeg,png,webp";
 const imageTransformation = "c_limit,w_1920,h_1920,q_auto:good";
 
 export async function POST(request: Request) {
@@ -28,7 +29,7 @@ export async function POST(request: Request) {
   const contentType = body.contentType ?? "";
   const size = Number(body.size ?? 0);
 
-  if (!allowedImageTypes.has(contentType) || !size) {
+  if (!allowedImageTypes.has(contentType) || !Number.isSafeInteger(size) || size <= 0) {
     return NextResponse.json(
       { error: "Поддерживаются изображения JPEG, PNG и WebP." },
       { status: 400 }
@@ -60,6 +61,8 @@ export async function POST(request: Request) {
     {
       folder,
       format: "webp",
+      allowed_formats: allowedImageFormats,
+      max_file_size: albumImageMaxBytes,
       timestamp,
       transformation: imageTransformation
     },
@@ -71,6 +74,8 @@ export async function POST(request: Request) {
     apiKey: credentials.apiKey,
     folder,
     format: "webp",
+    allowedFormats: allowedImageFormats,
+    maxFileSize: albumImageMaxBytes,
     timestamp,
     transformation: imageTransformation,
     signature

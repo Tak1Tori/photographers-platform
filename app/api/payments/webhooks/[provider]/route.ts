@@ -14,10 +14,11 @@ export async function POST(
     const result = await handlePaymentWebhook(provider, request);
     return NextResponse.json(result.body, { status: result.status });
   } catch (error) {
+    console.error("Payment webhook request failed", error);
     return NextResponse.json(
       {
         ok: false,
-        error: error instanceof Error ? error.message : "Invalid webhook request"
+        error: "Invalid webhook request"
       },
       { status: 400 }
     );

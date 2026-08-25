@@ -12,6 +12,7 @@ const allowedVideoTypes = new Set([
   "video/webm",
   "video/quicktime"
 ]);
+const allowedVideoFormats = "mp4,webm,mov";
 
 export async function POST(request: Request) {
   const session = await getSession();
@@ -31,7 +32,7 @@ export async function POST(request: Request) {
   const contentType = body.contentType ?? "";
   const size = Number(body.size ?? 0);
 
-  if (!allowedVideoTypes.has(contentType) || !size) {
+  if (!allowedVideoTypes.has(contentType) || !Number.isSafeInteger(size) || size <= 0) {
     return NextResponse.json(
       { error: "Поддерживаются видео MP4, WebM и MOV." },
       { status: 400 }
@@ -62,6 +63,8 @@ export async function POST(request: Request) {
   const signature = client.utils.api_sign_request(
     {
       folder,
+      allowed_formats: allowedVideoFormats,
+      max_file_size: albumVideoMaxBytes,
       timestamp
     },
     credentials.apiSecret
@@ -71,6 +74,8 @@ export async function POST(request: Request) {
     cloudName: credentials.cloudName,
     apiKey: credentials.apiKey,
     folder,
+    allowedFormats: allowedVideoFormats,
+    maxFileSize: albumVideoMaxBytes,
     timestamp,
     signature
   });

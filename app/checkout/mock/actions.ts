@@ -14,6 +14,7 @@ import {
   getPaymentById
 } from "@/lib/payments/payment-service";
 import {
+  assertMockPaymentsEnabled,
   signMockWebhookPayload
 } from "@/lib/payments/providers/mock-provider";
 import {
@@ -21,6 +22,8 @@ import {
 } from "@/lib/payments/webhook-service";
 
 export async function confirmMockPaymentAction(formData: FormData): Promise<void> {
+  assertMockPaymentsEnabled();
+
   const paymentId = String(formData.get("paymentId") ?? "");
   const acceptedLegal = formData.get("acceptedLegal") === "on";
 
@@ -75,6 +78,8 @@ export async function confirmMockPaymentAction(formData: FormData): Promise<void
 }
 
 export async function cancelMockPaymentAction(formData: FormData): Promise<void> {
+  assertMockPaymentsEnabled();
+
   const paymentId = String(formData.get("paymentId") ?? "");
 
   if (!paymentId) {

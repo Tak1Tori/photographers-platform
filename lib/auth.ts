@@ -1,7 +1,6 @@
-import type { NextAuthOptions } from "next-auth";
-import { getServerSession } from "next-auth";
+import NextAuth, { type NextAuthConfig } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
-import type { OAuthConfig } from "next-auth/providers/oauth";
+import type { OAuthConfig } from "@auth/core/providers/oauth";
 import {
   consumeTelegramSessionTicket,
   getTelegramAccountUser,
@@ -10,38 +9,7 @@ import {
 } from "@/lib/telegram-login";
 import { normalizePhone } from "@/lib/phone";
 
-const demoUsers = [
-  {
-    id: "demo-client",
-    name: "Тестовый клиент",
-    email: "client@photo-booking.local",
-    password: "password123",
-    role: "CLIENT",
-    phone: "+7 700 000 00 02"
-  },
-  {
-    id: "demo-photographer",
-    name: "Арина Ким",
-    email: "photographer@photo-booking.local",
-    password: "password123",
-    role: "PHOTOGRAPHER",
-    phone: "+7 700 000 00 03"
-  },
-  {
-    id: "demo-studio",
-    name: "North Group",
-    email: "studio@photo-booking.local",
-    password: "password123",
-    role: "STUDIO_OWNER",
-    phone: "+7 700 000 00 04"
-  }
-] as const;
-
-function canUseLocalDemoAuth() {
-  return process.env.NODE_ENV === "development" && process.env.DEMO_MODE === "true";
-}
-
-export const authOptions: NextAuthOptions = {
+export const authOptions: NextAuthConfig = {
   secret:
     process.env.AUTH_SECRET ??
     process.env.NEXTAUTH_SECRET ??
@@ -62,35 +30,19 @@ export const authOptions: NextAuthOptions = {
         adminAccess: { label: "Admin access", type: "hidden" }
       },
       async authorize(credentials) {
-        const password = credentials?.password;
+        const password =
+          typeof credentials?.password === "string" ? credentials.password : undefined;
         const isAdminAccess = credentials?.adminAccess === "true";
-        const phone = normalizePhone(credentials?.phone);
+        const phone = normalizePhone(
+          typeof credentials?.phone === "string" ? credentials.phone : undefined
+        );
 
         if (!password || (!isAdminAccess && !phone)) {
           return null;
         }
 
         if (!process.env.DATABASE_URL) {
-          if (!canUseLocalDemoAuth() || isAdminAccess) {
-            return null;
-          }
-
-          const demoUser = demoUsers.find(
-            (user) => normalizePhone(user.phone) === phone
-          );
-
-          if (!demoUser || demoUser.password !== password) {
-            return null;
-          }
-
-          return {
-            id: demoUser.id,
-            name: demoUser.name,
-            email: demoUser.email,
-            role: demoUser.role,
-            phone: demoUser.phone,
-            image: null
-          };
+          return null;
         }
 
         const [{ compare }, { prisma }] = await Promise.all([
@@ -128,7 +80,8 @@ export const authOptions: NextAuthOptions = {
         ticket: { label: "Telegram onboarding ticket", type: "hidden" }
       },
       async authorize(credentials) {
-        const user = await consumeTelegramSessionTicket(credentials?.ticket ?? "");
+        const ticket = typeof credentials?.ticket === "string" ? credentials.ticket : "";
+        const user = await consumeTelegramSessionTicket(ticket);
         return user;
       }
     }),
@@ -160,10 +113,10 @@ export const authOptions: NextAuthOptions = {
       if (user) {
         const authenticatedUser =
           account?.provider === "telegram"
-            ? await getTelegramAccountUser(account.providerAccountId)
+            ? await getTelegramAccountUser(account.providerAccountId ?? "")
             : user;
 
-        if (!authenticatedUser) {
+        if (!authenticatedUser?.id) {
           throw new Error("Telegram account is not linked to a Framely user");
         }
 
@@ -228,8 +181,13 @@ export const authOptions: NextAuthOptions = {
   }
 };
 
+export const {
+  handlers: { GET, POST },
+  auth
+} = NextAuth(authOptions);
+
 export function getSession() {
-  return getServerSession(authOptions);
+  return auth();
 }
 
 export function getDashboardHref(role?: string) {
@@ -253,7 +211,7 @@ function telegramOidcProvider(): OAuthConfig<Record<string, unknown>> {
   return {
     id: "telegram",
     name: "Telegram",
-    type: "oauth",
+    type: "oidc",
     wellKnown: "https://oauth.telegram.org/.well-known/openid-configuration",
     clientId: process.env.TELEGRAM_OIDC_CLIENT_ID,
     clientSecret: process.env.TELEGRAM_OIDC_CLIENT_SECRET,

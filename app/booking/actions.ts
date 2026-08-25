@@ -10,6 +10,7 @@ import { getSession } from "@/lib/auth";
 import { canUseDatabase } from "@/lib/data/db";
 import { notifyBookingCreated } from "@/lib/notifications/notification-service";
 import { createDepositPaymentForBooking } from "@/lib/payments/payment-service";
+import { isMockPaymentsEnabled } from "@/lib/payments/providers/mock-provider";
 import { cancelBookingHolds } from "@/lib/calendar/hold-service";
 import type { CreateBookingInput, CreateBookingResult } from "@/lib/types";
 
@@ -40,6 +41,10 @@ export async function createBookingAction(
   }
 
   if (!canUseDatabase()) {
+    if (!isMockPaymentsEnabled()) {
+      return { success: false, error: "Оплата пока не подключена." };
+    }
+
     const bookingNumber = `MOCK-${Date.now().toString().slice(-6)}`;
     await saveMockRuntimeBooking(createMockRuntimeBooking(bookingInput, bookingNumber));
 
