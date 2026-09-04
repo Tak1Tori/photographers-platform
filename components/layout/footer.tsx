@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { Instagram } from "lucide-react";
 import { BrandLogo } from "@/components/layout/brand-logo";
 
 const marketplaceLinks = [
@@ -19,7 +18,7 @@ const legalLinks = [
 export function Footer() {
   return (
     <footer className="border-t border-border bg-card">
-      <div className="container grid gap-9 py-9 sm:grid-cols-2 lg:grid-cols-[1.35fr_0.8fr_1.25fr_auto] lg:items-start lg:gap-12 lg:py-10">
+      <div className="container grid gap-9 py-9 sm:grid-cols-2 lg:grid-cols-[1.35fr_0.8fr_1.25fr] lg:items-start lg:gap-12 lg:py-10">
         <div className="max-w-[17rem]">
           <Link href="/" className="inline-flex items-center" aria-label="Framely">
             <BrandLogo className="h-12 w-auto" sizes="108px" />
@@ -43,22 +42,6 @@ export function Footer() {
               {link.label}
             </Link>
           ))}
-        </div>
-
-        <div className="grid content-start gap-3 lg:justify-items-end">
-          <p className="text-sm text-muted-foreground">Следите за нами:</p>
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <a
-              href="https://www.instagram.com/framely_kz/"
-              target="_blank"
-              rel="noreferrer"
-              className="flex size-9 items-center justify-center rounded-full border border-border transition-colors hover:border-primary hover:text-primary"
-              aria-label="Framely в Instagram"
-              title="Instagram"
-            >
-              <Instagram className="size-4" aria-hidden="true" />
-            </a>
-          </div>
         </div>
       </div>
     </footer>
