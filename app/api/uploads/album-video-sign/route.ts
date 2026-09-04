@@ -64,7 +64,6 @@ export async function POST(request: Request) {
     {
       folder,
       allowed_formats: allowedVideoFormats,
-      max_file_size: albumVideoMaxBytes,
       timestamp
     },
     credentials.apiSecret
@@ -75,7 +74,6 @@ export async function POST(request: Request) {
     apiKey: credentials.apiKey,
     folder,
     allowedFormats: allowedVideoFormats,
-    maxFileSize: albumVideoMaxBytes,
     timestamp,
     signature
   });

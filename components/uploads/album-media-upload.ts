@@ -31,7 +31,6 @@ type SignedCloudinaryImageUpload = {
   folder: string;
   format: string;
   allowedFormats: string;
-  maxFileSize: number;
   timestamp: number;
   transformation: string;
   signature: string;
@@ -43,7 +42,6 @@ type SignedCloudinaryVideoUpload = {
   apiKey: string;
   folder: string;
   allowedFormats: string;
-  maxFileSize: number;
   timestamp: number;
   signature: string;
   error?: string;
@@ -257,7 +255,6 @@ function createCloudinaryFormData(
   formData.append("timestamp", String(signed.timestamp));
   formData.append("folder", signed.folder);
   formData.append("allowed_formats", signed.allowedFormats);
-  formData.append("max_file_size", String(signed.maxFileSize));
   formData.append("signature", signed.signature);
   return formData;
 }

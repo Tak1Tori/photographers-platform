@@ -62,7 +62,6 @@ export async function POST(request: Request) {
       folder,
       format: "webp",
       allowed_formats: allowedImageFormats,
-      max_file_size: albumImageMaxBytes,
       timestamp,
       transformation: imageTransformation
     },
@@ -75,7 +74,6 @@ export async function POST(request: Request) {
     folder,
     format: "webp",
     allowedFormats: allowedImageFormats,
-    maxFileSize: albumImageMaxBytes,
     timestamp,
     transformation: imageTransformation,
     signature
