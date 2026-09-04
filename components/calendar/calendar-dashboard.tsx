@@ -265,7 +265,20 @@ export function CalendarDashboard({
                 <p className="text-sm capitalize text-muted-foreground">
                   {formatWeekday(selectedDay)}
                 </p>
-                <h3 className="mt-1 text-2xl font-semibold">{formatSelectedDate(selectedDay)}</h3>
+                <div className="mt-1 flex flex-wrap items-center gap-2">
+                  <h3 className="text-2xl font-semibold">{formatSelectedDate(selectedDay)}</h3>
+                  <span
+                    className={cn(
+                      "inline-flex items-center gap-1 rounded-full border px-2 py-1 text-xs font-medium",
+                      selectedRule?.isActive
+                        ? "border-primary/35 bg-primary/10 text-primary"
+                        : "border-border bg-muted text-muted-foreground"
+                    )}
+                  >
+                    {selectedRule?.isActive ? <Check className="size-3" aria-hidden="true" /> : null}
+                    {selectedRule?.isActive ? "Рабочий день" : "Выходной"}
+                  </span>
+                </div>
                 <div className="mt-4 grid gap-2 xl:mt-3">
                   {selectedEvents.length === 0 ? (
                     <p className="rounded-md border border-dashed border-border px-3 py-4 text-sm text-muted-foreground">
@@ -386,21 +399,6 @@ export function CalendarDashboard({
                   <span className="inline-flex items-center gap-2 font-medium">
                     <Clock3 className="size-4 text-emerald-300" />
                     Рабочие часы
-                  </span>
-                  <span
-                    className={cn(
-                      "inline-flex items-center gap-1 text-xs",
-                      selectedRule?.isActive ? "text-emerald-300" : "text-muted-foreground"
-                    )}
-                  >
-                    {selectedRule?.isActive ? (
-                      <>
-                        <Check className="size-3" />
-                        Рабочий день
-                      </>
-                    ) : (
-                      "Выходной"
-                    )}
                   </span>
                 </summary>
                 <form

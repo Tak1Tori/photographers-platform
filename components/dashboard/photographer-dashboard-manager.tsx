@@ -100,6 +100,7 @@ export function PhotographerDashboardManager({
   const [portfolioUploadProgress, setPortfolioUploadProgress] = useState<string | null>(null);
   const isPortfolioBusy = isPending || Boolean(portfolioUploadProgress);
   const rescheduleRequestsCount = bookings.filter((booking) => booking.rescheduleRequestedAt).length;
+  const hasNoAvailability = !calendar.rules.some((rule) => rule.isActive);
   const sections: DashboardSectionTab<PhotographerSection>[] = [
     {
       id: "profile",
@@ -124,9 +125,10 @@ export function PhotographerDashboardManager({
     {
       id: "schedule",
       label: "Расписание",
-      description: "Календарь месяца",
+      description: hasNoAvailability ? "Добавьте доступные дни и время" : "Календарь месяца",
       icon: CalendarDays,
-      count: calendar.events.length
+      count: calendar.events.length,
+      attention: hasNoAvailability
     },
     {
       id: "bookings",
