@@ -103,7 +103,7 @@ export default async function AdminPage() {
                 clientName: review.clientName ?? "Клиент",
                 rating: review.rating,
                 comment: review.comment,
-                createdAt: review.createdAt.toISOString()
+                reviewedAt: review.reviewedAt?.toISOString() ?? null
               }))
             }))}
             editors={editors.map((profile) => ({

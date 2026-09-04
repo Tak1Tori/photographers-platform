@@ -212,7 +212,7 @@ export interface PhotographerReview {
   id: string;
   rating: number;
   comment?: string;
-  createdAt: string;
+  reviewedAt?: string;
   clientName: string;
 }
 
@@ -452,6 +452,7 @@ export interface CreateStudioOnlyBookingInput {
 
 export interface CreateBookingResult {
   success: boolean;
+  paymentUnavailable?: boolean;
   bookingNumber?: string;
   checkoutUrl?: string;
   paymentId?: string;

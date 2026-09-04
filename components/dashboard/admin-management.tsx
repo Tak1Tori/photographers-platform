@@ -52,7 +52,7 @@ interface AdminManagementProps {
       clientName: string;
       rating: number;
       comment: string | null;
-      createdAt: string;
+      reviewedAt: string | null;
     }>;
   }>;
   styles: Array<{
@@ -509,7 +509,7 @@ function AdminPhotographerReviewsPanel({
   const selectedPhotographer =
     photographers.find((photographer) => photographer.id === selectedPhotographerId) ?? photographers[0];
   const reviews = [...(selectedPhotographer?.reviews ?? [])]
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    .sort((a, b) => (b.reviewedAt ? new Date(b.reviewedAt).getTime() : 0) - (a.reviewedAt ? new Date(a.reviewedAt).getTime() : 0));
 
   if (photographers.length === 0) {
     return (
@@ -582,7 +582,6 @@ function AdminPhotographerReviewsPanel({
               <input
                 type="date"
                 name="reviewDate"
-                defaultValue={getDateInputValue()}
                 className="rounded-md border border-input bg-background p-3 outline-none"
               />
             </label>
@@ -617,7 +616,8 @@ function AdminPhotographerReviewsPanel({
                 <div className="min-w-0">
                   <p className="truncate font-medium">{review.clientName}</p>
                   <p className="text-xs text-muted-foreground">
-                    {selectedPhotographer?.name} · {formatDate(review.createdAt)}
+                    {selectedPhotographer?.name}
+                    {review.reviewedAt ? ` · ${formatDate(review.reviewedAt)}` : ""}
                   </p>
                 </div>
                 <span className="shrink-0 rounded-md bg-secondary px-2 py-1 text-sm">
@@ -1174,10 +1174,6 @@ function formatDate(value: string) {
   if (Number.isNaN(date.getTime())) return value;
 
   return date.toLocaleDateString("ru-RU");
-}
-
-function getDateInputValue(date = new Date()) {
-  return date.toISOString().slice(0, 10);
 }
 
 function Empty({ text }: { text: string }) {

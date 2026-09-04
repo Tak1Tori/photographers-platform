@@ -138,13 +138,15 @@ function ReviewCard({ review }: { review: PhotographerReview }) {
       <div className="flex items-start justify-between gap-4">
         <div>
           <h3 className="font-semibold tracking-normal">{review.clientName}</h3>
-          <p className="mt-1 text-xs text-muted-foreground">
-            {new Intl.DateTimeFormat("ru-RU", {
-              day: "numeric",
-              month: "long",
-              year: "numeric"
-            }).format(new Date(review.createdAt))}
-          </p>
+          {review.reviewedAt ? (
+            <p className="mt-1 text-xs text-muted-foreground">
+              {new Intl.DateTimeFormat("ru-RU", {
+                day: "numeric",
+                month: "long",
+                year: "numeric"
+              }).format(new Date(review.reviewedAt))}
+            </p>
+          ) : null}
         </div>
         <div className="flex items-center gap-1 rounded-md bg-secondary px-2 py-1 text-sm font-medium">
           <Star className="size-4 fill-emerald-300 text-emerald-300" aria-hidden="true" />

@@ -208,6 +208,7 @@ function getCachedPublicPhotographerPageData(id: string) {
             id: true,
             rating: true,
             comment: true,
+            reviewedAt: true,
             createdAt: true,
             clientName: true,
             booking: {
@@ -278,6 +279,7 @@ function mapPhotographerReview(review: {
   id: string;
   rating: number;
   comment: string | null;
+  reviewedAt: Date | null;
   createdAt: Date;
   clientName: string | null;
   booking: {
@@ -289,7 +291,7 @@ function mapPhotographerReview(review: {
     id: review.id,
     rating: review.rating,
     comment: review.comment ?? undefined,
-    createdAt: review.createdAt.toISOString(),
+    reviewedAt: review.reviewedAt?.toISOString(),
     clientName: review.clientName ?? review.booking?.client?.name ?? review.booking?.clientName ?? "Клиент"
   };
 }

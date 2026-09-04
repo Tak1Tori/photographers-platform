@@ -99,11 +99,11 @@ export async function adminCreatePhotographerReviewAction(formData: FormData): P
     const comment = String(formData.get("comment") ?? "").trim();
     const rating = Number(formData.get("rating") ?? 0);
     const reviewDate = String(formData.get("reviewDate") ?? "").trim();
-    const createdAt = reviewDate ? new Date(`${reviewDate}T12:00:00.000Z`) : null;
+    const reviewedAt = reviewDate ? new Date(`${reviewDate}T12:00:00.000Z`) : null;
 
     if (!photographerId) return { success: false, error: "Выберите фотографа." };
     if (!clientName) return { success: false, error: "Укажите имя клиента." };
-    if (reviewDate && (!createdAt || Number.isNaN(createdAt.getTime()))) {
+    if (reviewDate && (!reviewedAt || Number.isNaN(reviewedAt.getTime()))) {
       return { success: false, error: "Укажите корректную дату отзыва." };
     }
     if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
@@ -116,7 +116,7 @@ export async function adminCreatePhotographerReviewAction(formData: FormData): P
         clientName,
         rating,
         comment: comment || null,
-        ...(createdAt ? { createdAt } : {})
+        ...(reviewedAt ? { reviewedAt } : {})
       }
     });
 
