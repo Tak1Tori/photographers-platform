@@ -583,7 +583,6 @@ function AdminPhotographerReviewsPanel({
                 type="date"
                 name="reviewDate"
                 defaultValue={getDateInputValue()}
-                required
                 className="rounded-md border border-input bg-background p-3 outline-none"
               />
             </label>

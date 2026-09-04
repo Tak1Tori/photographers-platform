@@ -103,8 +103,8 @@ export async function adminCreatePhotographerReviewAction(formData: FormData): P
 
     if (!photographerId) return { success: false, error: "Выберите фотографа." };
     if (!clientName) return { success: false, error: "Укажите имя клиента." };
-    if (!createdAt || Number.isNaN(createdAt.getTime())) {
-      return { success: false, error: "Укажите дату отзыва." };
+    if (reviewDate && (!createdAt || Number.isNaN(createdAt.getTime()))) {
+      return { success: false, error: "Укажите корректную дату отзыва." };
     }
     if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
       return { success: false, error: "Оценка должна быть от 1 до 5." };
@@ -116,7 +116,7 @@ export async function adminCreatePhotographerReviewAction(formData: FormData): P
         clientName,
         rating,
         comment: comment || null,
-        createdAt
+        ...(createdAt ? { createdAt } : {})
       }
     });
 
