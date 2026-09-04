@@ -1,6 +1,8 @@
 import { BookingType, type SettlementMode } from "@prisma/client";
 
 const BASIS_POINTS = 10_000;
+const PLATFORM_FEE_RATE_BASIS_POINTS = 1_000;
+export const MAX_PLATFORM_FEE_AMOUNT = 7_000;
 
 export interface BookingPricingInput {
   bookingType?: BookingType;
@@ -19,15 +21,11 @@ export function calculatePlatformCommission(input: CommissionInput) {
   assertMoney(input.photographerPrice, "photographerPrice");
   assertMoney(input.studioPrice, "studioPrice");
 
-  if (input.bookingType === "PHOTOGRAPHER_ONLY") {
-    return percentageOf(input.photographerPrice, 1_000);
-  }
-
-  if (input.bookingType === "STUDIO_ONLY") {
-    return Math.max(percentageOf(input.studioPrice, 800), input.studioPrice > 0 ? 1_000 : 0);
-  }
-
-  return percentageOf(input.photographerPrice + input.studioPrice, 1_200);
+  const totalServicePrice = input.photographerPrice + input.studioPrice;
+  return Math.min(
+    percentageOf(totalServicePrice, PLATFORM_FEE_RATE_BASIS_POINTS),
+    MAX_PLATFORM_FEE_AMOUNT
+  );
 }
 
 export function calculateServiceFee(
