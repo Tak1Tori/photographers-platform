@@ -76,8 +76,9 @@ export function ImageUploadField({
       try {
         uploadFile = await optimizeImage(file);
       } catch {
-        setError("Не удалось оптимизировать изображение. Попробуйте другой файл.");
-        return;
+        // Safari may fail to decode otherwise valid photos in createImageBitmap.
+        // The server validates the original file and Cloudinary performs the final conversion.
+        uploadFile = file;
       }
     }
 

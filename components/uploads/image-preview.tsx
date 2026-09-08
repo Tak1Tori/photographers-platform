@@ -20,6 +20,7 @@ export function ImagePreview({
         src={src || fallback}
         alt={alt}
         fill
+        unoptimized={Boolean(src?.startsWith("blob:"))}
         sizes="(max-width: 768px) 100vw, 420px"
         className="object-cover"
       />

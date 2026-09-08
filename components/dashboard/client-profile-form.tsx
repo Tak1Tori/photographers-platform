@@ -165,6 +165,7 @@ function AvatarUploadField({
           src={previewUrl}
           alt={previewAlt}
           fill
+          unoptimized={previewUrl.startsWith("blob:")}
           sizes="160px"
           className="object-cover transition duration-200 group-hover:brightness-50 group-focus-within:brightness-50"
         />
