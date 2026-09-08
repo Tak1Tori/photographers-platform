@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { SlidersHorizontal } from "lucide-react";
+import { ChevronDown, SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   PHOTOGRAPHER_MAX_PRICE,
@@ -85,10 +85,13 @@ export function EditorFilters({
       >
         <label className="grid gap-2 text-sm font-medium">
           Теги монтажа
-          <select name="tag" value={tag} onChange={(event) => updateFilters({ tag: event.currentTarget.value })} className={inputClass}>
-            <option value="">Все направления</option>
-            {tags.map((tag) => <option key={tag.id} value={tag.id}>{tag.title}</option>)}
-          </select>
+          <div className="relative">
+            <select name="tag" value={tag} onChange={(event) => updateFilters({ tag: event.currentTarget.value })} className={inputClass}>
+              <option value="">Все направления</option>
+              {tags.map((tag) => <option key={tag.id} value={tag.id}>{tag.title}</option>)}
+            </select>
+            <ChevronDown className="pointer-events-none absolute right-7 top-1/2 size-5 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+          </div>
         </label>
         <div className="grid gap-2 text-sm font-medium">
           <div className="flex items-center justify-between gap-3"><span>Цена до</span><span className="text-primary">{price >= PHOTOGRAPHER_MAX_PRICE ? `${formatPrice(PHOTOGRAPHER_MAX_PRICE)}+` : formatPrice(price)}</span></div>
@@ -111,4 +114,4 @@ export function EditorFilters({
   );
 }
 
-const inputClass = "h-11 w-full rounded-md border border-input bg-background px-3 text-sm outline-none transition focus:ring-2 focus:ring-ring";
+const inputClass = "h-11 w-full appearance-none rounded-md border border-input bg-background px-8 text-sm outline-none transition focus:ring-2 focus:ring-ring";

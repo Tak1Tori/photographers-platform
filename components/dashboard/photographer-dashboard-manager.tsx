@@ -157,7 +157,7 @@ export function PhotographerDashboardManager({
           success: false,
           message:
             area === "profile"
-              ? "Размер аватарки не должен превышать 25 МБ."
+              ? "Ограничение фото профиля: 7 МБ."
               : "Выбрано слишком много файлов для одного сохранения. Сохраните изменения по одному альбому."
         });
         return;
@@ -174,7 +174,9 @@ export function PhotographerDashboardManager({
             success: result.success,
             message: result.success
               ? "Изменения сохранены."
-              : result.error ?? "Ошибка сохранения."
+              : area === "profile"
+                ? "Ограничение фото профиля: 7 МБ."
+                : result.error ?? "Ошибка сохранения."
           });
           if (result.success) {
             if (area === "service-create") {
@@ -189,8 +191,9 @@ export function PhotographerDashboardManager({
           setState({
             area,
             success: false,
-            message:
-              "Не удалось отправить файлы. Уменьшите количество изображений и попробуйте снова."
+            message: area === "profile"
+              ? "Ограничение фото профиля: 7 МБ."
+              : "Не удалось отправить файлы. Уменьшите количество изображений и попробуйте снова."
           });
         }
       });
@@ -356,7 +359,9 @@ export function PhotographerDashboardManager({
             </p>
           ) : null}
           <form action={run("profile", updatePhotographerProfileAction)} className="grid gap-6">
-            <Message state={state} area="profile" />
+            {state?.area === "profile" ? (
+              <SuccessToast message={state.message} tone={state.success ? "success" : "error"} />
+            ) : null}
             <div className="grid gap-4 rounded-lg border border-border p-4 md:grid-cols-[220px_1fr] md:items-start">
               <div className="max-w-[220px]">
                 <ImageUploadField
@@ -364,7 +369,7 @@ export function PhotographerDashboardManager({
                   label="Новый аватар"
                   currentUrl={profile.avatarUrl}
                   previewAlt={profile.name}
-                  maxSizeMb={25}
+                  maxSizeMb={7}
                   allowAnyImageFormat
                 />
               </div>

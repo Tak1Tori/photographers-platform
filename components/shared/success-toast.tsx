@@ -1,10 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CheckCircle2, X } from "lucide-react";
+import { AlertCircle, CheckCircle2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-export function SuccessToast({ message }: { message: string }) {
+export function SuccessToast({
+  message,
+  tone = "success"
+}: {
+  message: string;
+  tone?: "success" | "error";
+}) {
   const [isVisible, setIsVisible] = useState(true);
 
   useEffect(() => {
@@ -18,20 +24,28 @@ export function SuccessToast({ message }: { message: string }) {
   return (
     <div className="pointer-events-none fixed inset-x-4 bottom-5 z-[100] flex justify-center sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2">
       <div
-        role="status"
-        className="pointer-events-auto flex w-full max-w-md items-center gap-3 rounded-lg border border-primary/35 bg-card px-4 py-3 text-sm font-medium text-card-foreground shadow-xl shadow-black/20 animate-in fade-in slide-in-from-bottom-4 duration-300 sm:w-auto"
+        role={tone === "error" ? "alert" : "status"}
+        className={
+          tone === "error"
+            ? "pointer-events-auto flex w-full max-w-md items-center gap-3 rounded-lg border border-rose-500/45 bg-rose-950 px-4 py-3 text-sm font-medium text-rose-50 shadow-xl shadow-black/25 animate-in fade-in slide-in-from-bottom-4 duration-300 sm:w-auto"
+            : "pointer-events-auto flex w-full max-w-md items-center gap-3 rounded-lg border border-primary/35 bg-card px-4 py-3 text-sm font-medium text-card-foreground shadow-xl shadow-black/20 animate-in fade-in slide-in-from-bottom-4 duration-300 sm:w-auto"
+        }
       >
-        <CheckCircle2 className="size-5 shrink-0 text-primary" aria-hidden="true" />
+        {tone === "error" ? (
+          <AlertCircle className="size-5 shrink-0 text-rose-300" aria-hidden="true" />
+        ) : (
+          <CheckCircle2 className="size-5 shrink-0 text-primary" aria-hidden="true" />
+        )}
         <span className="min-w-0 flex-1">{message}</span>
         <Button
           type="button"
           variant="ghost"
           size="sm"
-          className="size-7 shrink-0"
+          className={tone === "error" ? "size-9 shrink-0 text-rose-50 hover:bg-rose-50/15 hover:text-rose-50" : "size-9 shrink-0"}
           onClick={() => setIsVisible(false)}
           aria-label="Закрыть уведомление"
         >
-          <X className="size-4" aria-hidden="true" />
+          <X className="size-5" aria-hidden="true" />
         </Button>
       </div>
     </div>

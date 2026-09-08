@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { SlidersHorizontal } from "lucide-react";
+import { ChevronDown, SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   PHOTOGRAPHER_MAX_PRICE,
@@ -95,19 +95,22 @@ export function PhotographerFilters({
 
         <label className="grid gap-2 text-sm font-medium">
           Теги
-          <select
-            name="style"
-            value={style}
-            onChange={(event) => updateFilters({ style: event.currentTarget.value })}
-            className={filterInputClass}
-          >
-            <option value="">Все направления</option>
-            {styles.map((style) => (
-              <option key={style.id} value={style.id}>
-                {style.title}
-              </option>
-            ))}
-          </select>
+          <div className="relative">
+            <select
+              name="style"
+              value={style}
+              onChange={(event) => updateFilters({ style: event.currentTarget.value })}
+              className={filterInputClass}
+            >
+              <option value="">Все направления</option>
+              {styles.map((style) => (
+                <option key={style.id} value={style.id}>
+                  {style.title}
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="pointer-events-none absolute right-7 top-1/2 size-5 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+          </div>
         </label>
 
         <div className="grid gap-2 text-sm font-medium">
@@ -185,4 +188,4 @@ function buildResetHref({
 }
 
 const filterInputClass =
-  "h-11 w-full rounded-md border border-input bg-background px-3 text-sm outline-none transition focus:ring-2 focus:ring-ring";
+  "h-11 w-full appearance-none rounded-md border border-input bg-background px-8 text-sm outline-none transition focus:ring-2 focus:ring-ring";
