@@ -360,6 +360,7 @@ export function PhotographerDashboardManager({
                   currentUrl={profile.avatarUrl}
                   previewAlt={profile.name}
                   maxSizeMb={25}
+                  allowAnyImageFormat
                 />
               </div>
               <div className="grid gap-4">

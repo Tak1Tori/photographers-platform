@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
 import type { AccountProfile } from "@/lib/data/account";
 
 const defaultAvatarUrl = "/images/default-avatar.png";
-const avatarAccept = "image/jpeg,image/png,image/webp";
+const avatarAccept = "image/*";
 
 type ClientProfileFormProps = {
   account: AccountProfile;
@@ -116,8 +116,8 @@ function AvatarUploadField({
       return;
     }
 
-    if (!avatarAccept.split(",").includes(file.type)) {
-      setError("Поддерживаются JPEG, PNG и WebP.");
+    if (!file.type.startsWith("image/")) {
+      setError("Можно выбрать только изображение.");
       return;
     }
 

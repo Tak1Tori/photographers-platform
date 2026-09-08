@@ -247,7 +247,9 @@ export async function updateClientProfileAction(
     });
 
     if (hasNewAvatar && avatarFile) {
-      const validation = validateImageFile(avatarFile, avatarImageMaxBytes);
+      const validation = validateImageFile(avatarFile, avatarImageMaxBytes, {
+        allowAnyImageFormat: true
+      });
 
       if (!validation.valid) {
         return { success: false, error: validation.error };
@@ -256,7 +258,8 @@ export async function updateClientProfileAction(
       const uploaded = await uploadImageToCloudinary(
         avatarFile,
         "accounts/avatars",
-        avatarImageMaxBytes
+        avatarImageMaxBytes,
+        { allowAnyImageFormat: true }
       );
       image = uploaded.secureUrl;
       newAvatarPublicId = uploaded.publicId;

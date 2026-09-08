@@ -5,7 +5,8 @@ import { DragEvent, useEffect, useRef, useState } from "react";
 import { ImagePreview } from "@/components/uploads/image-preview";
 import { cn } from "@/lib/utils";
 
-const accept = "image/jpeg,image/png,image/webp";
+const supportedImageTypes = ["image/jpeg", "image/png", "image/webp"];
+const supportedImageAccept = supportedImageTypes.join(",");
 const optimizedUploadMaxBytes = 1.2 * 1024 * 1024;
 const optimizedImageMaxDimension = 2560;
 
@@ -15,7 +16,8 @@ export function ImageUploadField({
   currentUrl,
   previewAlt = "Selected image",
   required = false,
-  maxSizeMb = 5
+  maxSizeMb = 5,
+  allowAnyImageFormat = false
 }: {
   name?: string;
   label?: string;
@@ -23,6 +25,7 @@ export function ImageUploadField({
   previewAlt?: string;
   required?: boolean;
   maxSizeMb?: number;
+  allowAnyImageFormat?: boolean;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [previewUrl, setPreviewUrl] = useState(currentUrl ?? "");
@@ -48,8 +51,15 @@ export function ImageUploadField({
       setPreviewUrl(currentUrl ?? "");
       return;
     }
-    if (!accept.split(",").includes(file.type)) {
-      setError("Поддерживаются JPEG, PNG и WebP.");
+    const isAllowedType = allowAnyImageFormat
+      ? file.type.startsWith("image/")
+      : supportedImageTypes.includes(file.type);
+    if (!isAllowedType) {
+      setError(
+        allowAnyImageFormat
+          ? "Можно выбрать только изображение."
+          : "Поддерживаются JPEG, PNG и WebP."
+      );
       return;
     }
     if (file.size > maxSizeMb * 1024 * 1024) {
@@ -58,7 +68,11 @@ export function ImageUploadField({
     }
 
     let uploadFile = file;
-    if (maxSizeMb > 5 && file.size > optimizedUploadMaxBytes) {
+    if (
+      maxSizeMb > 5 &&
+      file.size > optimizedUploadMaxBytes &&
+      supportedImageTypes.includes(file.type)
+    ) {
       try {
         uploadFile = await optimizeImage(file);
       } catch {
@@ -112,7 +126,7 @@ export function ImageUploadField({
             Перетащите изображение сюда или нажмите для выбора
           </span>
           <span className="text-xs text-muted-foreground">
-            JPEG, PNG или WebP, до {maxSizeMb} МБ
+            {allowAnyImageFormat ? "Любой формат изображения" : "JPEG, PNG или WebP"}, до {maxSizeMb} МБ
           </span>
         </span>
         {maxSizeMb > 5 ? (
@@ -124,7 +138,7 @@ export function ImageUploadField({
           ref={inputRef}
           type="file"
           name={name}
-          accept={accept}
+          accept={allowAnyImageFormat ? "image/*" : supportedImageAccept}
           required={required}
           className="sr-only"
           onChange={(event) => void setFile(event.target.files?.[0])}

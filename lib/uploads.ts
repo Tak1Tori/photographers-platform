@@ -26,17 +26,30 @@ export {
 
 const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
 const maxBytes = 5 * 1024 * 1024;
+type ImageValidationOptions = {
+  allowAnyImageFormat?: boolean;
+};
 
 export function validateImageFile(
   file: File | null | undefined,
-  sizeLimit = maxBytes
+  sizeLimit = maxBytes,
+  options: ImageValidationOptions = {}
 ) {
   if (!file || file.size === 0) {
     return { valid: false, error: "Выберите изображение." };
   }
 
-  if (!allowedTypes.includes(file.type)) {
-    return { valid: false, error: "Можно загружать только JPEG, PNG или WebP." };
+  const isAllowedType = options.allowAnyImageFormat
+    ? file.type.startsWith("image/")
+    : allowedTypes.includes(file.type);
+
+  if (!isAllowedType) {
+    return {
+      valid: false,
+      error: options.allowAnyImageFormat
+        ? "Можно загружать только изображения."
+        : "Можно загружать только JPEG, PNG или WebP."
+    };
   }
 
   if (file.size > sizeLimit) {
@@ -52,9 +65,10 @@ export function validateImageFile(
 export async function uploadImageToCloudinary(
   file: File,
   folder: string,
-  sizeLimit = maxBytes
+  sizeLimit = maxBytes,
+  options: ImageValidationOptions = {}
 ): Promise<CloudinaryUploadResult> {
-  const validation = validateImageFile(file, sizeLimit);
+  const validation = validateImageFile(file, sizeLimit, options);
 
   if (!validation.valid) {
     throw new Error(validation.error);
