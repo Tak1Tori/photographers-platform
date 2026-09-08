@@ -657,23 +657,25 @@ function CoverCropDialog({
             Отмена
           </Button>
         </div>
-        <div className="relative flex max-h-[72vh] min-h-[320px] items-center justify-center overflow-hidden rounded-md bg-background">
-          <img
-            ref={imageRef}
-            src={media.previewUrl ?? media.imageUrl}
-            alt="Фото для обложки"
-            className="max-h-[72vh] max-w-full select-none object-contain"
-            draggable={false}
-          />
-          <div
-            role="presentation"
-            className="absolute cursor-move touch-none border-2 border-white bg-white/5 shadow-[0_0_0_9999px_rgba(0,0,0,0.58)]"
-            style={getCropFrameStyle(draft)}
-            onPointerDown={handlePointerDown}
-            onPointerMove={handlePointerMove}
-            onPointerUp={stopDragging}
-            onPointerCancel={stopDragging}
-          />
+        <div className="flex max-h-[72vh] min-h-[320px] items-center justify-center overflow-hidden rounded-md bg-background p-2">
+          <div className="relative inline-block max-h-[calc(72vh-1rem)] max-w-full">
+            <img
+              ref={imageRef}
+              src={media.previewUrl ?? media.imageUrl}
+              alt="Фото для обложки"
+              className="block max-h-[calc(72vh-1rem)] max-w-full select-none"
+              draggable={false}
+            />
+            <div
+              role="presentation"
+              className="absolute cursor-move touch-none border-2 border-white bg-white/5 shadow-[0_0_0_9999px_rgba(0,0,0,0.58)]"
+              style={getCropFrameStyle(draft)}
+              onPointerDown={handlePointerDown}
+              onPointerMove={handlePointerMove}
+              onPointerUp={stopDragging}
+              onPointerCancel={stopDragging}
+            />
+          </div>
         </div>
         <div className="mt-4 flex justify-end gap-2">
           <Button type="button" variant="outline" className="album-crop-cancel" onClick={onClose}>

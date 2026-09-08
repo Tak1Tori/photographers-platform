@@ -23,7 +23,7 @@ export function getCoverCropPresentation(crop: CoverCrop) {
   return {
     objectPosition: `${x + width / 2}% ${y + height / 2}%`,
     transform: hasCrop
-      ? `scale(${Math.min(1.35, Math.max(1.05, 100 / Math.max(width, height)))})`
+      ? `scale(${Math.max(1.05, 100 / Math.min(width, height))})`
       : undefined
   };
 }
