@@ -557,31 +557,95 @@ function CoverCropDialog({
   onClose: () => void;
 }) {
   const imageRef = useRef<HTMLImageElement | null>(null);
+  const cropDragRef = useRef<{
+    pointerId: number;
+    startX: number;
+    startY: number;
+    crop: AlbumCoverCrop;
+  } | null>(null);
   const [draft, setDraft] = useState(value);
 
   useEffect(() => {
     setDraft(value);
   }, [value]);
 
+  useEffect(() => {
+    const body = document.body;
+    const root = document.documentElement;
+    const scrollY = window.scrollY;
+    const previousBodyStyles = {
+      position: body.style.position,
+      top: body.style.top,
+      left: body.style.left,
+      right: body.style.right,
+      width: body.style.width,
+      overflow: body.style.overflow
+    };
+    const previousRootOverflow = root.style.overflow;
+
+    root.style.overflow = "hidden";
+    body.style.position = "fixed";
+    body.style.top = `-${scrollY}px`;
+    body.style.left = "0";
+    body.style.right = "0";
+    body.style.width = "100%";
+    body.style.overflow = "hidden";
+
+    return () => {
+      root.style.overflow = previousRootOverflow;
+      body.style.position = previousBodyStyles.position;
+      body.style.top = previousBodyStyles.top;
+      body.style.left = previousBodyStyles.left;
+      body.style.right = previousBodyStyles.right;
+      body.style.width = previousBodyStyles.width;
+      body.style.overflow = previousBodyStyles.overflow;
+      window.scrollTo(0, scrollY);
+    };
+  }, []);
+
+  function handlePointerDown(event: PointerEvent<HTMLDivElement>) {
+    if (!event.isPrimary) return;
+
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    cropDragRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      crop: draft
+    };
+  }
+
   function handlePointerMove(event: PointerEvent<HTMLDivElement>) {
-    if (event.buttons !== 1 || !imageRef.current) return;
+    const drag = cropDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId || !imageRef.current) return;
 
+    event.preventDefault();
     const imageBounds = imageRef.current.getBoundingClientRect();
-    const deltaX = (event.movementX / imageBounds.width) * 100;
-    const deltaY = (event.movementY / imageBounds.height) * 100;
+    const deltaX = ((event.clientX - drag.startX) / imageBounds.width) * 100;
+    const deltaY = ((event.clientY - drag.startY) / imageBounds.height) * 100;
 
-    setDraft((current) =>
+    setDraft(() =>
       clampCoverCrop({
-        ...current,
-        x: current.x + deltaX,
-        y: current.y + deltaY
+        ...drag.crop,
+        x: drag.crop.x + deltaX,
+        y: drag.crop.y + deltaY
       })
     );
   }
 
+  function stopDragging(event: PointerEvent<HTMLDivElement>) {
+    if (cropDragRef.current?.pointerId !== event.pointerId) return;
+
+    cropDragRef.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+  }
+
   return (
-    <div className="album-crop-dialog fixed inset-0 z-50 flex items-center justify-center bg-background/85 p-4 backdrop-blur-md">
-      <div className="w-full max-w-5xl rounded-lg border border-border bg-card p-4 shadow-2xl md:p-5">
+    <div className="album-crop-dialog fixed inset-0 z-50 flex overflow-y-auto overscroll-contain bg-background/85 p-4 backdrop-blur-md">
+      <div className="m-auto w-full max-w-5xl rounded-lg border border-border bg-card p-4 shadow-2xl md:p-5">
         <div className="mb-4 flex items-center justify-between gap-4">
           <div>
             <p className="text-lg font-semibold">Кадр обложки</p>
@@ -603,12 +667,12 @@ function CoverCropDialog({
           />
           <div
             role="presentation"
-            className="absolute cursor-move border-2 border-white bg-white/5 shadow-[0_0_0_9999px_rgba(0,0,0,0.58)]"
+            className="absolute cursor-move touch-none border-2 border-white bg-white/5 shadow-[0_0_0_9999px_rgba(0,0,0,0.58)]"
             style={getCropFrameStyle(draft)}
-            onPointerDown={(event) => {
-              event.currentTarget.setPointerCapture(event.pointerId);
-            }}
+            onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
+            onPointerUp={stopDragging}
+            onPointerCancel={stopDragging}
           />
         </div>
         <div className="mt-4 flex justify-end gap-2">
