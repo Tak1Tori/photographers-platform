@@ -51,6 +51,7 @@ import {
 } from "@/lib/bookings/client-status";
 import { formatPrice } from "@/lib/mock-data";
 import { calculateProviderPayouts } from "@/lib/provider-payouts";
+import { avatarImageMaxBytes } from "@/lib/upload-limits";
 import { cn } from "@/lib/utils";
 import type {
   Booking,
@@ -147,13 +148,17 @@ export function PhotographerDashboardManager({
         (total, value) => total + (value instanceof File ? value.size : 0),
         0
       );
+      const uploadLimit =
+        area === "profile" ? avatarImageMaxBytes : maxServerActionUploadBytes;
 
-      if (uploadBytes > maxServerActionUploadBytes) {
+      if (uploadBytes > uploadLimit) {
         setState({
           area,
           success: false,
           message:
-            "Выбрано слишком много файлов для одного сохранения. Сохраните изменения по одному альбому."
+            area === "profile"
+              ? "Размер аватарки не должен превышать 25 МБ."
+              : "Выбрано слишком много файлов для одного сохранения. Сохраните изменения по одному альбому."
         });
         return;
       }
