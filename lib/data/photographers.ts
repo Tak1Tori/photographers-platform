@@ -224,8 +224,7 @@ function getCachedPublicPhotographerPageData(id: string) {
           },
           orderBy: {
             createdAt: "desc"
-          },
-          take: 24
+          }
         },
         services: {
           where: { isActive: true },

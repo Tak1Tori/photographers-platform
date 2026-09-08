@@ -140,8 +140,7 @@ function getCachedEditorPageData(id: string) {
               clientName: true,
               booking: { select: { clientName: true, client: { select: { name: true } } } }
             },
-            orderBy: { createdAt: "desc" },
-            take: 24
+            orderBy: { createdAt: "desc" }
           }
         }
       });
