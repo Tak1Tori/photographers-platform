@@ -6,6 +6,7 @@ import {
   AlertTriangle,
   CalendarDays,
   Check,
+  ChevronDown,
   ExternalLink,
   Images,
   ListChecks,
@@ -98,6 +99,7 @@ export function PhotographerDashboardManager({
   const [isPublicLinkCopied, setIsPublicLinkCopied] = useState(false);
   const [isCreateServiceOpen, setIsCreateServiceOpen] = useState(false);
   const [isCreatePortfolioOpen, setIsCreatePortfolioOpen] = useState(false);
+  const [expandedPortfolioItemIds, setExpandedPortfolioItemIds] = useState<Set<string>>(() => new Set());
   const [portfolioUploadProgress, setPortfolioUploadProgress] = useState<string | null>(null);
   const isPortfolioBusy = isPending || Boolean(portfolioUploadProgress);
   const rescheduleRequestsCount = bookings.filter((booking) => booking.rescheduleRequestedAt).length;
@@ -298,6 +300,18 @@ export function PhotographerDashboardManager({
 
     setIsPublicLinkCopied(true);
     window.setTimeout(() => setIsPublicLinkCopied(false), 2400);
+  }
+
+  function togglePortfolioItem(itemId: string) {
+    setExpandedPortfolioItemIds((current) => {
+      const next = new Set(current);
+      if (next.has(itemId)) {
+        next.delete(itemId);
+      } else {
+        next.add(itemId);
+      }
+      return next;
+    });
   }
 
   return (
@@ -611,41 +625,65 @@ export function PhotographerDashboardManager({
             <form onSubmit={runPortfolioSave("portfolio-save")} className="grid gap-5">
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {portfolioItems.map((item) => (
-                  <div key={item.id} className="grid gap-3 rounded-lg border border-border p-4">
-                    <input type="hidden" name="portfolioItemIds" value={item.id} />
-                    <Field
-                      label="Название"
-                      name={`portfolioTitle:${item.id}`}
-                      defaultValue={item.title}
-                    />
-                    <AlbumContentField
-                      name={`albumImages:${item.id}`}
-                      uploadScope="portfolio-save"
-                      disabled={isPortfolioBusy}
-                      existingImages={item.albumImages}
-                      initialCoverCrop={{
-                        x: item.coverCropX,
-                        y: item.coverCropY,
-                        width: item.coverCropWidth,
-                        height: item.coverCropHeight
-                      }}
-                    />
-                    <Button
-                      disabled={isPortfolioBusy || !databaseReady}
-                      size="sm"
-                      variant="outline"
+                  <div key={item.id} className="rounded-lg border border-border">
+                    <button
                       type="button"
-                      className="portfolio-delete-button w-fit !border-[#2e3c28] !bg-[#2e3c28] !text-[#f6f0e6] hover:!border-[#ddd5c9] hover:!bg-[#ddd5c9] hover:!text-[#2e3c28]"
-                      onClick={() => {
-                        if (!window.confirm("Удалить работу из портфолио?")) return;
-                        const data = new FormData();
-                        data.set("id", item.id);
-                        run("portfolio-delete", deletePortfolioItemAction)(data);
-                      }}
+                      className="flex w-full items-center justify-between gap-3 p-4 text-left sm:hidden"
+                      onClick={() => togglePortfolioItem(item.id)}
+                      aria-expanded={expandedPortfolioItemIds.has(item.id)}
+                      aria-controls={`portfolio-album-${item.id}`}
                     >
-                      <Trash2 className="size-4" aria-hidden="true" />
-                      Удалить
-                    </Button>
+                      <span className="min-w-0 truncate text-base font-semibold">{item.title || "Альбом без названия"}</span>
+                      <ChevronDown
+                        className={cn(
+                          "size-5 shrink-0 text-primary transition-transform duration-200",
+                          expandedPortfolioItemIds.has(item.id) && "rotate-180"
+                        )}
+                        aria-hidden="true"
+                      />
+                    </button>
+                    <div
+                      id={`portfolio-album-${item.id}`}
+                      className={cn(
+                        "hidden gap-3 p-4 sm:grid",
+                        expandedPortfolioItemIds.has(item.id) && "grid"
+                      )}
+                    >
+                      <input type="hidden" name="portfolioItemIds" value={item.id} />
+                      <Field
+                        label="Название"
+                        name={`portfolioTitle:${item.id}`}
+                        defaultValue={item.title}
+                      />
+                      <AlbumContentField
+                        name={`albumImages:${item.id}`}
+                        uploadScope="portfolio-save"
+                        disabled={isPortfolioBusy}
+                        existingImages={item.albumImages}
+                        initialCoverCrop={{
+                          x: item.coverCropX,
+                          y: item.coverCropY,
+                          width: item.coverCropWidth,
+                          height: item.coverCropHeight
+                        }}
+                      />
+                      <Button
+                        disabled={isPortfolioBusy || !databaseReady}
+                        size="sm"
+                        variant="outline"
+                        type="button"
+                        className="portfolio-delete-button w-fit !border-[#2e3c28] !bg-[#2e3c28] !text-[#f6f0e6] hover:!border-[#ddd5c9] hover:!bg-[#ddd5c9] hover:!text-[#2e3c28]"
+                        onClick={() => {
+                          if (!window.confirm("Удалить работу из портфолио?")) return;
+                          const data = new FormData();
+                          data.set("id", item.id);
+                          run("portfolio-delete", deletePortfolioItemAction)(data);
+                        }}
+                      >
+                        <Trash2 className="size-4" aria-hidden="true" />
+                        Удалить
+                      </Button>
+                    </div>
                   </div>
                 ))}
               </div>
