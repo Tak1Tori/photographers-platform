@@ -1,32 +1,13 @@
 "use client";
 
-import { Pause, Play } from "lucide-react";
-import { useEffect, useState } from "react";
-
-const MOTION_PREFERENCE_KEY = "framely-motion-paused";
+import { useEffect } from "react";
 
 export function SiteMotion() {
-  const [paused, setPaused] = useState(false);
-  const [reducedMotion, setReducedMotion] = useState(false);
-  const [ready, setReady] = useState(false);
-
   useEffect(() => {
     const preference = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const syncPreference = () => setReducedMotion(preference.matches);
-    syncPreference();
-    try {
-      setPaused(window.localStorage.getItem(MOTION_PREFERENCE_KEY) === "true");
-    } catch {
-      // Motion controls also work when storage is unavailable.
-    }
-    setReady(true);
-    preference.addEventListener("change", syncPreference);
-    return () => preference.removeEventListener("change", syncPreference);
-  }, []);
-
-  useEffect(() => {
-    const syncVisibility = () => {
-      if (paused || reducedMotion || document.hidden) {
+    const syncMotionState = () => {
+      const motionDisabled = preference.matches || document.hidden;
+      if (motionDisabled) {
         document.querySelectorAll<HTMLElement>('[data-reveal-state="visible"]').forEach((element) => {
           element.dataset.revealState = "complete";
         });
@@ -34,12 +15,17 @@ export function SiteMotion() {
           element.dataset.motionComplete = "true";
         });
       }
-      document.documentElement.dataset.motionPaused = String(paused || reducedMotion || document.hidden);
+      document.documentElement.dataset.motionPaused = String(motionDisabled);
     };
-    syncVisibility();
-    document.addEventListener("visibilitychange", syncVisibility);
-    return () => document.removeEventListener("visibilitychange", syncVisibility);
-  }, [paused, reducedMotion]);
+
+    syncMotionState();
+    document.addEventListener("visibilitychange", syncMotionState);
+    preference.addEventListener("change", syncMotionState);
+    return () => {
+      document.removeEventListener("visibilitychange", syncMotionState);
+      preference.removeEventListener("change", syncMotionState);
+    };
+  }, []);
 
   useEffect(() => {
     if (!("IntersectionObserver" in window)) return;
@@ -126,29 +112,5 @@ export function SiteMotion() {
     };
   }, []);
 
-  function toggleMotion() {
-    const next = !paused;
-    setPaused(next);
-    try {
-      window.localStorage.setItem(MOTION_PREFERENCE_KEY, String(next));
-    } catch {
-      // The current session still respects the user's choice.
-    }
-  }
-
-  if (!ready || reducedMotion) return null;
-
-  return (
-    <button
-      type="button"
-      onClick={toggleMotion}
-      aria-label={paused ? "Включить анимации" : "Приостановить анимации"}
-      aria-pressed={paused}
-      title={paused ? "Включить анимации" : "Приостановить анимации"}
-      className="motion-control fixed bottom-4 right-4 z-40 flex min-h-11 items-center gap-2 rounded-full border border-border bg-card/90 px-4 text-xs font-medium text-muted-foreground shadow-lg backdrop-blur transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-    >
-      {paused ? <Play className="size-3.5" aria-hidden="true" /> : <Pause className="size-3.5" aria-hidden="true" />}
-      Анимации
-    </button>
-  );
+  return null;
 }
