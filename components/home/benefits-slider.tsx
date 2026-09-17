@@ -59,12 +59,17 @@ export function BenefitsSlider() {
   }, []);
 
   return (
-    <section className="border-b border-border py-8 md:py-10">
-      <div className="container mb-5">
+    <section className="benefits-motion border-b border-border py-8 md:py-10" data-motion-scope>
+      <div className="container mb-5" data-reveal>
         <p className="text-sm font-medium uppercase tracking-[0.18em] text-primary">Framely</p>
       </div>
 
-      <div className="overflow-hidden pb-1">
+      <div
+        className="benefits-viewport overflow-x-auto pb-1 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        tabIndex={0}
+        role="region"
+        aria-label="Преимущества Framely — прокручивайте стрелками влево и вправо"
+      >
         <div ref={trackRef} className="benefits-slider-track flex w-max gap-4">
           {[0, 1].flatMap((loopIndex) =>
           benefits.map((benefit) => {
@@ -72,6 +77,8 @@ export function BenefitsSlider() {
               <article
                 key={`${loopIndex}-${benefit.title}`}
                 data-benefit-card
+                aria-hidden={loopIndex === 1 ? true : undefined}
+                data-benefit-copy={loopIndex === 1 ? "true" : undefined}
                 className="grid w-[84vw] max-w-[42rem] shrink-0 overflow-hidden rounded-lg border border-border bg-card sm:grid-cols-[1fr_13rem] sm:w-[38rem]"
               >
                 <div className="p-5 md:p-7">

@@ -28,7 +28,7 @@ export function PhotographerCard({
       : `/photographers/${photographer.id}`);
 
   return (
-    <Card className="group relative flex h-full flex-col overflow-hidden transition-colors hover:border-primary/45">
+    <Card data-reveal="card" className="group relative flex h-full flex-col overflow-hidden transition-colors hover:border-primary/45">
       <Link
         href={profileHref}
         className="absolute inset-0 z-10"

@@ -1,12 +1,25 @@
 import { HeroDotField } from "@/components/home/hero-dot-field";
+import styles from "@/components/home/hero-motion.module.css";
 
 export function HeroSection() {
   return (
     <section
-      className="hero-light-on relative overflow-hidden border-b border-border bg-background"
+      className={`${styles.hero} hero-light-on relative overflow-hidden border-b border-border bg-background`}
       data-dot-scene
+      data-motion-scope
     >
       <div className="hero-dot-scene pointer-events-none absolute inset-0" aria-hidden="true" />
+      <div className={styles.ambient} aria-hidden="true">
+        <div className={`${styles.glow} ${styles.glowPrimary}`} />
+        <div className={`${styles.glow} ${styles.glowSecondary}`} />
+        <div className={styles.viewfinder}>
+          <span className={`${styles.corner} ${styles.topLeft}`} />
+          <span className={`${styles.corner} ${styles.topRight}`} />
+          <span className={`${styles.corner} ${styles.bottomLeft}`} />
+          <span className={`${styles.corner} ${styles.bottomRight}`} />
+          <span className={styles.focusMark} />
+        </div>
+      </div>
       <HeroDotField />
 
       <div className="container relative flex min-h-[620px] items-center justify-center py-16 md:min-h-[680px] md:py-24">

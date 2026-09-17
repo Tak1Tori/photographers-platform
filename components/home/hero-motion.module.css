@@ -1,0 +1,203 @@
+.hero {
+  --glow-primary: 151 64% 37%;
+  --glow-secondary: 173 42% 37%;
+  --glow-strength: 0.25;
+  --frame-color: 151 36% 70%;
+}
+
+:global(:root.light) .hero {
+  --glow-primary: 102 34% 50%;
+  --glow-secondary: 42 74% 68%;
+  --glow-strength: 0.23;
+  --frame-color: 102 20% 30%;
+}
+
+.ambient {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.glow {
+  position: absolute;
+  width: min(76rem, 115vw);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.glowPrimary {
+  top: -105%;
+  left: -33%;
+  background: radial-gradient(ellipse, hsl(var(--glow-primary) / var(--glow-strength)), transparent 68%);
+  animation: lightDrift 18s ease-in-out infinite alternate;
+}
+
+.glowSecondary {
+  right: -34%;
+  bottom: -110%;
+  background: radial-gradient(ellipse, hsl(var(--glow-secondary) / var(--glow-strength)), transparent 68%);
+  animation: lightDrift 22s ease-in-out -9s infinite alternate-reverse;
+}
+
+.viewfinder {
+  position: absolute;
+  inset: 18% max(1.5rem, calc((100% - 1120px) / 2));
+  color: hsl(var(--frame-color) / 0.5);
+  animation: focusBreathe 8s ease-in-out infinite;
+}
+
+.corner {
+  position: absolute;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-color: currentColor;
+  border-style: solid;
+  border-width: 0;
+}
+
+.topLeft {
+  top: 0;
+  left: 0;
+  border-top-width: 1px;
+  border-left-width: 1px;
+  border-top-left-radius: 0.65rem;
+}
+
+.topRight {
+  top: 0;
+  right: 0;
+  border-top-width: 1px;
+  border-right-width: 1px;
+  border-top-right-radius: 0.65rem;
+}
+
+.bottomLeft {
+  bottom: 0;
+  left: 0;
+  border-bottom-width: 1px;
+  border-left-width: 1px;
+  border-bottom-left-radius: 0.65rem;
+}
+
+.bottomRight {
+  bottom: 0;
+  right: 0;
+  border-bottom-width: 1px;
+  border-right-width: 1px;
+  border-bottom-right-radius: 0.65rem;
+}
+
+.focusMark {
+  position: absolute;
+  bottom: 0;
+  left: calc(50% - 1.5rem);
+  width: 3rem;
+  height: 1px;
+  background: currentColor;
+  transform-origin: center;
+  animation: focusLock 8s ease-in-out infinite;
+}
+
+.dotOrbit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: dotBreathe 6.5s ease-in-out var(--dot-delay, 0s) infinite;
+}
+
+.hero[data-motion-active="false"] .ambient *,
+.hero[data-motion-active="false"] .dotOrbit,
+.hero[data-motion-active="false"] .dotOrbit *,
+:global(:root[data-motion-paused="true"]) .ambient *,
+:global(:root[data-motion-paused="true"]) .dotOrbit,
+:global(:root[data-motion-paused="true"]) .dotOrbit * {
+  animation-play-state: paused !important;
+}
+
+@keyframes lightDrift {
+  from {
+    opacity: 0.65;
+    transform: translate3d(0, 0, 0) scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(20%, 20%, 0) scale(1.13);
+  }
+}
+
+@keyframes focusBreathe {
+  0%, 100% {
+    opacity: 0.48;
+    transform: scale(1.015);
+  }
+  35%, 62% {
+    opacity: 0.95;
+    transform: scale(0.98);
+  }
+}
+
+@keyframes focusLock {
+  0%, 100% {
+    opacity: 0.35;
+    transform: scaleX(0.55);
+  }
+  35%, 62% {
+    opacity: 0.9;
+    transform: scaleX(1);
+  }
+}
+
+@keyframes dotBreathe {
+  0%, 100% {
+    opacity: 0.5;
+    transform: scale(0.92);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.18);
+  }
+}
+
+@media (max-width: 639px) {
+  .glow {
+    width: 160vw;
+  }
+
+  .glowPrimary {
+    top: -40%;
+    left: -90%;
+  }
+
+  .glowSecondary {
+    right: -75%;
+    bottom: -40%;
+  }
+
+  .viewfinder {
+    inset: 16% 1.25rem;
+  }
+
+  .corner {
+    width: 1.65rem;
+    height: 1.65rem;
+  }
+
+  .dotOrbit[data-mobile-visible="false"] {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero *,
+  .hero *::before,
+  .hero *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  .viewfinder {
+    opacity: 0.5;
+  }
+}

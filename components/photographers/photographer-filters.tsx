@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { ChevronDown, SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,7 @@ import {
 import { formatPrice } from "@/lib/mock-data";
 import type { PhotoStyle } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import motionStyles from "./photographer-filters.module.css";
 
 interface PhotographerFiltersProps {
   styles: PhotoStyle[];
@@ -33,6 +34,7 @@ export function PhotographerFilters({
   const pathname = usePathname();
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
+  const filtersId = useId();
   const [price, setPrice] = useState(() => normalizePhotographerMaxPrice(selectedPrice));
   const [style, setStyle] = useState(selectedStyle ?? "");
   const [reviews, setReviews] = useState(() => String(normalizePhotographerRating(selectedReviews) || ""));
@@ -74,104 +76,111 @@ export function PhotographerFilters({
         onClick={() => setIsOpen((current) => !current)}
         className="flex w-full items-center justify-between gap-3 text-left md:hidden"
         aria-expanded={isOpen}
+        aria-controls={filtersId}
       >
         <span className="inline-flex items-center gap-2 text-base font-semibold">
-          <SlidersHorizontal className="h-5 w-5 text-primary" />
+          <SlidersHorizontal className="h-5 w-5 text-primary" aria-hidden="true" />
           Фильтры
         </span>
-        <span className="text-sm text-primary">
+        <span className="inline-flex items-center gap-2 text-sm text-primary">
           {price >= PHOTOGRAPHER_MAX_PRICE ? `${formatPrice(PHOTOGRAPHER_MAX_PRICE)}+` : formatPrice(price)}
+          <ChevronDown
+            className={cn("size-4", motionStyles.chevron, isOpen && motionStyles.chevronOpen)}
+            aria-hidden="true"
+          />
         </span>
       </button>
 
-      <form
-        className={cn(
-          "mt-4 grid gap-5 md:mt-0 md:grid lg:grid-cols-[1fr_1.2fr_1.4fr_auto] lg:items-end",
-          isOpen ? "grid" : "hidden"
-        )}
-        onSubmit={(event) => event.preventDefault()}
-      >
-        {mode ? <input type="hidden" name="mode" value={mode} /> : null}
+      <div id={filtersId} className={cn(motionStyles.panel, isOpen && motionStyles.panelOpen)}>
+        <div className={motionStyles.panelInner}>
+          <form
+            className="grid gap-5 pt-4 md:pt-0 lg:grid-cols-[1fr_1.2fr_1.4fr_auto] lg:items-end"
+            onSubmit={(event) => event.preventDefault()}
+          >
+            {mode ? <input type="hidden" name="mode" value={mode} /> : null}
 
-        <label className="grid gap-2 text-sm font-medium">
-          Теги
-          <div className="relative">
-            <select
-              name="style"
-              value={style}
-              onChange={(event) => updateFilters({ style: event.currentTarget.value })}
-              className={filterInputClass}
-            >
-              <option value="">Все направления</option>
-              {styles.map((style) => (
-                <option key={style.id} value={style.id}>
-                  {style.title}
-                </option>
-              ))}
-            </select>
-            <ChevronDown className="pointer-events-none absolute right-7 top-1/2 size-5 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
-          </div>
-        </label>
-
-        <div className="grid gap-2 text-sm font-medium">
-          <div className="flex items-center justify-between gap-3">
-            <span>Цена до</span>
-            <span className="text-sm text-primary">
-              {price >= PHOTOGRAPHER_MAX_PRICE ? `${formatPrice(PHOTOGRAPHER_MAX_PRICE)}+` : formatPrice(price)}
-            </span>
-          </div>
-          <input
-            type="range"
-            name="price"
-            min={PHOTOGRAPHER_MIN_PRICE}
-            max={PHOTOGRAPHER_MAX_PRICE}
-            step={PHOTOGRAPHER_PRICE_STEP}
-            value={price}
-            onChange={(event) => updateFilters({ price: Number(event.target.value) })}
-            className="h-11 w-full accent-[hsl(var(--primary))]"
-          />
-        </div>
-
-        <div className="grid gap-2 text-sm font-medium">
-          <span>Отзывы</span>
-          <div className="grid grid-cols-6 gap-1 rounded-md border border-input bg-background p-1">
-            <label className="cursor-pointer">
-              <input
-                type="radio"
-                name="reviews"
-                value=""
-                checked={!reviews}
-                onChange={() => updateFilters({ reviews: "" })}
-                className="peer sr-only"
-              />
-              <span className="flex h-9 items-center justify-center rounded text-xs text-muted-foreground transition peer-checked:bg-primary peer-checked:text-primary-foreground">
-                Все
-              </span>
+            <label className="grid gap-2 text-sm font-medium">
+              Теги
+              <div className="relative">
+                <select
+                  name="style"
+                  value={style}
+                  onChange={(event) => updateFilters({ style: event.currentTarget.value })}
+                  className={filterInputClass}
+                >
+                  <option value="">Все направления</option>
+                  {styles.map((style) => (
+                    <option key={style.id} value={style.id}>
+                      {style.title}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="pointer-events-none absolute right-7 top-1/2 size-5 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+              </div>
             </label>
-            {[1, 2, 3, 4, 5].map((rating) => (
-              <label key={rating} className="cursor-pointer">
-                <input
-                  type="radio"
-                  name="reviews"
-                  value={rating}
-                  checked={reviews === String(rating)}
-                  onChange={() => updateFilters({ reviews: String(rating) })}
-                  className="peer sr-only"
-                />
-                <span className="flex h-9 items-center justify-center rounded text-xs text-muted-foreground transition peer-checked:bg-primary peer-checked:text-primary-foreground">
-                  {rating}★
-                </span>
-              </label>
-            ))}
-          </div>
-        </div>
 
-        <div className="flex justify-end">
-          <Button type="button" variant="outline" onClick={resetFilters}>
-            Сбросить
-          </Button>
+            <div className="grid gap-2 text-sm font-medium">
+              <div className="flex items-center justify-between gap-3">
+                <span>Цена до</span>
+                <span className="text-sm text-primary">
+                  {price >= PHOTOGRAPHER_MAX_PRICE ? `${formatPrice(PHOTOGRAPHER_MAX_PRICE)}+` : formatPrice(price)}
+                </span>
+              </div>
+              <input
+                type="range"
+                name="price"
+                min={PHOTOGRAPHER_MIN_PRICE}
+                max={PHOTOGRAPHER_MAX_PRICE}
+                step={PHOTOGRAPHER_PRICE_STEP}
+                value={price}
+                aria-label="Максимальная цена"
+                onChange={(event) => updateFilters({ price: Number(event.target.value) })}
+                className="h-11 w-full accent-[hsl(var(--primary))]"
+              />
+            </div>
+
+            <div className="grid gap-2 text-sm font-medium">
+              <span>Отзывы</span>
+              <div className="grid grid-cols-6 gap-1 rounded-md border border-input bg-background p-1">
+                <label className="cursor-pointer">
+                  <input
+                    type="radio"
+                    name="reviews"
+                    value=""
+                    checked={!reviews}
+                    onChange={() => updateFilters({ reviews: "" })}
+                    className="peer sr-only"
+                  />
+                  <span className="flex h-9 items-center justify-center rounded text-xs text-muted-foreground transition peer-checked:bg-primary peer-checked:text-primary-foreground">
+                    Все
+                  </span>
+                </label>
+                {[1, 2, 3, 4, 5].map((rating) => (
+                  <label key={rating} className="cursor-pointer">
+                    <input
+                      type="radio"
+                      name="reviews"
+                      value={rating}
+                      checked={reviews === String(rating)}
+                      onChange={() => updateFilters({ reviews: String(rating) })}
+                      className="peer sr-only"
+                    />
+                    <span className="flex h-9 items-center justify-center rounded text-xs text-muted-foreground transition peer-checked:bg-primary peer-checked:text-primary-foreground">
+                      {rating}★
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex justify-end">
+              <Button type="button" variant="outline" onClick={resetFilters}>
+                Сбросить
+              </Button>
+            </div>
+          </form>
         </div>
-      </form>
+      </div>
     </div>
   );
 }

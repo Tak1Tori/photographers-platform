@@ -68,14 +68,15 @@ export function MarketplaceSlider(props: MarketplaceSliderProps) {
 
     rail.scrollBy({
       left: direction * Math.max(rail.clientWidth * 0.82, 280),
-      behavior: "smooth"
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ||
+        document.documentElement.dataset.motionPaused === "true" ? "instant" : "smooth"
     });
   }
 
   return (
     <section className="py-10 md:py-14">
       <div className="container">
-        <div className="mb-6 flex items-center justify-between gap-4">
+        <div className="mb-6 flex items-center justify-between gap-4" data-reveal>
           <div className="flex min-w-0 items-baseline gap-4">
             <h2 className="text-2xl font-semibold tracking-normal md:text-3xl">
               {props.title}
@@ -147,6 +148,7 @@ function PhotographerSlide({ photographer, profileBasePath = "/photographers", p
   return (
     <Link
       href={`${profileBasePath}/${photographer.id}`}
+      data-reveal="card"
       className="group w-[82vw] max-w-[310px] shrink-0 snap-start overflow-hidden rounded-lg border border-border bg-card transition-colors hover:border-primary/45 sm:w-[46vw] lg:w-[calc((100%_-_3rem)/4)]"
     >
       <div className="relative aspect-[4/3] overflow-hidden">
@@ -182,6 +184,7 @@ function StudioSlide({ studio }: { studio: Studio }) {
   return (
     <Link
       href={`/studios/${studio.id}`}
+      data-reveal="card"
       className="group w-[82vw] max-w-[310px] shrink-0 snap-start overflow-hidden rounded-lg border border-border bg-card transition-colors hover:border-primary/45 sm:w-[46vw] lg:w-[calc((100%_-_3rem)/4)]"
     >
       <div className="relative aspect-[4/3] overflow-hidden">

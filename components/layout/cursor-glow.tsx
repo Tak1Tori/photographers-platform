@@ -8,45 +8,93 @@ export function CursorGlow() {
   useEffect(() => {
     const glow = glowRef.current;
 
-    if (!glow || window.matchMedia("(pointer: coarse)").matches) {
+    if (!glow) {
       return;
     }
 
+    const motionPreference = window.matchMedia("(pointer: coarse), (prefers-reduced-motion: reduce)");
     let targetX = window.innerWidth / 2;
     let targetY = window.innerHeight / 2;
     let currentX = targetX;
     let currentY = targetY;
     let animationFrame = 0;
 
+    const isMotionDisabled = () =>
+      motionPreference.matches ||
+      document.hidden ||
+      document.documentElement.dataset.motionPaused === "true";
+
+    const hideGlow = () => {
+      glow.dataset.visible = "false";
+      window.cancelAnimationFrame(animationFrame);
+      animationFrame = 0;
+    };
+
     const updatePosition = () => {
-      currentX += (targetX - currentX) * 0.16;
-      currentY += (targetY - currentY) * 0.16;
+      animationFrame = 0;
+
+      if (isMotionDisabled()) {
+        hideGlow();
+        return;
+      }
+
+      const isSettled = Math.abs(targetX - currentX) < 0.15 && Math.abs(targetY - currentY) < 0.15;
+      currentX = isSettled ? targetX : currentX + (targetX - currentX) * 0.16;
+      currentY = isSettled ? targetY : currentY + (targetY - currentY) * 0.16;
       glow.style.transform = `translate3d(${currentX}px, ${currentY}px, 0) translate(-50%, -50%)`;
-      animationFrame = window.requestAnimationFrame(updatePosition);
+
+      if (!isSettled) {
+        animationFrame = window.requestAnimationFrame(updatePosition);
+      }
     };
 
     const handlePointerMove = (event: PointerEvent) => {
-      if (event.target instanceof Element && event.target.closest("[data-dot-scene]")) {
-        glow.dataset.visible = "false";
+      if (
+        isMotionDisabled() ||
+        (event.target instanceof Element && event.target.closest("[data-dot-scene]"))
+      ) {
+        hideGlow();
         return;
       }
 
       targetX = event.clientX;
       targetY = event.clientY;
+
+      if (glow.dataset.visible !== "true") {
+        currentX = targetX;
+        currentY = targetY;
+      }
+
       glow.dataset.visible = "true";
+
+      if (!animationFrame) {
+        animationFrame = window.requestAnimationFrame(updatePosition);
+      }
     };
 
-    const handlePointerLeave = () => {
-      glow.dataset.visible = "false";
+    const handleMotionChange = () => {
+      if (isMotionDisabled()) hideGlow();
     };
+
+    const motionObserver = new MutationObserver(handleMotionChange);
+    motionObserver.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["data-motion-paused"]
+    });
 
     window.addEventListener("pointermove", handlePointerMove, { passive: true });
-    document.documentElement.addEventListener("mouseleave", handlePointerLeave);
-    animationFrame = window.requestAnimationFrame(updatePosition);
+    window.addEventListener("blur", hideGlow);
+    document.documentElement.addEventListener("mouseleave", hideGlow);
+    document.addEventListener("visibilitychange", handleMotionChange);
+    motionPreference.addEventListener("change", handleMotionChange);
 
     return () => {
       window.removeEventListener("pointermove", handlePointerMove);
-      document.documentElement.removeEventListener("mouseleave", handlePointerLeave);
+      window.removeEventListener("blur", hideGlow);
+      document.documentElement.removeEventListener("mouseleave", hideGlow);
+      document.removeEventListener("visibilitychange", handleMotionChange);
+      motionPreference.removeEventListener("change", handleMotionChange);
+      motionObserver.disconnect();
       window.cancelAnimationFrame(animationFrame);
     };
   }, []);

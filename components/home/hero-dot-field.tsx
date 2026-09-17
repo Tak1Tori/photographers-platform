@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { type CSSProperties, useEffect, useRef } from "react";
+import styles from "@/components/home/hero-motion.module.css";
 
 const COLUMNS = 12;
 const ROWS = 7;
@@ -14,8 +15,9 @@ const DOTS = Array.from({ length: COLUMNS * ROWS }, (_, index) => {
     x: (column - 0.5) / COLUMNS,
     y: (row - 0.5) / ROWS,
     isMobileVisible:
-      (column % 2 === 1 && row % 2 === 1) ||
-      (column % 3 === 0 && (row === 2 || row === 6))
+      (row < 3 || row > 5) &&
+      ((column % 2 === 1 && row % 2 === 1) ||
+        (column % 3 === 0 && (row === 2 || row === 6)))
   };
 }).filter(({ x, y }) => {
   const horizontalDistance = (x - 0.5) / 0.38;
@@ -31,13 +33,11 @@ export function HeroDotField() {
   useEffect(() => {
     const field = fieldRef.current;
 
-    if (
-      !field ||
-      window.matchMedia("(pointer: coarse), (prefers-reduced-motion: reduce)").matches
-    ) {
+    if (!field) {
       return;
     }
 
+    const disablePointerMotion = window.matchMedia("(pointer: coarse), (prefers-reduced-motion: reduce)");
     let frame = 0;
     let pointer: { x: number; y: number } | undefined;
     let wasActive = false;
@@ -89,6 +89,8 @@ export function HeroDotField() {
     };
 
     const handlePointerMove = (event: PointerEvent) => {
+      if (disablePointerMotion.matches) return;
+
       const bounds = field.getBoundingClientRect();
       const isInside =
         event.clientX >= bounds.left &&
@@ -107,10 +109,12 @@ export function HeroDotField() {
 
     window.addEventListener("pointermove", handlePointerMove, { passive: true });
     document.documentElement.addEventListener("mouseleave", handlePointerLeave);
+    disablePointerMotion.addEventListener("change", handlePointerLeave);
 
     return () => {
       window.removeEventListener("pointermove", handlePointerMove);
       document.documentElement.removeEventListener("mouseleave", handlePointerLeave);
+      disablePointerMotion.removeEventListener("change", handlePointerLeave);
       window.cancelAnimationFrame(frame);
     };
   }, []);
@@ -120,13 +124,22 @@ export function HeroDotField() {
       {DOTS.map((dot, index) => (
         <span
           key={index}
-          ref={(element) => {
-            dotRefs.current[index] = element;
-          }}
-          className={`hero-dot${dot.isMobileVisible ? ` hero-dot-pulse-${index % 4}` : ""}`}
+          className={styles.dotOrbit}
           data-mobile-visible={dot.isMobileVisible}
-          style={{ gridColumn: dot.column, gridRow: dot.row }}
-        />
+          style={{
+            gridColumn: dot.column,
+            gridRow: dot.row,
+            "--dot-delay": `${-(dot.column * 0.38 + dot.row * 0.6)}s`
+          } as CSSProperties}
+        >
+          <span
+            ref={(element) => {
+              dotRefs.current[index] = element;
+            }}
+            className={`hero-dot${dot.isMobileVisible ? ` hero-dot-pulse-${index % 4}` : ""}`}
+            data-mobile-visible={dot.isMobileVisible}
+          />
+        </span>
       ))}
     </div>
   );

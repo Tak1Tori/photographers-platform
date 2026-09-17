@@ -1296,8 +1296,59 @@
   will-change: transform;
 }
 
+/* Motion is progressive enhancement: content remains visible without JS. */
+[data-reveal="card"]:nth-child(4n + 2) { --reveal-delay: 70ms; }
+[data-reveal="card"]:nth-child(4n + 3) { --reveal-delay: 140ms; }
+[data-reveal="card"]:nth-child(4n + 4) { --reveal-delay: 210ms; }
+
+@keyframes section-reveal {
+  from { opacity: 0; transform: translate3d(0, 22px, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  [data-reveal-state="waiting"] {
+    opacity: 0;
+    transform: translate3d(0, 22px, 0);
+  }
+
+  [data-reveal-state="visible"] {
+    animation: section-reveal 650ms cubic-bezier(0.22, 1, 0.36, 1) var(--reveal-delay, 0ms) both;
+  }
+}
+
+[data-reveal]:focus-within,
+:root[data-motion-paused="true"] [data-reveal] {
+  opacity: 1;
+  transform: none;
+  animation: none;
+}
+
+.benefits-motion[data-motion-active="false"] .benefits-slider-track,
+.benefits-motion:focus-within .benefits-slider-track,
+.benefits-motion:hover .benefits-slider-track,
+:root[data-motion-paused="true"] .benefits-slider-track,
+:root[data-motion-paused="true"] .hero-dot {
+  animation-play-state: paused;
+}
+
+:root[data-motion-paused="true"] .hero-light-item,
+.hero-light-item[data-motion-complete="true"] {
+  animation: none;
+  opacity: 1;
+  transform: none;
+}
+
+:root[data-motion-paused="true"] .cursor-glow {
+  display: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .benefits-slider-track {
     animation: none;
   }
+
+  [data-benefit-copy="true"] { display: none; }
+
+  .cursor-glow { display: none; }
 }

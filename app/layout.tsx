@@ -5,6 +5,7 @@ import { CursorGlow } from "@/components/layout/cursor-glow";
 import { CookieConsentBanner } from "@/components/layout/cookie-consent-banner";
 import { Footer } from "@/components/layout/footer";
 import { Header } from "@/components/layout/header";
+import { SiteMotion } from "@/components/layout/site-motion";
 
 const manrope = Manrope({ subsets: ["latin", "cyrillic"] });
 
@@ -30,6 +31,7 @@ export default function RootLayout({
         />
       </head>
       <body className={manrope.className}>
+        <SiteMotion />
         <CursorGlow />
         <div className="relative z-10 flex min-h-screen flex-col">
           <Header />
