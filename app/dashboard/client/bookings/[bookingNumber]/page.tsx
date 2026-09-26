@@ -21,16 +21,17 @@ import type { ClientBookingDetails } from "@/lib/types";
 export const dynamic = "force-dynamic";
 
 interface ClientBookingDetailsPageProps {
-  params: {
+  params: Promise<{
     bookingNumber: string;
-  };
+  }>;
 }
 
 export default async function ClientBookingDetailsPage({ params }: ClientBookingDetailsPageProps) {
+  const { bookingNumber } = await params;
   const session = await requireSession(["CLIENT", "ADMIN"]);
   const booking = await getClientBookingByNumber(
     session.user.id,
-    params.bookingNumber,
+    bookingNumber,
     session.user.role
   );
 

@@ -3,8 +3,8 @@ import { redirect } from "next/navigation";
 export default async function StudioConfirmationWaitingPage({
   params
 }: {
-  params: { requestId: string };
+  params: Promise<{ requestId: string }>;
 }) {
-  void params;
+  await params;
   redirect("/photographers?mode=booking");
 }

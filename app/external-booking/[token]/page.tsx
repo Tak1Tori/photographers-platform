@@ -9,11 +9,12 @@ import { formatPrice } from "@/lib/mock-data";
 import { BookingLeadStatus } from "@prisma/client";
 
 interface ExternalBookingPageProps {
-  params: { token: string };
+  params: Promise<{ token: string }>;
 }
 
 export default async function ExternalBookingPage({ params }: ExternalBookingPageProps) {
-  const lead = await getBookingLeadByPublicToken(params.token);
+  const { token } = await params;
+  const lead = await getBookingLeadByPublicToken(token);
   const isActive =
     lead &&
     lead.publicLinkExpiresAt &&
@@ -101,7 +102,7 @@ export default async function ExternalBookingPage({ params }: ExternalBookingPag
             </div>
 
             <form action={submitExternalBookingLeadAction} className="space-y-4">
-              <input type="hidden" name="token" value={params.token} />
+              <input type="hidden" name="token" value={token} />
               <Field name="clientName" label="Имя" defaultValue={lead.clientName ?? ""} required />
               <Field name="clientPhone" label="Телефон" defaultValue={lead.clientPhone ?? ""} required />
               <label className="block text-sm font-medium text-foreground">

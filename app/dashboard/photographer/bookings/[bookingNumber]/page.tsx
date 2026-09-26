@@ -16,17 +16,18 @@ import { calculateProviderPayouts } from "@/lib/provider-payouts";
 export const dynamic = "force-dynamic";
 
 interface PhotographerBookingDetailsPageProps {
-  params: {
+  params: Promise<{
     bookingNumber: string;
-  };
+  }>;
 }
 
 export default async function PhotographerBookingDetailsPage({
   params
 }: PhotographerBookingDetailsPageProps) {
+  const { bookingNumber: rawBookingNumber } = await params;
   const session = await requireSession(["PHOTOGRAPHER", "ADMIN"]);
   const profile = await getOrCreatePhotographerProfileByUserId(session.user.id);
-  const bookingNumber = decodeURIComponent(params.bookingNumber);
+  const bookingNumber = decodeURIComponent(rawBookingNumber);
 
   await autoCompletePastBookings();
 
