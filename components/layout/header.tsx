@@ -22,6 +22,11 @@ const navItems = [
     href: "/editors",
     label: "Монтажеры",
     sectionPath: "/editors"
+  },
+  {
+    href: "/requests",
+    label: "Заявки",
+    sectionPath: "/requests"
   }
 ];
 const defaultAvatarUrl = "/images/default-avatar.png";
