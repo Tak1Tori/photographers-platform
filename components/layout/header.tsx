@@ -46,6 +46,9 @@ function HeaderContent() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const dashboardHref = getDashboardHref(session?.user.role);
+  const visibleNavItems = session?.user.role === "PHOTOGRAPHER"
+    ? navItems.filter((item) => item.href === "/requests")
+    : navItems;
 
   useEffect(() => {
     setIsMobileMenuOpen(false);
@@ -100,7 +103,7 @@ function HeaderContent() {
         </Link>
 
         <nav className="absolute left-1/2 hidden -translate-x-1/2 items-center gap-8 text-base font-semibold text-muted-foreground md:flex">
-          {navItems.map((item) => {
+          {visibleNavItems.map((item) => {
             const isActive = pathname.startsWith(item.sectionPath);
 
             return (
@@ -183,7 +186,7 @@ function HeaderContent() {
         <div className="border-t border-border/80 bg-background/95 shadow-[0_18px_44px_rgba(0,0,0,0.35)] backdrop-blur md:hidden">
           <div className="container grid gap-3 py-4">
             <nav className="grid gap-1 text-xl font-semibold leading-tight">
-              {navItems.map((item) => {
+              {visibleNavItems.map((item) => {
                 const isActive = pathname.startsWith(item.sectionPath);
 
                 return (
