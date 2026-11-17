@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
-import { KeyRound, Pencil, UserRound } from "lucide-react";
+import { ClipboardList, KeyRound, Pencil, UserRound } from "lucide-react";
 import { SignOutButton } from "@/components/auth/sign-out-button";
 import { AccountActionsCard } from "@/components/dashboard/account-actions-card";
 import { ClientBookingCard } from "@/components/dashboard/client-booking-card";
@@ -71,6 +71,13 @@ export default async function ClientDashboardPage() {
                 <UserRound className="size-6 text-muted-foreground" aria-hidden="true" />
                 История бронирований
               </Link>
+              <Link
+                href="/dashboard/client/requests"
+                className="flex items-center gap-4 transition-colors hover:text-emerald-300"
+              >
+                <ClipboardList className="size-6 text-muted-foreground" aria-hidden="true" />
+                Мои объявления
+              </Link>
               <SignOutButton
                 variant="ghost"
                 size="lg"
@@ -92,6 +99,13 @@ export default async function ClientDashboardPage() {
           />
 
           <div className="grid gap-4 xl:grid-cols-2">
+            <Card className="h-full">
+              <CardHeader className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
+                <div><CardTitle>Мои объявления</CardTitle><p className="mt-2 text-sm text-muted-foreground">Создавайте задачи для фотографов и выбирайте подходящий отклик.</p></div>
+                <Button asChild variant="outline" size="sm" className="shrink-0"><Link href="/dashboard/client/requests">Открыть</Link></Button>
+              </CardHeader>
+              <CardContent><Button asChild><Link href="/requests/new">Создать объявление</Link></Button></CardContent>
+            </Card>
             <BookingPreviewSection
               title="Текущие записи"
               description="Активные брони, которые ожидают подтверждения, оплаты или проведения."

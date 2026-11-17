@@ -68,6 +68,22 @@ enum BookingType {
   STUDIO_ONLY
 }
 
+enum JobPostStatus {
+  DRAFT
+  PUBLISHED
+  SELECTED
+  PAUSED
+  CLOSED
+  EXPIRED
+}
+
+enum JobResponseStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  WITHDRAWN
+}
+
 enum StudioConfirmationMode {
   PLATFORM_CALENDAR_AUTO
   WHATSAPP_CONFIRMATION
@@ -164,6 +180,8 @@ enum NotificationType {
   BOOKING_COMPLETED
   RESCHEDULE_REQUESTED
   REVIEW_CREATED
+  JOB_RESPONSE_CREATED
+  JOB_RESPONSE_ACCEPTED
   PAYMENT_REFUNDED
   ADMIN_NOTICE
 }
@@ -307,6 +325,7 @@ model User {
   createdCalendarDrafts      CalendarDraft[]             @relation("CalendarDraftCreator")
   confirmedCalendarDrafts    CalendarDraft[]             @relation("CalendarDraftConfirmer")
   cancelledBookings          Booking[]                   @relation("BookingCancelledBy")
+  jobPosts                   JobPost[]                   @relation("ClientJobPosts")
   studioConfirmationRequests StudioConfirmationRequest[]
   legalAcceptances           LegalAcceptance[]
 }
@@ -412,6 +431,7 @@ model Style {
   updatedAt     DateTime              @updatedAt
   photographers PhotographerProfile[] @relation("PhotographerStyles")
   bookings      Booking[]
+  jobPosts      JobPost[]
 }
 
 model EditorTag {
@@ -458,6 +478,7 @@ model PhotographerProfile {
   bookingLeads            BookingLead[]
   telegramConnectionCodes TelegramConnectionCode[]
   services                PhotographerService[]
+  jobResponses            JobResponse[]
 }
 
 model PhotographerService {
@@ -797,6 +818,51 @@ model Booking {
   @@index([studioId, status])
   @@index([paymentStatus, createdAt])
   @@index([source, createdAt])
+}
+
+model JobPost {
+  id          String        @id @default(cuid())
+  clientId    String
+  title       String
+  description String
+  city        String
+  date        DateTime
+  startTime   String
+  durationHours Int
+  budget      Int
+  styleId     String?
+  status      JobPostStatus @default(PUBLISHED)
+  publishedAt DateTime       @default(now())
+  expiresAt   DateTime
+  selectedAt  DateTime?
+  closedAt    DateTime?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  client      User           @relation("ClientJobPosts", fields: [clientId], references: [id], onDelete: Cascade)
+  style       Style?         @relation(fields: [styleId], references: [id], onDelete: SetNull)
+  responses   JobResponse[]
+
+  @@index([status, expiresAt, publishedAt])
+  @@index([city, date, status])
+  @@index([clientId, createdAt])
+  @@index([styleId, status])
+}
+
+model JobResponse {
+  id             String            @id @default(cuid())
+  jobPostId      String
+  photographerId String
+  message        String
+  quotedPrice    Int
+  status         JobResponseStatus @default(PENDING)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  jobPost        JobPost           @relation(fields: [jobPostId], references: [id], onDelete: Cascade)
+  photographer   PhotographerProfile @relation(fields: [photographerId], references: [id], onDelete: Cascade)
+
+  @@unique([jobPostId, photographerId])
+  @@index([photographerId, status, createdAt])
+  @@index([jobPostId, status, createdAt])
 }
 
 model StudioConfirmationRequest {
