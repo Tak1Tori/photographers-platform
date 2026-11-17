@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { SlidersHorizontal } from "lucide-react";
+import { ChevronDown, SlidersHorizontal } from "lucide-react";
 import type { ReactNode } from "react";
 import type { PhotoStyle } from "@/lib/types";
 
@@ -31,16 +31,22 @@ export function JobPostFilters({ styles }: { styles: PhotoStyle[] }) {
           <input className={inputClass} type="date" value={searchParams.get("date") ?? ""} onChange={(event) => update("date", event.currentTarget.value)} />
         </Filter>
         <Filter label="Стиль">
-          <select className={inputClass} value={searchParams.get("style") ?? ""} onChange={(event) => update("style", event.currentTarget.value)}>
-            <option value="">Все направления</option>
-            {styles.map((style) => <option key={style.id} value={style.id}>{style.title}</option>)}
-          </select>
+          <span className="relative block">
+            <select className={`${inputClass} appearance-none pr-10`} value={searchParams.get("style") ?? ""} onChange={(event) => update("style", event.currentTarget.value)}>
+              <option value="">Все направления</option>
+              {styles.map((style) => <option key={style.id} value={style.id}>{style.title}</option>)}
+            </select>
+            <ChevronDown className="pointer-events-none absolute right-3.5 top-1/2 size-4 -translate-y-1/2" aria-hidden="true" />
+          </span>
         </Filter>
         <Filter label="Бюджет до">
-          <select className={inputClass} value={searchParams.get("budget") ?? ""} onChange={(event) => update("budget", event.currentTarget.value)}>
-            <option value="">Неважно</option>
-            {[20_000, 40_000, 70_000, 120_000, 200_000].map((value) => <option key={value} value={value}>{new Intl.NumberFormat("ru-RU").format(value)} ₸</option>)}
-          </select>
+          <span className="relative block">
+            <select className={`${inputClass} appearance-none pr-10`} value={searchParams.get("budget") ?? ""} onChange={(event) => update("budget", event.currentTarget.value)}>
+              <option value="">Неважно</option>
+              {[20_000, 40_000, 70_000, 120_000, 200_000].map((value) => <option key={value} value={value}>{new Intl.NumberFormat("ru-RU").format(value)} ₸</option>)}
+            </select>
+            <ChevronDown className="pointer-events-none absolute right-3.5 top-1/2 size-4 -translate-y-1/2" aria-hidden="true" />
+          </span>
         </Filter>
       </div>
     </aside>
